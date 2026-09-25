@@ -20,3 +20,13 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/

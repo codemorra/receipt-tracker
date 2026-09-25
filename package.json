@@ -1,0 +1,18 @@
+{
+  "name": "receipt-tracker-tooling",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "typecheck": "npm --prefix frontend run typecheck && npm --prefix backend run typecheck",
+    "lint": "npm --prefix frontend run lint && npm --prefix backend run lint",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build",
+    "format": "prettier --write \"{frontend,backend}/**/*.{ts,tsx,js,json,css,html}\" python-worker/README.md package.json",
+    "format:check": "prettier --check \"{frontend,backend}/**/*.{ts,tsx,js,json,css,html}\" python-worker/README.md package.json",
+    "check": "npm run typecheck && npm run lint && npm run build && npm run format:check"
+  },
+  "devDependencies": {
+    "prettier": "3.9.9"
+  }
+}
