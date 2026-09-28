@@ -44,6 +44,7 @@ export class PythonWorkerClient {
   constructor(
     private readonly command: string,
     private readonly args: string[],
+    private readonly cwd?: string,
   ) {}
 
   // Starts the Python worker process and initializes the client.
@@ -58,7 +59,10 @@ export class PythonWorkerClient {
       this.readyResolve = resolve;
       this.readyReject = reject;
       try {
-        const child = spawn(this.command, this.args, { stdio: "pipe" });
+        const child = spawn(this.command, this.args, {
+          stdio: "pipe",
+          cwd: this.cwd,
+        });
         this.process = child;
         child.stdout.setEncoding("utf8");
         child.stdout.on("data", (chunk: string) => this.onOutput(chunk));

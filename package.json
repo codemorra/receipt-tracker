@@ -8,8 +8,8 @@
     "typecheck": "npm --prefix frontend run typecheck && npm --prefix backend run typecheck",
     "lint": "npm --prefix frontend run lint && npm --prefix backend run lint",
     "build": "npm --prefix frontend run build && npm --prefix backend run build",
-    "format": "prettier --write \"{frontend,backend}/**/*.{ts,tsx,js,json,css,html}\" python-worker/README.md package.json",
-    "format:check": "prettier --check \"{frontend,backend}/**/*.{ts,tsx,js,json,css,html}\" python-worker/README.md package.json",
+    "format": "prettier --write \"{frontend,backend}/**/*.{ts,tsx,js,json,css,html}\" python_worker/README.md package.json",
+    "format:check": "prettier --check \"{frontend,backend}/**/*.{ts,tsx,js,json,css,html}\" python_worker/README.md package.json",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run format:check",
     "test": "npm --prefix backend run test"
   },

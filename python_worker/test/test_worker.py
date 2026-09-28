@@ -19,11 +19,12 @@ def run_worker(requests):
         subprocess.CompletedProcess: The result of running the worker.
     """
     return subprocess.run(
-        [sys.executable, str(WORKER_DIRECTORY / "worker.py")],
+        [sys.executable, "-m", "python_worker.worker"],
         input="".join(json.dumps(request) + "\n" for request in requests),
         text=True,
         capture_output=True,
         check=True,
+        cwd=WORKER_DIRECTORY.parent,
     )
 
 

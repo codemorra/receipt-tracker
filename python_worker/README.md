@@ -2,10 +2,10 @@
 
 Use Python 3.12. Create the local environment and install dependencies with:
 
-    python3.12 -m venv python-worker/.venv
-    python-worker/.venv/bin/python -m pip install -r python-worker/requirements.txt
+    python3.12 -m venv python_worker/.venv
+    python_worker/.venv/bin/python -m pip install -r python_worker/requirements.txt
 
-Start the worker with `python-worker/.venv/bin/python python-worker/worker.py`.
+Start the worker from the repository root with `python_worker/.venv/bin/python -m python_worker.worker`.
 It stays alive and reads one JSON request per line from stdin. Stdout contains only JSONL protocol messages; diagnostics go to stderr.
 
 The first stdout message is {"type":"ready"}. A preview request looks like:
@@ -19,4 +19,4 @@ If OpenCV is unavailable or no convincing contour is found, the worker suggests 
 
 Run the worker tests with:
 
-    python-worker/.venv/bin/python -m pytest python-worker/test
+    python_worker/.venv/bin/python -m pytest python_worker/test
