@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { resolve } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -50,4 +52,24 @@ test("unexpected worker exit enters failed state and rejects requests", async ()
     worker.requestPreview("10", "preview.webp"),
     WorkerUnavailableError,
   );
+});
+
+// Test for the Python worker client starting in the configured working directory.
+test("worker starts in the configured working directory", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "receipt-worker-cwd-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const script = `
+    if (process.cwd() !== ${JSON.stringify(directory)}) process.exit(2);
+    process.stdout.write(JSON.stringify({ type: "ready" }) + "\\n");
+    process.stdin.resume();
+  `;
+  const worker = new PythonWorkerClient(
+    process.execPath,
+    ["-e", script],
+    directory,
+  );
+  t.after(() => worker.stop());
+
+  await worker.start();
+  assert.equal(worker.state, "ready");
 });

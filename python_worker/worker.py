@@ -2,7 +2,7 @@ import json
 import sys
 import traceback
 
-from preview import create_preview
+from .preview import create_preview
 
 
 def send(message):

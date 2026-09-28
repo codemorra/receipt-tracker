@@ -1,12 +1,7 @@
-import sys
-from pathlib import Path
-
 import pytest
 from PIL import Image, ImageDraw
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from final_image import create_final_images
+from python_worker.final_image import create_final_images
 
 
 def test_final_images_use_the_oriented_original_and_keep_separate_outputs(tmp_path):
