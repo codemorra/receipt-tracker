@@ -1,6 +1,6 @@
 # Receipt Tracker
 
-> This project is my upcoming final project for a software development bootcamp. Development is scheduled to begin on September 28, 2026.
+> This project is my final project for a software development bootcamp and is currently under active development.
 
 Receipt Tracker is an application for digitizing, organizing, and analyzing receipts.
 
@@ -86,9 +86,9 @@ Aliases allow the application to learn confirmed receipt labels over time and au
 
 ## Project Status
 
-The project is currently in the planning phase. Development is scheduled to begin on September 28, 2026.
+The project is currently under active development.
 
-The first development phase focuses on implementing the complete vertical receipt import workflow:
+Development focuses first on implementing the complete receipt import workflow:
 
 ```text
 Image Upload
