@@ -29,7 +29,7 @@ def run_worker(requests):
 
 def test_protocol_keeps_worker_alive_after_failed_request(tmp_path):
     """Test that the worker remains alive after a failed request.
-    
+
     Args:
         tmp_path (Path): A temporary directory provided by pytest.
     """
@@ -55,7 +55,7 @@ def test_protocol_keeps_worker_alive_after_failed_request(tmp_path):
 
 def test_orientation_and_normalized_corners(tmp_path):
     """Test that the worker correctly handles image orientation and returns normalized corners.
-    
+
     Args:
         tmp_path (Path): A temporary directory provided by pytest.
     """
@@ -80,7 +80,7 @@ def test_orientation_and_normalized_corners(tmp_path):
 
 def test_detects_a_clear_receipt_outline(tmp_path):
     """Test that the worker can detect a clear receipt outline.
-    
+
     Args:
         tmp_path (Path): A temporary directory provided by pytest.
     """
