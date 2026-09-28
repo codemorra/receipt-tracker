@@ -1,6 +1,6 @@
 {
   "heading": "Receipt Tracker",
-  "intro": "Upload a receipt image and review its frame.",
+  "intro": "Upload a receipt image, check its frame, and recognize its text.",
   "languageLabel": "Choose language",
   "german": "German",
   "english": "English",
@@ -26,6 +26,16 @@
     "workerUnavailable": "Image processing is unavailable right now. Try again later.",
     "uploadFailed": "The preview could not be created. Try again.",
     "network": "The server cannot be reached. Check your connection and try again.",
-    "previewUnavailable": "The preview image could not be loaded."
-  }
+    "previewUnavailable": "The preview image could not be loaded.",
+    "invalidCorners": "The corners do not form a valid receipt frame. Adjust them and try again.",
+    "scanNotFound": "The preview is no longer available. Upload the image again.",
+    "processingFailed": "The receipt could not be processed. Check the frame and try again.",
+    "archiveUnavailable": "The processed receipt image could not be loaded."
+  },
+  "processReceipt": "Process receipt",
+  "processing": "Processing receipt…",
+  "resultHeading": "Processed receipt",
+  "archiveAlt": "Cropped archive image of the receipt",
+  "ocrHeading": "Recognized text",
+  "noOcrText": "No text was recognized on this receipt."
 }
