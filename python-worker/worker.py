@@ -53,7 +53,7 @@ def main():
             if isinstance(request, dict):
                 request_id = request.get("requestId")
             send(handle_request(request))
-        except OSError as error:
+        except (OSError, ValueError, TypeError) as error:
             traceback.print_exc(file=sys.stderr)
             send({"requestId": request_id, "status": "error", "error": str(error)})
 

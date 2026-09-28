@@ -100,9 +100,15 @@ def test_detects_a_clear_receipt_outline(tmp_path):
 
 def test_invalid_message_returns_an_error_with_request_id():
     """Test that the worker returns an error with the correct request ID for an invalid message."""
-    result = run_worker([{"requestId": "wrong", "type": "unknown"}])
-    assert json.loads(result.stdout.splitlines()[1]) == {
+    result = run_worker([{"requestId": "wrong", "type": "unknown"}, []])
+    messages = [json.loads(line) for line in result.stdout.splitlines()]
+    assert messages[1] == {
         "requestId": "wrong",
         "status": "error",
         "error": "Unsupported request type",
+    }
+    assert messages[2] == {
+        "requestId": None,
+        "status": "error",
+        "error": "Request must be an object",
     }
