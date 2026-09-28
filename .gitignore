@@ -24,6 +24,7 @@ Thumbs.db
 # Dependencies and build output
 node_modules/
 dist/
+/data/
 *.tsbuildinfo
 *.sqlite
 *.sqlite-shm
