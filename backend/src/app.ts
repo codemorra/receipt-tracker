@@ -4,6 +4,7 @@ import {
   WorkerUnavailableError,
 } from "./worker/python-worker-client.js";
 import {
+  InvalidCornersError,
   InvalidUploadError,
   MAX_UPLOAD_BYTES,
   ScanSessionService,
@@ -66,6 +67,52 @@ export function createApp(scans: ScanSessionService) {
     }
   });
 
+  // Scan processing endpoint
+  app.post(
+    "/api/scans/:scanId/process",
+    express.json({ limit: "16kb" }),
+    async (request, response) => {
+      try {
+        const result = await scans.process(
+          request.params.scanId,
+          request.body?.corners,
+        );
+        if (!result) {
+          response.status(404).json({ error: "scan_not_found" });
+          return;
+        }
+        response.json(result);
+      } catch (error) {
+        if (error instanceof InvalidCornersError) {
+          response.status(400).json({ error: "invalid_corners" });
+        } else if (error instanceof WorkerUnavailableError) {
+          response.status(503).json({ error: "worker_unavailable" });
+        } else if (error instanceof WorkerRequestError) {
+          response.status(422).json({ error: "processing_failed" });
+        } else {
+          console.error("Scan processing failed", error);
+          response.status(500).json({ error: "scan_failed" });
+        }
+      }
+    },
+  );
+
+  // Scan archive endpoint
+  app.get("/api/scans/:scanId/archive", async (request, response) => {
+    try {
+      const archivePath = await scans.archivePath(request.params.scanId);
+      if (!archivePath) {
+        response.status(404).json({ error: "scan_not_found" });
+        return;
+      }
+      response.type("image/webp").sendFile(archivePath);
+    } catch (error) {
+      console.error("Scan archive failed", error);
+      response.status(500).json({ error: "scan_failed" });
+    }
+  });
+
+  // Global error handler
   const handleError: ErrorRequestHandler = (
     error,
     _request,
@@ -83,6 +130,15 @@ export function createApp(scans: ScanSessionService) {
       error.status === 413
     ) {
       response.status(413).json({ error: "upload_too_large" });
+      return;
+    }
+    if (
+      error &&
+      typeof error === "object" &&
+      "status" in error &&
+      error.status === 400
+    ) {
+      response.status(400).json({ error: "invalid_request" });
       return;
     }
     console.error("Request failed", error);

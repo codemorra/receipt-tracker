@@ -16,6 +16,12 @@ The first stdout message is {"type":"ready"} after PaddleOCR initializes success
 
 The response includes the same requestId, status, preview dimensions, and suggestedCorners. Corners are named topLeft, topRight, bottomRight, and bottomLeft; each is an [x, y] pair normalized to 0–1. Coordinates refer to the orientation-corrected preview and can be applied to the original after the same EXIF orientation correction. Errors return status "error" and an error message. Invalid requests do not stop the worker.
 
+A final processing request uses the original image and confirmed normalized corners:
+
+    {"requestId":"example-2","type":"process","originalPath":"/path/to/original.jpg","archivePath":"/path/to/archive.webp","ocrPath":"/path/to/ocr.webp","corners":{"topLeft":[0,0],"topRight":[1,0],"bottomRight":[1,1],"bottomLeft":[0,1]}}
+
+Its response contains `width`, `height`, `plainText`, and ordered `lines` with `index`, `text`, `confidence`, and normalized `box` coordinates. The backend exposes this through `POST /api/scans/:scanId/process` with a JSON body containing `corners`; the response includes an `archiveUrl` for the processed image.
+
 The worker uses Pillow for EXIF correction, gentle brightness and contrast adjustment, and WebP output. OpenCV provides optional corner suggestions.
 If OpenCV is unavailable or no convincing contour is found, the worker suggests an inset frame that the user can adjust.
 

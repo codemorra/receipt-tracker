@@ -18,13 +18,29 @@ export interface PreviewResult {
   suggestedCorners: Corners;
 }
 
+// Interface representing a single line of OCR result from the Python worker.
+export interface OcrLine {
+  index: number;
+  text: string;
+  confidence: number;
+  box: [number, number, number, number];
+}
+
+// Result of a process request from the Python worker.
+export interface ProcessResult {
+  width: number;
+  height: number;
+  plainText: string;
+  lines: OcrLine[];
+}
+
 export class WorkerUnavailableError extends Error {}
 export class WorkerRequestError extends Error {}
 
 // Interface for a pending request to the Python worker.
 interface PendingRequest {
   requestId: string;
-  resolve: (result: PreviewResult) => void;
+  complete: (value: Record<string, unknown>) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
 }
@@ -86,14 +102,49 @@ export class PythonWorkerClient {
     });
   }
 
-  // Sends a preview request to the Python worker.
   requestPreview(
     originalPath: string,
     previewPath: string,
   ): Promise<PreviewResult> {
-    const result = this.queue.then(() =>
-      this.sendPreview(originalPath, previewPath),
+    return this.enqueue(() =>
+      this.sendRequest(
+        { type: "preview", originalPath, previewPath },
+        (value) =>
+          isPreviewResult(value)
+            ? {
+                width: value.width,
+                height: value.height,
+                suggestedCorners: value.suggestedCorners,
+              }
+            : undefined,
+      ),
     );
+  }
+
+  requestProcess(
+    originalPath: string,
+    corners: Corners,
+    archivePath: string,
+    ocrPath: string,
+  ): Promise<ProcessResult> {
+    return this.enqueue(() =>
+      this.sendRequest(
+        { type: "process", originalPath, corners, archivePath, ocrPath },
+        (value) =>
+          isProcessResult(value)
+            ? {
+                width: value.width,
+                height: value.height,
+                plainText: value.plainText,
+                lines: value.lines,
+              }
+            : undefined,
+      ),
+    );
+  }
+
+  private enqueue<T>(send: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(send);
     this.queue = result.then(
       () => undefined,
       () => undefined,
@@ -109,11 +160,10 @@ export class PythonWorkerClient {
     this.process?.kill();
   }
 
-  // Sends a preview request to the Python worker (internal method).
-  private sendPreview(
-    originalPath: string,
-    previewPath: string,
-  ): Promise<PreviewResult> {
+  private sendRequest<T>(
+    request: Record<string, unknown>,
+    parse: (value: Record<string, unknown>) => T | undefined,
+  ): Promise<T> {
     if (this.state !== "ready" || !this.process) {
       return Promise.reject(
         new WorkerUnavailableError("Worker is unavailable"),
@@ -121,18 +171,22 @@ export class PythonWorkerClient {
     }
 
     const requestId = randomUUID();
-    return new Promise<PreviewResult>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.fail(new WorkerUnavailableError("Worker request timed out"));
       }, 60_000);
-      this.pending = { requestId, resolve, reject, timeout };
+      this.pending = {
+        requestId,
+        complete: (value) => {
+          const result = parse(value);
+          if (result === undefined) throw new Error("Invalid worker response");
+          resolve(result);
+        },
+        reject,
+        timeout,
+      };
       this.process!.stdin.write(
-        JSON.stringify({
-          requestId,
-          type: "preview",
-          originalPath,
-          previewPath,
-        }) + "\n",
+        JSON.stringify({ requestId, ...request }) + "\n",
         (error) => {
           if (error) this.fail(error);
         },
@@ -187,22 +241,21 @@ export class PythonWorkerClient {
     this.pending = undefined;
     if (value.status === "error") {
       pending.reject(
-        new WorkerRequestError(String(value.error ?? "Preview failed")),
+        new WorkerRequestError(String(value.error ?? "Worker request failed")),
       );
       return;
     }
-    if (value.status !== "ok" || !isPreviewResult(value)) {
-      this.fail(new Error("Invalid worker preview response"));
-      pending.reject(
-        new WorkerUnavailableError("Invalid worker preview response"),
-      );
+    if (value.status !== "ok") {
+      pending.reject(new WorkerUnavailableError("Invalid worker response"));
+      this.fail(new Error("Invalid worker response"));
       return;
     }
-    pending.resolve({
-      width: value.width,
-      height: value.height,
-      suggestedCorners: value.suggestedCorners,
-    });
+    try {
+      pending.complete(value);
+    } catch (error) {
+      pending.reject(new WorkerUnavailableError("Invalid worker response"));
+      this.fail(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
   // Handles failure of the Python worker, cleaning up state and rejecting outstanding requests.
@@ -252,6 +305,44 @@ function isPreviewResult(
         (coordinate) =>
           typeof coordinate === "number" && coordinate >= 0 && coordinate <= 1,
       )
+    );
+  });
+}
+
+/**
+ * Type guard to check if a value is a valid process result from the Python worker.
+ * @param value - The value to check.
+ * @returns True if the value is a valid process result, false otherwise.
+ */
+function isProcessResult(
+  value: Record<string, unknown>,
+): value is Record<string, unknown> & ProcessResult {
+  if (!Number.isInteger(value.width) || !Number.isInteger(value.height))
+    return false;
+  if ((value.width as number) <= 0 || (value.height as number) <= 0)
+    return false;
+  if (typeof value.plainText !== "string" || !Array.isArray(value.lines))
+    return false;
+  return value.lines.every((line: unknown, index: number) => {
+    if (!line || typeof line !== "object") return false;
+    const item = line as Record<string, unknown>;
+    if (
+      item.index !== index ||
+      typeof item.text !== "string" ||
+      typeof item.confidence !== "number" ||
+      !Number.isFinite(item.confidence) ||
+      item.confidence < 0 ||
+      item.confidence > 1 ||
+      !Array.isArray(item.box) ||
+      item.box.length !== 4
+    )
+      return false;
+    return item.box.every(
+      (coordinate: unknown) =>
+        typeof coordinate === "number" &&
+        Number.isFinite(coordinate) &&
+        coordinate >= 0 &&
+        coordinate <= 1,
     );
   });
 }

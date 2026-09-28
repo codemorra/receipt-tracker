@@ -3,7 +3,8 @@ import os
 import sys
 import traceback
 
-from .ocr import initialize_ocr
+from .final_image import create_final_images
+from .ocr import initialize_ocr, recognize_image
 from .preview import create_preview
 
 
@@ -32,14 +33,27 @@ def handle_request(request):
     request_id = request.get("requestId")
     if not isinstance(request_id, str) or not request_id:
         raise ValueError("requestId must be a non-empty string")
-    if request.get("type") != "preview":
+    if request.get("type") not in ("preview", "process"):
         raise ValueError("Unsupported request type")
     if not isinstance(request.get("originalPath"), str) or not request["originalPath"]:
         raise ValueError("originalPath must be a non-empty string")
-    if not isinstance(request.get("previewPath"), str) or not request["previewPath"]:
-        raise ValueError("previewPath must be a non-empty string")
 
-    result = create_preview(request["originalPath"], request["previewPath"])
+    if request.get("type") == "preview":
+        if not isinstance(request.get("previewPath"), str) or not request["previewPath"]:
+            raise ValueError("previewPath must be a non-empty string")
+        result = create_preview(request["originalPath"], request["previewPath"])
+    else:
+        for name in ("archivePath", "ocrPath"):
+            if not isinstance(request.get(name), str) or not request[name]:
+                raise ValueError(f"{name} must be a non-empty string")
+        result = create_final_images(
+            request["originalPath"],
+            request.get("corners"),
+            request["archivePath"],
+            request["ocrPath"],
+        )
+        result.update(recognize_image(initialize_ocr(), request["ocrPath"]))
+
     return {"requestId": request_id, "status": "ok", **result}
 
 
@@ -62,7 +76,7 @@ def main():
             if isinstance(request, dict):
                 request_id = request.get("requestId")
             send(handle_request(request), protocol_output)
-        except (OSError, ValueError, TypeError) as error:
+        except (OSError, ValueError, TypeError, RuntimeError) as error:
             traceback.print_exc(file=sys.stderr)
             send({"requestId": request_id, "status": "error", "error": str(error)}, protocol_output)
     return 0

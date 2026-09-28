@@ -30,6 +30,25 @@ test("worker waits for ready and maps sequenced responses by requestId", async (
   assert.equal(second.width, 20);
   assert.deepEqual(first.suggestedCorners.topLeft, [0, 0]);
 
+  const processed = await worker.requestProcess(
+    "receipt.png",
+    {
+      topLeft: [0, 0],
+      topRight: [1, 0],
+      bottomRight: [1, 1],
+      bottomLeft: [0, 1],
+    },
+    "archive.webp",
+    "ocr.webp",
+  );
+  assert.equal(processed.plainText, "RECEIPT");
+  assert.deepEqual(processed.lines[0], {
+    index: 0,
+    text: "RECEIPT",
+    confidence: 0.95,
+    box: [0, 0, 1, 1],
+  });
+
   worker.stop();
   assert.equal(worker.state, "stopped");
   await assert.rejects(

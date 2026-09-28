@@ -1,4 +1,7 @@
 import os
+from types import SimpleNamespace
+
+from PIL import Image
 
 
 class PaddleOCR:
@@ -25,3 +28,17 @@ class PaddleOCR:
             raise ValueError("Unexpected PaddleOCR configuration")
         print("PaddleOCR initialized")
         os.write(1, b"Native OCR initialization log\n")
+
+    def predict(self, path):
+        """Mock predict method for the PaddleOCR class."""
+        if os.environ.get("OCR_TEST_FAIL_PREDICT"):
+            raise RuntimeError("OCR prediction failed")
+        with Image.open(path) as image:
+            width, height = image.size
+        print("PaddleOCR predicted")
+        os.write(1, b"Native OCR prediction log\n")
+        return [SimpleNamespace(json={"res": {
+            "rec_texts": ["RECEIPT"],
+            "rec_scores": [0.95],
+            "rec_boxes": [[0, 0, width, height]],
+        }})]
