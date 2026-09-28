@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,12 @@ def run_worker(requests):
     Returns:
         subprocess.CompletedProcess: The result of running the worker.
     """
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join([
+        str(WORKER_DIRECTORY / "test" / "fixtures"),
+        str(WORKER_DIRECTORY.parent),
+        environment.get("PYTHONPATH", ""),
+    ])
     return subprocess.run(
         [sys.executable, "-m", "python_worker.worker"],
         input="".join(json.dumps(request) + "\n" for request in requests),
@@ -25,6 +32,7 @@ def run_worker(requests):
         capture_output=True,
         check=True,
         cwd=WORKER_DIRECTORY.parent,
+        env=environment,
     )
 
 
@@ -52,6 +60,8 @@ def test_protocol_keeps_worker_alive_after_failed_request(tmp_path):
     with Image.open(preview) as image:
         assert image.format == "WEBP"
     assert "Traceback" in result.stderr
+    assert result.stderr.count("PaddleOCR initialized") == 1
+    assert result.stderr.count("Native OCR initialization log") == 1
 
 
 def test_orientation_and_normalized_corners(tmp_path):
@@ -113,3 +123,25 @@ def test_invalid_message_returns_an_error_with_request_id():
         "status": "error",
         "error": "Request must be an object",
     }
+
+
+def test_hpi_startup_failure_has_no_ready_message():
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join([
+        str(WORKER_DIRECTORY / "test" / "fixtures"),
+        str(WORKER_DIRECTORY.parent),
+    ])
+    environment["OCR_TEST_FAIL_START"] = "1"
+    result = subprocess.run(
+        [sys.executable, "-m", "python_worker.worker"],
+        text=True,
+        capture_output=True,
+        cwd=WORKER_DIRECTORY.parent,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "Traceback" in result.stderr
+    assert "HPI dependencies unavailable" in result.stderr

@@ -1,8 +1,10 @@
 iniconfig==2.3.0
-numpy==2.5.3
-opencv-python-headless==5.0.0.93
+numpy==2.3.5
+opencv-contrib-python==4.10.0.84
 packaging==26.3
 pillow==12.3.0
 pluggy==1.6.0
 Pygments==2.21.0
 pytest==9.1.1
+paddleocr==3.7.0
+paddlepaddle==3.2.2

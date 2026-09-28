@@ -1,18 +1,21 @@
 import json
+import os
 import sys
 import traceback
 
+from .ocr import initialize_ocr
 from .preview import create_preview
 
 
-def send(message):
-    """Sends a message to the standard output as a JSON string.
+def send(message, output):
+    """Send a message to the specified output stream.
 
     Args:
         message (dict): The message to send.
+        output: The output stream to write the message to.
     """
-    sys.stdout.write(json.dumps(message, separators=(",", ":")) + "\n")
-    sys.stdout.flush()
+    output.write(json.dumps(message, separators=(",", ":")) + "\n")
+    output.flush()
 
 
 def handle_request(request):
@@ -45,18 +48,25 @@ def main():
 
     Reads requests from the standard input, handles them, and sends responses to the standard output.
     """
-    send({"type": "ready"})
+    protocol_output = os.fdopen(os.dup(sys.stdout.fileno()), "w", encoding="utf-8")
+    sys.stdout.flush()
+    os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
+
+    initialize_ocr()
+
+    send({"type": "ready"}, protocol_output)
     for line in sys.stdin:
         request_id = None
         try:
             request = json.loads(line)
             if isinstance(request, dict):
                 request_id = request.get("requestId")
-            send(handle_request(request))
+            send(handle_request(request), protocol_output)
         except (OSError, ValueError, TypeError) as error:
             traceback.print_exc(file=sys.stderr)
-            send({"requestId": request_id, "status": "error", "error": str(error)})
+            send({"requestId": request_id, "status": "error", "error": str(error)}, protocol_output)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
