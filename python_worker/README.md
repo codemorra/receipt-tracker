@@ -3,12 +3,14 @@
 Use Python 3.12. Create the local environment and install dependencies with:
 
     python3.12 -m venv python_worker/.venv
-    python_worker/.venv/bin/python -m pip install -r python_worker/requirements.txt
+    source python_worker/.venv/bin/activate
+    python -m pip install -r python_worker/requirements.txt
+    paddleocr install_hpi_deps cpu
 
 Start the worker from the repository root with `python_worker/.venv/bin/python -m python_worker.worker`.
 It stays alive and reads one JSON request per line from stdin. Stdout contains only JSONL protocol messages; diagnostics go to stderr.
 
-The first stdout message is {"type":"ready"}. A preview request looks like:
+The first stdout message is {"type":"ready"} after PaddleOCR initializes successfully. If HPI initialization fails, the worker exits with an error on stderr and does not send ready. A preview request looks like:
 
     {"requestId":"example-1","type":"preview","originalPath":"/path/to/original.jpg","previewPath":"/path/to/preview.webp"}
 
@@ -20,3 +22,7 @@ If OpenCV is unavailable or no convincing contour is found, the worker suggests 
 Run the worker tests with:
 
     python_worker/.venv/bin/python -m pytest python_worker/test
+
+The worker tests use a local PaddleOCR substitute and do not download OCR models.
+
+PaddleOCR is initialized once per worker process with PP-OCRv6 medium detection and recognition, German language, CPU HPI, and MKL-DNN. The OCR result includes plain text and ordered lines with confidence and normalized bounding boxes.
