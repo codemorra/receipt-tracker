@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { WorkerUnavailableError } from "../src/worker/python-worker-client.js";
+import {
+  WorkerRequestError,
+  WorkerUnavailableError,
+} from "../src/worker/python-worker-client.js";
 import {
   isScanId,
   MAX_UPLOAD_BYTES,
@@ -27,6 +31,30 @@ function previewWorker() {
     async requestPreview(_originalPath: string, previewPath: string) {
       await writeFile(previewPath, "preview");
       return { width: 100, height: 200, suggestedCorners };
+    },
+    async requestProcess(
+      originalPath: string,
+      corners: typeof suggestedCorners,
+      archivePath: string,
+      ocrPath: string,
+    ) {
+      assert.ok(originalPath.endsWith("original.png"));
+      assert.deepEqual(corners, suggestedCorners);
+      await writeFile(archivePath, "archive");
+      await writeFile(ocrPath, "ocr");
+      return {
+        width: 100,
+        height: 200,
+        plainText: "RECEIPT",
+        lines: [
+          {
+            index: 0,
+            text: "RECEIPT",
+            confidence: 0.95,
+            box: [0, 0, 1, 1] as [number, number, number, number],
+          },
+        ],
+      };
     },
   };
 }
@@ -80,6 +108,9 @@ test("failed preview processing removes the temporary session", async (t) => {
     async requestPreview() {
       throw new WorkerUnavailableError("stopped");
     },
+    async requestProcess() {
+      throw new WorkerUnavailableError("stopped");
+    },
   });
 
   await assert.rejects(
@@ -112,6 +143,38 @@ test("scan API creates a session and serves its preview", async (t) => {
   assert.equal(preview.headers.get("content-type"), "image/webp");
   assert.equal(await preview.text(), "preview");
 
+  const processed = await fetch(base + `/api/scans/${scan.scanId}/process`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ corners: suggestedCorners }),
+  });
+  assert.equal(processed.status, 200);
+  const result = await processed.json();
+  assert.equal(result.plainText, "RECEIPT");
+  assert.equal(result.lines[0].index, 0);
+  const archive = await fetch(base + result.archiveUrl);
+  assert.equal(archive.status, 200);
+  assert.equal(archive.headers.get("content-type"), "image/webp");
+  assert.equal(await archive.text(), "archive");
+
+  const invalidCorners = await fetch(
+    base + `/api/scans/${scan.scanId}/process`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ corners: { topLeft: [0, 0] } }),
+    },
+  );
+  assert.equal(invalidCorners.status, 400);
+  assert.equal((await invalidCorners.json()).error, "invalid_corners");
+
+  const missing = await fetch(base + `/api/scans/${randomUUID()}/process`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ corners: suggestedCorners }),
+  });
+  assert.equal(missing.status, 404);
+
   const invalid = await fetch(base + "/api/scans", {
     method: "POST",
     headers: { "content-type": "image/jpeg" },
@@ -119,4 +182,36 @@ test("scan API creates a session and serves its preview", async (t) => {
   });
   assert.equal(invalid.status, 400);
   assert.equal((await invalid.json()).error, "invalid_upload");
+});
+
+// Test for failed reprocessing scenario
+test("failed reprocessing keeps the previous archive and removes temporary files", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "receipt-scans-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const service = new ScanSessionService(directory, previewWorker());
+  const scan = await service.create("image/png", png);
+  await service.process(scan.scanId, suggestedCorners);
+
+  const failing = new ScanSessionService(directory, {
+    ...previewWorker(),
+    async requestProcess(_originalPath, _corners, archivePath) {
+      await writeFile(archivePath, "incomplete");
+      throw new WorkerRequestError("OCR failed");
+    },
+  });
+  await assert.rejects(
+    failing.process(scan.scanId, suggestedCorners),
+    WorkerRequestError,
+  );
+  assert.equal(
+    await readFile(join(directory, scan.scanId, "archive.webp"), "utf8"),
+    "archive",
+  );
+  assert.deepEqual((await readdir(join(directory, scan.scanId))).sort(), [
+    "archive.webp",
+    "ocr.webp",
+    "original.png",
+    "preview.webp",
+    "session.json",
+  ]);
 });
