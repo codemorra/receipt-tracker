@@ -1,6 +1,6 @@
 {
   "heading": "Receipt Tracker",
-  "intro": "Belegbild hochladen und den Belegrahmen prüfen.",
+  "intro": "Belegbild hochladen, den Rahmen prüfen und Text erkennen.",
   "languageLabel": "Sprache wählen",
   "german": "Deutsch",
   "english": "Englisch",
@@ -26,6 +26,16 @@
     "workerUnavailable": "Die Bildverarbeitung ist momentan nicht verfügbar. Versuche es später erneut.",
     "uploadFailed": "Die Vorschau konnte nicht erstellt werden. Versuche es erneut.",
     "network": "Der Server ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
-    "previewUnavailable": "Das Vorschaubild konnte nicht geladen werden."
-  }
+    "previewUnavailable": "Das Vorschaubild konnte nicht geladen werden.",
+    "invalidCorners": "Die Ecken bilden keinen gültigen Belegrahmen. Passe sie an und versuche es erneut.",
+    "scanNotFound": "Die Vorschau ist nicht mehr verfügbar. Lade das Bild erneut hoch.",
+    "processingFailed": "Der Beleg konnte nicht verarbeitet werden. Prüfe den Rahmen und versuche es erneut.",
+    "archiveUnavailable": "Das verarbeitete Belegbild konnte nicht geladen werden."
+  },
+  "processReceipt": "Beleg verarbeiten",
+  "processing": "Beleg wird verarbeitet…",
+  "resultHeading": "Verarbeiteter Beleg",
+  "archiveAlt": "Zugeschnittenes Archivbild des Belegs",
+  "ocrHeading": "Erkannter Text",
+  "noOcrText": "Auf dem Beleg wurde kein Text erkannt."
 }

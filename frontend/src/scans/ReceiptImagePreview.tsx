@@ -20,6 +20,7 @@ interface Props {
   corners: Corners;
   onChange: (corners: Corners) => void;
   onImageError: () => void;
+  disabled?: boolean;
 }
 
 // ReceiptImagePreview component for displaying and adjusting receipt image corners.
@@ -30,6 +31,7 @@ function ReceiptImagePreview({
   corners,
   onChange,
   onImageError,
+  disabled = false,
 }: Props) {
   const { t } = useTranslation();
   const imageRef = useRef<HTMLImageElement>(null);
@@ -126,6 +128,7 @@ function ReceiptImagePreview({
         <button
           key={name}
           type="button"
+          disabled={disabled}
           aria-label={t("corners." + name)}
           aria-describedby="corner-instructions"
           onPointerDown={(event) => {
