@@ -1,7 +1,31 @@
 {
   "heading": "Receipt Tracker",
-  "intro": "The project foundation is ready.",
+  "intro": "Upload a receipt image and review its frame.",
   "languageLabel": "Choose language",
   "german": "German",
-  "english": "English"
+  "english": "English",
+  "uploadHeading": "Upload receipt",
+  "uploadHint": "JPEG, PNG, or WebP, up to 20 MB.",
+  "fileLabel": "Receipt image",
+  "createPreview": "Create preview",
+  "uploading": "Creating preview…",
+  "previewHeading": "Adjust receipt frame",
+  "previewInstructions": "Drag the four points onto the receipt corners. Use the arrow keys for fine adjustments; hold Shift for larger steps.",
+  "previewAlt": "Preview of the uploaded receipt",
+  "corners": {
+    "topLeft": "Top left corner",
+    "topRight": "Top right corner",
+    "bottomRight": "Bottom right corner",
+    "bottomLeft": "Bottom left corner"
+  },
+  "errors": {
+    "unsupportedType": "Please choose a JPEG, PNG, or WebP image.",
+    "tooLarge": "The image must be no larger than 20 MB.",
+    "invalidUpload": "The image could not be accepted. Check its type and contents.",
+    "invalidImage": "The image could not be processed. Choose another image.",
+    "workerUnavailable": "Image processing is unavailable right now. Try again later.",
+    "uploadFailed": "The preview could not be created. Try again.",
+    "network": "The server cannot be reached. Check your connection and try again.",
+    "previewUnavailable": "The preview image could not be loaded."
+  }
 }

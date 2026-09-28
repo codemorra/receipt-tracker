@@ -1,7 +1,31 @@
 {
   "heading": "Receipt Tracker",
-  "intro": "Die Projektgrundlage ist eingerichtet.",
+  "intro": "Belegbild hochladen und den Belegrahmen prüfen.",
   "languageLabel": "Sprache wählen",
   "german": "Deutsch",
-  "english": "Englisch"
+  "english": "Englisch",
+  "uploadHeading": "Beleg hochladen",
+  "uploadHint": "JPEG, PNG oder WebP, maximal 20 MB.",
+  "fileLabel": "Belegbild",
+  "createPreview": "Vorschau erstellen",
+  "uploading": "Vorschau wird erstellt…",
+  "previewHeading": "Belegrahmen anpassen",
+  "previewInstructions": "Ziehe die vier Punkte an die Belegecken. Mit den Pfeiltasten kannst du sie fein verschieben; mit Umschalt geht es schneller.",
+  "previewAlt": "Vorschau des hochgeladenen Belegs",
+  "corners": {
+    "topLeft": "Obere linke Ecke",
+    "topRight": "Obere rechte Ecke",
+    "bottomRight": "Untere rechte Ecke",
+    "bottomLeft": "Untere linke Ecke"
+  },
+  "errors": {
+    "unsupportedType": "Bitte wähle ein JPEG-, PNG- oder WebP-Bild.",
+    "tooLarge": "Das Bild darf höchstens 20 MB groß sein.",
+    "invalidUpload": "Das Bild konnte nicht angenommen werden. Prüfe Dateityp und Inhalt.",
+    "invalidImage": "Das Bild konnte nicht verarbeitet werden. Wähle ein anderes Bild.",
+    "workerUnavailable": "Die Bildverarbeitung ist momentan nicht verfügbar. Versuche es später erneut.",
+    "uploadFailed": "Die Vorschau konnte nicht erstellt werden. Versuche es erneut.",
+    "network": "Der Server ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
+    "previewUnavailable": "Das Vorschaubild konnte nicht geladen werden."
+  }
 }
