@@ -33,7 +33,7 @@ def suggested_corners(image):
             break
         perimeter = cv2.arcLength(contour, True)
         polygon = cv2.approxPolyDP(contour, perimeter * 0.025, True)
-        
+
         # Skip small contours that are unlikely to be the receipt.
         if len(polygon) != 4 or not cv2.isContourConvex(polygon):
             continue
@@ -53,7 +53,7 @@ def suggested_corners(image):
 
 def normalized_point(point, image):
     """Normalizes a point's coordinates relative to the image dimensions, clamping them between 0 and 1.
-    
+
     Args:
         point (list): A list of two floats representing the x and y coordinates of the point.
         image (PIL.Image.Image): The image to which the point belongs.
@@ -79,7 +79,7 @@ def default_corners():
 
 def create_preview(original_path, preview_path):
     """Creates a preview image from the original image, enhancing brightness and contrast, and suggesting receipt corners.
-    
+
     Args:
         original_path (str): The file path to the original image.
         preview_path (str): The file path where the preview image will be saved.
