@@ -8,6 +8,13 @@
       "when": 1790582066386,
       "tag": "0000_mushy_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790586307560,
+      "tag": "0001_seed-default-categories",
+      "breakpoints": true
     }
   ]
 }
