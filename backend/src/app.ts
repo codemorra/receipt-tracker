@@ -1,4 +1,14 @@
 import express, { type ErrorRequestHandler } from "express";
+import { ZodError } from "zod";
+import type { createDatabase } from "./db/database.js";
+import { loadExtractionReferenceData } from "./extraction/extraction-reference-data.js";
+import {
+  InvalidLlmResponseError,
+  OllamaRequestError,
+  OllamaUnavailableError,
+} from "./extraction/ollama-provider.js";
+import type { ReceiptExtractionProvider } from "./extraction/receipt-extraction-provider.js";
+import { createReceiptExtractionSchema } from "./extraction/receipt-extraction.js";
 import {
   WorkerRequestError,
   WorkerUnavailableError,
@@ -14,9 +24,15 @@ import {
  * Creates and configures an Express application.
  *
  * @param scans - The ScanSessionService instance used for handling scan sessions.
+ * @param db - The database instance used for data persistence.
+ * @param provider - The receipt extraction provider used for extracting receipt data.
  * @returns The configured Express application.
  */
-export function createApp(scans: ScanSessionService) {
+export function createApp(
+  scans: ScanSessionService,
+  db: ReturnType<typeof createDatabase>["db"],
+  provider: ReceiptExtractionProvider,
+) {
   const app = express();
 
   // Health check endpoint
@@ -81,7 +97,15 @@ export function createApp(scans: ScanSessionService) {
           response.status(404).json({ error: "scan_not_found" });
           return;
         }
-        response.json(result);
+        const { categoryNames } = loadExtractionReferenceData(db);
+        const extracted = await provider.extractReceipt({
+          plainText: result.plainText,
+          lines: result.lines,
+          categoryNames,
+        });
+        const extraction =
+          createReceiptExtractionSchema(categoryNames).parse(extracted);
+        response.json({ ...result, extraction });
       } catch (error) {
         if (error instanceof InvalidCornersError) {
           response.status(400).json({ error: "invalid_corners" });
@@ -89,6 +113,18 @@ export function createApp(scans: ScanSessionService) {
           response.status(503).json({ error: "worker_unavailable" });
         } else if (error instanceof WorkerRequestError) {
           response.status(422).json({ error: "processing_failed" });
+        } else if (error instanceof OllamaUnavailableError) {
+          console.error("Ollama unavailable", error);
+          response.status(503).json({ error: "ollama_unavailable" });
+        } else if (error instanceof OllamaRequestError) {
+          console.error("Ollama request failed", error);
+          response.status(502).json({ error: "ollama_failed" });
+        } else if (error instanceof InvalidLlmResponseError) {
+          console.error("Invalid Ollama response", error);
+          response.status(502).json({ error: "invalid_llm_response" });
+        } else if (error instanceof ZodError) {
+          console.error("Invalid receipt extraction", error);
+          response.status(502).json({ error: "invalid_extraction" });
         } else {
           console.error("Scan processing failed", error);
           response.status(500).json({ error: "scan_failed" });
