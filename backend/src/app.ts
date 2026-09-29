@@ -1,6 +1,9 @@
 import express, { type ErrorRequestHandler } from "express";
+import { isAbsolute, relative, resolve, sep } from "node:path";
+import { eq } from "drizzle-orm";
 import { ZodError } from "zod";
 import type { createDatabase } from "./db/database.js";
+import { receipts } from "./db/schema.js";
 import { loadExtractionReferenceData } from "./extraction/extraction-reference-data.js";
 import {
   InvalidLlmResponseError,
@@ -10,6 +13,13 @@ import {
 import type { ReceiptExtractionProvider } from "./extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "./extraction/receipt-extraction.js";
 import { createReviewDto } from "./review/review-dto.js";
+import {
+  listBrands,
+  listCategories,
+  listMerchants,
+  listProductGroups,
+  listProducts,
+} from "./review/review-lookups.js";
 import {
   WorkerRequestError,
   WorkerUnavailableError,
@@ -33,12 +43,92 @@ export function createApp(
   scans: ScanSessionService,
   db: ReturnType<typeof createDatabase>["db"],
   provider: ReceiptExtractionProvider,
+  dataRoot = resolve(process.cwd(), "../data"),
 ) {
   const app = express();
+  const receiptsRoot = resolve(dataRoot, "receipts");
 
   // Health check endpoint
   app.get("/health", (_request, response) => {
     response.json({ status: "ok" });
+  });
+
+  // Categories endpoint
+  app.get("/api/categories", (_request, response) => {
+    response.json(listCategories(db));
+  });
+
+  // Merchants endpoint
+  app.get("/api/merchants", (request, response) => {
+    const query =
+      typeof request.query.query === "string" ? request.query.query : "";
+    response.json(listMerchants(db, query));
+  });
+
+  // Brands endpoint
+  app.get("/api/brands", (request, response) => {
+    const query =
+      typeof request.query.query === "string" ? request.query.query : "";
+    response.json(listBrands(db, query));
+  });
+
+  // Product groups endpoint
+  app.get("/api/product-groups", (request, response) => {
+    const query =
+      typeof request.query.query === "string" ? request.query.query : "";
+    response.json(listProductGroups(db, query));
+  });
+
+  // Products endpoint
+  app.get("/api/products", (request, response) => {
+    const query =
+      typeof request.query.query === "string" ? request.query.query : "";
+    response.json(listProducts(db, query));
+  });
+
+  // Receipt image endpoint
+  app.get("/api/receipts/:receiptId/image", (request, response) => {
+    const receiptId = Number(request.params.receiptId);
+    if (!Number.isSafeInteger(receiptId) || receiptId <= 0) {
+      response.status(404).json({ error: "receipt_not_found" });
+      return;
+    }
+
+    const receipt = db
+      .select({ imagePath: receipts.imagePath })
+      .from(receipts)
+      .where(eq(receipts.id, receiptId))
+      .get();
+    if (!receipt || isAbsolute(receipt.imagePath)) {
+      response.status(404).json({ error: "receipt_not_found" });
+      return;
+    }
+
+    const imagePath = relative(
+      receiptsRoot,
+      resolve(dataRoot, receipt.imagePath),
+    );
+    if (
+      !imagePath ||
+      imagePath === ".." ||
+      imagePath.startsWith(`..${sep}`) ||
+      isAbsolute(imagePath)
+    ) {
+      response.status(404).json({ error: "receipt_not_found" });
+      return;
+    }
+
+    response
+      .type("image/webp")
+      .sendFile(imagePath, { root: receiptsRoot }, (error) => {
+        if (!error || response.headersSent) return;
+        if ("status" in error && error.status === 404) {
+          response.status(404).json({ error: "receipt_image_not_found" });
+          return;
+        }
+        console.error("Receipt image failed", error);
+        response.status(500).json({ error: "receipt_image_failed" });
+      });
   });
 
   // Scan creation endpoint
