@@ -23,7 +23,7 @@ const worker = new PythonWorkerClient(
 const scans = new ScanSessionService(scansRoot, worker);
 const provider = createOllamaProviderFromEnv();
 const { db, sqlite } = createDatabase();
-const app = createApp(scans, db, provider);
+const app = createApp(scans, db, provider, resolve(projectRoot, "data"));
 const port = Number(process.env.PORT ?? 3000);
 
 void worker.start().catch((error) => {
