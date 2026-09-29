@@ -9,6 +9,7 @@ import {
 } from "./extraction/ollama-provider.js";
 import type { ReceiptExtractionProvider } from "./extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "./extraction/receipt-extraction.js";
+import { createReviewDto } from "./review/review-dto.js";
 import {
   WorkerRequestError,
   WorkerUnavailableError,
@@ -105,7 +106,8 @@ export function createApp(
         });
         const extraction =
           createReceiptExtractionSchema(categoryNames).parse(extracted);
-        response.json({ ...result, extraction });
+        const review = createReviewDto(db, result, extraction);
+        response.json({ ...result, review });
       } catch (error) {
         if (error instanceof InvalidCornersError) {
           response.status(400).json({ error: "invalid_corners" });

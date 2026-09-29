@@ -55,7 +55,7 @@ const validExtraction = {
 };
 
 // Tests for the process endpoint of the receipt extraction application.
-test("process endpoint returns only a validated extraction using current categories", async (t) => {
+test("process endpoint returns a review DTO using current categories and database matches", async (t) => {
   t.mock.method(console, "error", () => {});
   const directory = await mkdtemp(join(tmpdir(), "receipt-process-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
@@ -112,6 +112,65 @@ test("process endpoint returns only a validated extraction using current categor
     )
     .run("custom", "2026-09-29T00:00:00.000Z", "2026-09-29T00:00:00.000Z");
 
+  const now = "2026-09-29T00:00:00.000Z";
+  const merchantId = Number(
+    sqlite
+      .prepare(
+        "INSERT INTO merchant (name, created_at, updated_at) VALUES (?, ?, ?)",
+      )
+      .run("Edeka", now, now).lastInsertRowid,
+  );
+  sqlite
+    .prepare(
+      "INSERT INTO merchant_alias (merchant_id, alias, normalized_alias, created_at) VALUES (?, ?, ?, ?)",
+    )
+    .run(merchantId, "EDEKA", "edeka", now);
+  const categoryId = (
+    sqlite.prepare("SELECT id FROM category WHERE name = ?").get("custom") as {
+      id: number;
+    }
+  ).id;
+  const groupId = Number(
+    sqlite
+      .prepare(
+        "INSERT INTO product_group (category_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(categoryId, "milk", now, now).lastInsertRowid,
+  );
+  const productId = Number(
+    sqlite
+      .prepare(
+        "INSERT INTO product (product_group_id, name, package_amount, package_unit, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+      .run(groupId, "Milch", 1000, "ml", now, now).lastInsertRowid,
+  );
+  sqlite
+    .prepare(
+      "INSERT INTO product_alias (product_id, alias, normalized_alias, created_at) VALUES (?, ?, ?, ?)",
+    )
+    .run(productId, "MILCH 1L", "milch 1 l", now);
+  const receiptId = Number(
+    sqlite
+      .prepare(
+        "INSERT INTO receipt (merchant_id, purchase_date, purchase_time, total_cents, currency, image_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        merchantId,
+        "2026-09-29",
+        "14:05",
+        119,
+        "EUR",
+        "receipts/existing.webp",
+        now,
+        now,
+      ).lastInsertRowid,
+  );
+  sqlite
+    .prepare(
+      "INSERT INTO receipt_item (receipt_id, position, raw_name, quantity, unit, total_price_cents, line_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .run(receiptId, 0, "MILCH 1L", 1, "pcs", 119, "product", now, now);
+
   const processScan = (scanId = scan.scanId) =>
     fetch(`${base}/api/scans/${scanId}/process`, {
       method: "POST",
@@ -128,7 +187,69 @@ test("process endpoint returns only a validated extraction using current categor
   const result = await processed.json();
   assert.equal(result.plainText, ocrLine.text);
   assert.equal(result.archiveUrl, `/api/scans/${scan.scanId}/archive`);
-  assert.deepEqual(result.extraction, validExtraction);
+  assert.equal(result.extraction, undefined);
+  assert.equal(result.review.scanId, scan.scanId);
+  assert.equal(result.review.archiveUrl, result.archiveUrl);
+  assert.deepEqual(result.review.merchant, {
+    ...validExtraction.merchant,
+    match: {
+      status: "MATCHED",
+      merchantId,
+      candidates: [{ merchantId, name: "Edeka" }],
+    },
+  });
+  assert.equal(result.review.items[0].match.status, "MATCHED");
+  assert.equal(result.review.items[0].match.productId, productId);
+  assert.deepEqual(result.review.items[0].sourceLineIndexes, [0]);
+  assert.deepEqual(
+    result.review.duplicateCandidates.map(
+      (candidate: { receiptId: number }) => candidate.receiptId,
+    ),
+    [receiptId],
+  );
+  assert.equal(
+    result.review.duplicateCandidates[0].imagePath,
+    "receipts/existing.webp",
+  );
+  assert.equal(
+    result.review.duplicateCandidates[0].items[0].rawName,
+    "MILCH 1L",
+  );
+  assert.deepEqual(result.review.sumCheck, {
+    status: "MATCH",
+    itemSumCents: 119,
+    discountSumCents: 0,
+    differenceCents: 0,
+  });
+  assert.deepEqual(result.review.warnings, ["possible_duplicate"]);
+
+  nextExtraction = { ...validExtraction, totalCents: 130 };
+  const mismatched = await processScan();
+  assert.equal(mismatched.status, 200);
+  const mismatchReview = (await mismatched.json()).review;
+  assert.equal(mismatchReview.sumCheck.status, "MISMATCH");
+  assert.deepEqual(mismatchReview.duplicateCandidates, []);
+  assert.deepEqual(mismatchReview.warnings, ["sum_mismatch"]);
+
+  nextExtraction = {
+    ...validExtraction,
+    merchant: { rawName: "Unknown", normalizedName: "Unknown" },
+    totalCents: null,
+  };
+  const incomplete = await processScan();
+  assert.equal(incomplete.status, 200);
+  const incompleteReview = (await incomplete.json()).review;
+  assert.equal(incompleteReview.merchant.match.status, "NEW");
+  assert.deepEqual(incompleteReview.duplicateCandidates, []);
+  assert.deepEqual(incompleteReview.warnings, ["sum_incomplete"]);
+
+  nextExtraction = {
+    ...validExtraction,
+    items: [{ ...validExtraction.items[0], lineType: "deposit" }],
+  };
+  const nonProduct = await processScan();
+  assert.equal(nonProduct.status, 200);
+  assert.equal((await nonProduct.json()).review.items[0].match, null);
 
   nextExtraction = {
     ...validExtraction,
@@ -153,9 +274,11 @@ test("process endpoint returns only a validated extraction using current categor
   assert.equal(malformed.status, 502);
   assert.deepEqual(await malformed.json(), { error: "invalid_llm_response" });
 
-  sqlite.exec("DROP TABLE category");
+  nextError = undefined;
+  nextExtraction = validExtraction;
+  sqlite.exec("DROP TABLE merchant_alias");
   const databaseFailure = await processScan();
   assert.equal(databaseFailure.status, 500);
   assert.deepEqual(await databaseFailure.json(), { error: "scan_failed" });
-  assert.equal(providerCalls, 5);
+  assert.equal(providerCalls, 9);
 });

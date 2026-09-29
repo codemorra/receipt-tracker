@@ -173,7 +173,8 @@ test("scan API creates a session and serves its preview", async (t) => {
   const result = await processed.json();
   assert.equal(result.plainText, "RECEIPT");
   assert.equal(result.lines[0].index, 0);
-  assert.deepEqual(result.extraction.items, []);
+  assert.deepEqual(result.review.items, []);
+  assert.deepEqual(result.review.warnings, ["sum_incomplete"]);
   const archive = await fetch(base + result.archiveUrl);
   assert.equal(archive.status, 200);
   assert.equal(archive.headers.get("content-type"), "image/webp");
