@@ -1,0 +1,138 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  createOllamaProviderFromEnv,
+  InvalidLlmResponseError,
+  OllamaProvider,
+  OllamaRequestError,
+  OllamaUnavailableError,
+} from "../src/extraction/ollama-provider.js";
+import { createReceiptExtractionPrompt } from "../src/extraction/receipt-extraction-prompt.js";
+
+// Defines a sample input for receipt extraction tests.
+const input = {
+  plainText: "EDEKA\nMILCH 1L\n1,19",
+  lines: [
+    { index: 0, text: "EDEKA", confidence: 0.98, box: [0, 0, 1, 0.1] },
+    { index: 1, text: "MILCH 1L" },
+  ],
+  categoryNames: ["food", "custom"],
+};
+
+// Tests for the OllamaProvider class and its interaction with receipt extraction prompts.
+test("sends only OCR data and categories with the extraction JSON schema", async () => {
+  let requestBody: Record<string, unknown> | undefined;
+  const provider = new OllamaProvider(
+    "http://127.0.0.1:11434/api/chat",
+    "test-model",
+    async (url, init) => {
+      assert.equal(url, "http://127.0.0.1:11434/api/chat");
+      assert.equal(init?.method, "POST");
+      requestBody = JSON.parse(String(init?.body));
+      return new Response(
+        JSON.stringify({ message: { content: '{"items":[]}' } }),
+        { status: 200 },
+      );
+    },
+  );
+
+  assert.deepEqual(await provider.extractReceipt(input), { items: [] });
+  assert.ok(requestBody);
+  assert.equal(requestBody.model, "test-model");
+  assert.equal(requestBody.stream, false);
+  assert.deepEqual(requestBody.options, { temperature: 0 });
+  const format = requestBody.format as {
+    properties: Record<string, unknown>;
+    additionalProperties: boolean;
+  };
+  assert.ok(format.properties.items);
+  assert.ok(format.properties.discounts);
+  assert.equal(format.additionalProperties, false);
+  assert.equal("warranty" in format.properties, false);
+
+  const messages = requestBody.messages as { content: string }[];
+  assert.equal(messages.length, 1);
+  assert.ok(
+    messages[0].content.includes('Current categories: ["food","custom"]'),
+  );
+  assert.ok(
+    messages[0].content.includes('"plainText":"EDEKA\\nMILCH 1L\\n1,19"'),
+  );
+  assert.equal(messages[0].content.includes("productAliases"), false);
+  assert.equal(messages[0].content.includes("Private Merchant"), false);
+  assert.ok(
+    messages[0].content.includes(`"lines":${JSON.stringify(input.lines)}`),
+  );
+});
+
+// Tests for the receipt extraction prompt creation function.
+test("prompt tells the model how to use unknown values and source indexes", () => {
+  const prompt = createReceiptExtractionPrompt(input);
+  assert.ok(prompt.includes("Use null for unknown or uncertain values"));
+  assert.ok(
+    prompt.includes(
+      "Use YYYY-MM-DD for purchaseDate and HH:mm for purchaseTime",
+    ),
+  );
+  assert.ok(
+    prompt.includes(
+      "packageAmount and packageUnit describe the size of one product package",
+    ),
+  );
+  assert.ok(prompt.includes("Use lineType product, deposit, fee, or other"));
+  assert.ok(prompt.includes("sourceLineIndexes refer to OCR line indexes"));
+  assert.ok(
+    prompt.includes("appliesToItemIndex refers to a zero-based item position"),
+  );
+  assert.ok(
+    prompt.includes("Do not include database IDs, aliases, warranty details"),
+  );
+});
+
+// Tests for the classification of different types of Ollama request failures.
+test("classifies transport, HTTP, envelope, and extraction JSON failures", async () => {
+  const unavailable = new OllamaProvider(
+    "http://localhost/api/chat",
+    "test",
+    async () => {
+      throw new TypeError("connection refused");
+    },
+  );
+  await assert.rejects(
+    unavailable.extractReceipt(input),
+    OllamaUnavailableError,
+  );
+
+  const rejected = new OllamaProvider(
+    "http://localhost/api/chat",
+    "test",
+    async () => new Response("model not found", { status: 404 }),
+  );
+  await assert.rejects(rejected.extractReceipt(input), OllamaRequestError);
+
+  for (const body of ["not JSON", "{}", '{"message":{"content":"{"}}']) {
+    const malformed = new OllamaProvider(
+      "http://localhost/api/chat",
+      "test",
+      async () => new Response(body, { status: 200 }),
+    );
+    await assert.rejects(
+      malformed.extractReceipt(input),
+      InvalidLlmResponseError,
+    );
+  }
+});
+
+// Tests for the creation of an OllamaProvider instance from environment variables.
+test("requires a model and a valid Ollama HTTP URL", () => {
+  assert.throws(() => createOllamaProviderFromEnv({}), /OLLAMA_MODEL/);
+  assert.throws(
+    () =>
+      createOllamaProviderFromEnv({
+        OLLAMA_MODEL: "test",
+        OLLAMA_BASE_URL: "file:///tmp/ollama",
+      }),
+    /OLLAMA_BASE_URL/,
+  );
+  assert.ok(createOllamaProviderFromEnv({ OLLAMA_MODEL: "test" }));
+});
