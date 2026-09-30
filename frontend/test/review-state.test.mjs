@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  chooseProduct,
   createReviewDraft,
   formatCents,
   isValidDate,
@@ -127,4 +128,63 @@ test("review issues flag invalid receipt values and discount amounts", () => {
     reviewIssues(draft).map((issue) => issue.code),
     ["purchaseDate", "currency", "quantity", "discountAmount"],
   );
+});
+
+// Tests for choosing products for item drafts.
+test("matched products show canonical names while clearing restores the new-product draft", () => {
+  const extractedItem = {
+    ...review.items[0],
+    rawName: "Wellenschnitt Pommes",
+    normalizedName: "Pommes",
+    match: {
+      status: "MATCHED",
+      productId: 8,
+      candidates: [
+        {
+          productId: 8,
+          name: "Gubuhubu!",
+          brand: null,
+          productGroup: "fries",
+          packageAmount: null,
+          packageUnit: null,
+          score: 1,
+        },
+      ],
+    },
+  };
+  const matched = createReviewDraft({
+    ...review,
+    items: [extractedItem],
+  }).items[0];
+  assert.equal(matched.rawName, "Wellenschnitt Pommes");
+  assert.equal(matched.normalizedName, "Pommes");
+  assert.equal(matched.productId, 8);
+  assert.equal(matched.selectedProductName, "Gubuhubu!");
+  assert.equal(matched.matchStatus, "MATCHED");
+
+  const manuallySelected = chooseProduct(matched, {
+    id: 9,
+    name: "Other saved product",
+  });
+  assert.equal(manuallySelected.selectedProductName, "Other saved product");
+  assert.equal(manuallySelected.matchStatus, null);
+  assert.equal(manuallySelected.normalizedName, "Pommes");
+  const cleared = chooseProduct(manuallySelected, null);
+  assert.equal(cleared.productId, null);
+  assert.equal(cleared.selectedProductName, null);
+  assert.equal(cleared.normalizedName, "Pommes");
+  assert.equal(cleared.brand, matched.brand);
+
+  const suggested = createReviewDraft({
+    ...review,
+    items: [
+      {
+        ...extractedItem,
+        match: { ...extractedItem.match, status: "SUGGESTED", productId: null },
+      },
+    ],
+  }).items[0];
+  assert.equal(suggested.productId, null);
+  assert.equal(suggested.selectedProductName, null);
+  assert.equal(suggested.matchStatus, "SUGGESTED");
 });
