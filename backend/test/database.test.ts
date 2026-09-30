@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -185,6 +185,7 @@ test("migration failure prevents backend startup", () => {
           ...process.env,
           DATABASE_FILE: filename,
           OLLAMA_MODEL: "test-model",
+          LOG_FILE: join(directory, "backend.log"),
         },
         encoding: "utf8",
         timeout: 10000,
@@ -197,6 +198,18 @@ test("migration failure prevents backend startup", () => {
       ),
     );
     assert.ok(!result.stdout.includes("Backend listening"));
+    const events = readFileSync(join(directory, "backend.log"), "utf8")
+      .trimEnd()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.ok(
+      events.some(
+        (event) =>
+          event.operation === "backend.start.failed" &&
+          event.phase === "database migration" &&
+          event.errorType === "DrizzleError",
+      ),
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

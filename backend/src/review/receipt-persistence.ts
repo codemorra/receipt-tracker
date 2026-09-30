@@ -4,6 +4,7 @@ import { copyFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import type { createDatabase } from "../db/database.js";
+import { errorType, silentLogger, type Logger } from "../logger.js";
 import {
   brands,
   categories,
@@ -352,6 +353,7 @@ export async function saveReceipt(
   dataRoot: string,
   scanId: string,
   input: unknown,
+  logger: Logger = silentLogger,
 ): Promise<number> {
   const receipt = finalSaveSchema.parse(input);
   const archive = await scans.archivePath(scanId);
@@ -367,6 +369,11 @@ export async function saveReceipt(
     copied = true;
     receiptId = persistReceipt(db, receipt, imagePath);
   } catch (error) {
+    logger("error", "receipt.persistence.failed", {
+      scanId,
+      stage: copied ? "database" : "archive_copy",
+      errorType: errorType(error),
+    });
     if (
       // If the error occurred because the file already exists, rethrow it.
       !copied &&
@@ -381,7 +388,10 @@ export async function saveReceipt(
       // If the error occurred for any other reason, attempt to clean up the copied file.
       await rm(archiveDestination, { force: true });
     } catch (cleanupError) {
-      console.error("Receipt archive cleanup failed", cleanupError);
+      logger("error", "receipt.archive_cleanup.failed", {
+        scanId,
+        errorType: errorType(cleanupError),
+      });
     }
     throw error;
   }
@@ -389,7 +399,11 @@ export async function saveReceipt(
     // Attempt to cancel the scan session for the saved receipt.
     await scans.cancel(scanId);
   } catch (error) {
-    console.error("Saved receipt scan cleanup failed", error);
+    logger("error", "receipt.scan_cleanup.failed", {
+      scanId,
+      receiptId,
+      errorType: errorType(error),
+    });
   }
   return receiptId;
 }

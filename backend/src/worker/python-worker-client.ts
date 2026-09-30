@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { errorType, silentLogger, type Logger } from "../logger.js";
 
 export type Corner = [number, number];
 
@@ -62,6 +63,7 @@ export class PythonWorkerClient {
     private readonly command: string,
     private readonly args: string[],
     private readonly cwd?: string,
+    private readonly logger: Logger = silentLogger,
   ) {}
 
   // Starts the Python worker process and initializes the client.
@@ -90,6 +92,9 @@ export class PythonWorkerClient {
         child.on("exit", (code) => {
           if (this.state === "failed" || this.state === "stopped") return;
           this.state = code === 0 ? "stopped" : "failed";
+          this.logger(code === 0 ? "warn" : "error", "worker.exited", {
+            exitCode: code ?? undefined,
+          });
           this.rejectOutstanding(
             new WorkerUnavailableError(`Worker stopped with code ${code}`),
           );
@@ -264,7 +269,7 @@ export class PythonWorkerClient {
   private fail(error: Error): void {
     if (this.state === "failed" || this.state === "stopped") return;
     this.state = "failed";
-    console.error("Python worker failed", error);
+    this.logger("error", "worker.failed", { errorType: errorType(error) });
     this.rejectOutstanding(new WorkerUnavailableError(error.message));
     this.process?.kill();
   }
