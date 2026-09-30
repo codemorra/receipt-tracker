@@ -21,9 +21,6 @@ export function createReceiptExtractionPrompt(
     "sourceLineIndexes refer to OCR line indexes. appliesToItemIndex refers to a zero-based item position, or null for a receipt-level discount.",
     "Do not include database IDs, aliases, warranty details, or fields outside the schema.",
     `Current categories: ${JSON.stringify(input.categoryNames)}`,
-    `OCR data: ${JSON.stringify({
-      plainText: input.plainText,
-      lines: input.lines,
-    })}`,
+    `OCR data: ${JSON.stringify({ lines: input.lines })}`,
   ].join("\n");
 }

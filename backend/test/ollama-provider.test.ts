@@ -41,6 +41,7 @@ test("sends only OCR data and categories with the extraction JSON schema", async
   assert.ok(requestBody);
   assert.equal(requestBody.model, "test-model");
   assert.equal(requestBody.stream, false);
+  assert.equal(requestBody.think, false);
   assert.deepEqual(requestBody.options, { temperature: 0 });
   const format = requestBody.format as {
     properties: Record<string, unknown>;
@@ -56,9 +57,7 @@ test("sends only OCR data and categories with the extraction JSON schema", async
   assert.ok(
     messages[0].content.includes('Current categories: ["food","custom"]'),
   );
-  assert.ok(
-    messages[0].content.includes('"plainText":"EDEKA\\nMILCH 1L\\n1,19"'),
-  );
+  assert.equal(messages[0].content.includes('"plainText"'), false);
   assert.equal(messages[0].content.includes("productAliases"), false);
   assert.equal(messages[0].content.includes("Private Merchant"), false);
   assert.ok(
