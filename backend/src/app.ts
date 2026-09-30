@@ -14,6 +14,11 @@ import type { ReceiptExtractionProvider } from "./extraction/receipt-extraction-
 import { createReceiptExtractionSchema } from "./extraction/receipt-extraction.js";
 import { createReviewDto } from "./review/review-dto.js";
 import {
+  ConfirmedEntityNotFoundError,
+  saveReceipt,
+  ScanArchiveNotFoundError,
+} from "./review/receipt-persistence.js";
+import {
   listBrands,
   listCategories,
   listMerchants,
@@ -220,6 +225,35 @@ export function createApp(
         } else {
           console.error("Scan processing failed", error);
           response.status(500).json({ error: "scan_failed" });
+        }
+      }
+    },
+  );
+
+  // Receipt confirmation endpoint
+  app.post(
+    "/api/scans/:scanId/confirm",
+    express.json({ limit: "256kb" }),
+    async (request, response) => {
+      try {
+        const receiptId = await saveReceipt(
+          db,
+          scans,
+          dataRoot,
+          request.params.scanId,
+          request.body,
+        );
+        response.status(201).json({ receiptId });
+      } catch (error) {
+        if (error instanceof ZodError) {
+          response.status(400).json({ error: "invalid_final_save" });
+        } else if (error instanceof ScanArchiveNotFoundError) {
+          response.status(404).json({ error: "scan_archive_not_found" });
+        } else if (error instanceof ConfirmedEntityNotFoundError) {
+          response.status(409).json({ error: "confirmed_entity_not_found" });
+        } else {
+          console.error("Receipt confirmation failed", error);
+          response.status(500).json({ error: "receipt_save_failed" });
         }
       }
     },

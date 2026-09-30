@@ -291,6 +291,11 @@ export type ReviewIssueCode =
   | "unitPrice"
   | "itemTotal"
   | "packageAmount"
+  | "productName"
+  | "productGroup"
+  | "category"
+  | "packageUnit"
+  | "warranty"
   | "discountAmount";
 
 // Represents a single issue found in the review draft, including its code and optional item number.
@@ -357,6 +362,21 @@ export function reviewIssues(draft: ReviewDraft): ReviewIssue[] {
       issues.push({ code: "itemTotal", number });
     if (item.packageAmount && !isPositiveDecimal(item.packageAmount))
       issues.push({ code: "packageAmount", number });
+    if (item.lineType === "product" && item.productId === null) {
+      if (!item.normalizedName.trim())
+        issues.push({ code: "productName", number });
+      if (!item.productGroup.trim())
+        issues.push({ code: "productGroup", number });
+      if (!item.category.trim()) issues.push({ code: "category", number });
+      if (Boolean(item.packageAmount) !== Boolean(item.packageUnit))
+        issues.push({ code: "packageUnit", number });
+    }
+    if (item.warranties.length > 0 && item.lineType !== "product")
+      issues.push({ code: "warranty", number });
+    if (
+      item.warranties.some((warranty) => warrantyDateIssue(warranty) !== null)
+    )
+      issues.push({ code: "warranty", number });
   });
   draft.discounts.forEach((discount, index) => {
     const amount = parseCents(discount.amount);
@@ -364,4 +384,51 @@ export function reviewIssues(draft: ReviewDraft): ReviewIssue[] {
       issues.push({ code: "discountAmount", number: index + 1 });
   });
   return issues;
+}
+
+// Build the final save DTO for the receipt, returning null if there are any review issues.
+export function buildFinalSaveDto(draft: ReviewDraft) {
+  if (reviewIssues(draft).length > 0) return null;
+  const optionalText = (value: string) => value.trim() || null;
+  return {
+    merchant: {
+      id: draft.merchantId,
+      name: draft.merchantName.trim(),
+      rawName: optionalText(draft.merchantRawName),
+    },
+    purchaseDate: draft.purchaseDate,
+    purchaseTime: optionalText(draft.purchaseTime),
+    totalCents: parseCents(draft.total)!,
+    currency: draft.currency,
+    items: draft.items.map((item) => ({
+      rawName: item.rawName.trim(),
+      productId: item.lineType === "product" ? item.productId : null,
+      productName: optionalText(item.normalizedName),
+      brandId: item.brandId,
+      brandName: optionalText(item.brand),
+      productGroupId: item.productGroupId,
+      productGroupName: optionalText(item.productGroup),
+      categoryName: optionalText(item.category),
+      packageAmount: item.packageAmount
+        ? Number(item.packageAmount.replace(",", "."))
+        : null,
+      packageUnit: item.packageUnit || null,
+      quantity: Number(item.quantity.replace(",", ".")),
+      unit: item.unit || null,
+      unitPriceCents: item.unitPrice ? parseCents(item.unitPrice) : null,
+      totalPriceCents: parseCents(item.totalPrice)!,
+      lineType: item.lineType,
+      warranties: item.warranties.map((warranty) => ({
+        type: warranty.type,
+        startDate: warranty.startDate,
+        endDate: warranty.endDate,
+        notes: optionalText(warranty.notes),
+      })),
+    })),
+    discounts: draft.discounts.map((discount) => ({
+      description: optionalText(discount.description || discount.rawName),
+      amountCents: parseCents(discount.amount)!,
+      appliesToItemIndex: discount.appliesToItemIndex,
+    })),
+  };
 }

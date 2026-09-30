@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildFinalSaveDto,
   chooseProduct,
   createReviewDraft,
   formatCents,
@@ -187,4 +188,34 @@ test("matched products show canonical names while clearing restores the new-prod
   assert.equal(suggested.productId, null);
   assert.equal(suggested.selectedProductName, null);
   assert.equal(suggested.matchStatus, "SUGGESTED");
+});
+
+// Test for verifying that the final save DTO correctly includes confirmed associations, monetary values in cents, and warranties.
+test("final save data contains confirmed associations, cents, and warranties", () => {
+  const draft = createReviewDraft(review);
+  draft.items[0].warranties = [
+    {
+      id: "warranty",
+      type: "manufacturer",
+      startDate: "2026-09-29",
+      endDate: "2028-09-29",
+      notes: "receipt required",
+    },
+  ];
+  const finalSave = buildFinalSaveDto(draft);
+  assert.ok(finalSave);
+  assert.deepEqual(finalSave.merchant, {
+    id: 4,
+    name: "Edeka",
+    rawName: "EDEKA",
+  });
+  assert.equal(finalSave.totalCents, 119);
+  assert.equal(finalSave.items[0].productId, 8);
+  assert.equal(finalSave.items[0].unitPriceCents, 149);
+  assert.equal(finalSave.items[0].warranties[0].type, "manufacturer");
+  assert.deepEqual(finalSave.discounts, [
+    { description: "RABATT", amountCents: 30, appliesToItemIndex: 0 },
+  ]);
+  draft.items[0].warranties[0].endDate = "2025-01-01";
+  assert.equal(buildFinalSaveDto(draft), null);
 });
