@@ -60,7 +60,15 @@ test("worker waits for ready and maps sequenced responses by requestId", async (
 
 // Test for the Python worker client handling unexpected worker exits and failure states.
 test("unexpected worker exit enters failed state and rejects requests", async () => {
-  const worker = new PythonWorkerClient(process.execPath, [fixture]);
+  const events: string[] = [];
+  const worker = new PythonWorkerClient(
+    process.execPath,
+    [fixture],
+    undefined,
+    (_level, operation) => {
+      events.push(operation);
+    },
+  );
   await worker.start();
 
   await assert.rejects(
@@ -68,6 +76,7 @@ test("unexpected worker exit enters failed state and rejects requests", async ()
     WorkerUnavailableError,
   );
   assert.equal(worker.state, "failed");
+  assert.ok(events.includes("worker.exited"));
   await assert.rejects(
     worker.requestPreview("10", "preview.webp"),
     WorkerUnavailableError,

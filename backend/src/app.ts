@@ -3,6 +3,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { eq } from "drizzle-orm";
 import { ZodError } from "zod";
 import type { createDatabase } from "./db/database.js";
+import { errorType, silentLogger, type Logger } from "./logger.js";
 import { receipts } from "./db/schema.js";
 import { loadExtractionReferenceData } from "./extraction/extraction-reference-data.js";
 import {
@@ -37,9 +38,19 @@ import {
 import {
   InvalidCornersError,
   InvalidUploadError,
+  isScanId,
   MAX_UPLOAD_BYTES,
   ScanSessionService,
 } from "./scans/scan-session-service.js";
+
+/**
+ * Logs the scan ID if it is valid.
+ * @param value - The scan ID value to be logged.
+ * @returns The scan ID if it is valid, otherwise undefined.
+ */
+function logScanId(value: string): string | undefined {
+  return isScanId(value) ? value : undefined;
+}
 
 /**
  * Creates and configures an Express application.
@@ -54,6 +65,7 @@ export function createApp(
   db: ReturnType<typeof createDatabase>["db"],
   provider: ReceiptExtractionProvider,
   dataRoot = resolve(process.cwd(), "../data"),
+  logger: Logger = silentLogger,
 ) {
   const app = express();
   const receiptsRoot = resolve(dataRoot, "receipts");
@@ -111,7 +123,10 @@ export function createApp(
       }
       response.json(detail);
     } catch (error) {
-      console.error("Receipt detail failed", error);
+      logger("error", "receipt.detail.failed", {
+        receiptId,
+        errorType: errorType(error),
+      });
       response.status(500).json({ error: "receipt_detail_failed" });
     }
   });
@@ -156,7 +171,10 @@ export function createApp(
           response.status(404).json({ error: "receipt_image_not_found" });
           return;
         }
-        console.error("Receipt image failed", error);
+        logger("error", "receipt.image.failed", {
+          receiptId,
+          errorType: errorType(error),
+        });
         response.status(500).json({ error: "receipt_image_failed" });
       });
   });
@@ -166,13 +184,23 @@ export function createApp(
     "/api/scans",
     express.raw({ type: () => true, limit: MAX_UPLOAD_BYTES }),
     async (request, response) => {
+      const started = performance.now();
+      logger("info", "scan.create.start");
       try {
         const scan = await scans.create(
           request.headers["content-type"],
           request.body,
         );
+        logger("info", "scan.create.complete", {
+          scanId: scan.scanId,
+          durationMs: performance.now() - started,
+        });
         response.status(201).json(scan);
       } catch (error) {
+        logger("error", "scan.create.failed", {
+          durationMs: performance.now() - started,
+          errorType: errorType(error),
+        });
         if (error instanceof InvalidUploadError) {
           response
             .status(error.status)
@@ -182,7 +210,6 @@ export function createApp(
         } else if (error instanceof WorkerRequestError) {
           response.status(422).json({ error: "invalid_image" });
         } else {
-          console.error("Scan creation failed", error);
           response.status(500).json({ error: "scan_failed" });
         }
       }
@@ -199,7 +226,10 @@ export function createApp(
       }
       response.type("image/webp").sendFile(previewPath);
     } catch (error) {
-      console.error("Scan preview failed", error);
+      logger("error", "scan.preview.failed", {
+        scanId: logScanId(request.params.scanId),
+        errorType: errorType(error),
+      });
       response.status(500).json({ error: "scan_failed" });
     }
   });
@@ -209,8 +239,17 @@ export function createApp(
     "/api/scans/:scanId/process",
     express.json({ limit: "16kb" }),
     async (request, response) => {
+      const processingStarted = performance.now();
+      let stage = "worker";
+      let llmStarted: number | undefined;
+      logger("info", "scan.process.start", {
+        scanId: logScanId(request.params.scanId),
+      });
+      logger("info", "scan.worker.start", {
+        scanId: logScanId(request.params.scanId),
+      });
+      const workerStarted = performance.now();
       try {
-        const processingStarted = performance.now();
         const result = await scans.process(
           request.params.scanId,
           request.body?.corners,
@@ -219,10 +258,18 @@ export function createApp(
           response.status(404).json({ error: "scan_not_found" });
           return;
         }
-        const workerDurationMs = performance.now() - processingStarted;
+        const workerDurationMs = performance.now() - workerStarted;
+        logger("info", "scan.ocr.complete", {
+          scanId: result.scanId,
+          ocrDurationMs: result.ocrDurationMs,
+          workerDurationMs,
+        });
+        stage = "reference_data";
         const { categoryNames } = loadExtractionReferenceData(db);
+        stage = "llm";
         let ollama: OllamaDiagnostics | undefined;
-        const llmStarted = performance.now();
+        logger("info", "scan.llm.start", { scanId: result.scanId });
+        llmStarted = performance.now();
         const extracted = await provider.extractReceipt(
           {
             plainText: result.plainText,
@@ -234,9 +281,29 @@ export function createApp(
           },
         );
         const llmDurationMs = performance.now() - llmStarted;
+        logger("info", "scan.llm.complete", {
+          scanId: result.scanId,
+          durationMs: llmDurationMs,
+          model: ollama?.model,
+          ollamaTotalDurationMs: ollama?.totalDurationMs,
+          loadDurationMs: ollama?.loadDurationMs,
+          promptEvalCount: ollama?.promptEvalCount,
+          promptEvalDurationMs: ollama?.promptEvalDurationMs,
+          evalCount: ollama?.evalCount,
+          evalDurationMs: ollama?.evalDurationMs,
+        });
+        stage = "review";
         const extraction =
           createReceiptExtractionSchema(categoryNames).parse(extracted);
         const review = createReviewDto(db, result, extraction);
+        const totalDurationMs = performance.now() - processingStarted;
+        logger("info", "scan.process.complete", {
+          scanId: result.scanId,
+          durationMs: totalDurationMs,
+          ocrDurationMs: result.ocrDurationMs,
+          llmDurationMs,
+          workerDurationMs,
+        });
         response.json({
           ...result,
           review,
@@ -244,11 +311,31 @@ export function createApp(
             ocrDurationMs: result.ocrDurationMs,
             workerDurationMs,
             llmDurationMs,
-            totalDurationMs: performance.now() - processingStarted,
+            totalDurationMs,
             ollama,
           },
         });
       } catch (error) {
+        if (stage === "worker") {
+          logger("error", "scan.worker.failed", {
+            scanId: logScanId(request.params.scanId),
+            durationMs: performance.now() - workerStarted,
+            errorType: errorType(error),
+          });
+        }
+        if (stage === "llm" && llmStarted !== undefined) {
+          logger("error", "scan.llm.failed", {
+            scanId: logScanId(request.params.scanId),
+            durationMs: performance.now() - llmStarted,
+            errorType: errorType(error),
+          });
+        }
+        logger("error", "scan.process.failed", {
+          scanId: logScanId(request.params.scanId),
+          stage,
+          durationMs: performance.now() - processingStarted,
+          errorType: errorType(error),
+        });
         if (error instanceof InvalidCornersError) {
           response.status(400).json({ error: "invalid_corners" });
         } else if (error instanceof WorkerUnavailableError) {
@@ -256,19 +343,14 @@ export function createApp(
         } else if (error instanceof WorkerRequestError) {
           response.status(422).json({ error: "processing_failed" });
         } else if (error instanceof OllamaUnavailableError) {
-          console.error("Ollama unavailable", error);
           response.status(503).json({ error: "ollama_unavailable" });
         } else if (error instanceof OllamaRequestError) {
-          console.error("Ollama request failed", error);
           response.status(502).json({ error: "ollama_failed" });
         } else if (error instanceof InvalidLlmResponseError) {
-          console.error("Invalid Ollama response", error);
           response.status(502).json({ error: "invalid_llm_response" });
         } else if (error instanceof ZodError) {
-          console.error("Invalid receipt extraction", error);
           response.status(502).json({ error: "invalid_extraction" });
         } else {
-          console.error("Scan processing failed", error);
           response.status(500).json({ error: "scan_failed" });
         }
       }
@@ -287,9 +369,18 @@ export function createApp(
           dataRoot,
           request.params.scanId,
           request.body,
+          logger,
         );
+        logger("info", "receipt.save.complete", {
+          scanId: logScanId(request.params.scanId),
+          receiptId,
+        });
         response.status(201).json({ receiptId });
       } catch (error) {
+        logger("error", "receipt.save.failed", {
+          scanId: logScanId(request.params.scanId),
+          errorType: errorType(error),
+        });
         if (error instanceof ZodError) {
           response.status(400).json({ error: "invalid_final_save" });
         } else if (error instanceof ScanArchiveNotFoundError) {
@@ -302,7 +393,6 @@ export function createApp(
             candidates: error.candidates,
           });
         } else {
-          console.error("Receipt confirmation failed", error);
           response.status(500).json({ error: "receipt_save_failed" });
         }
       }
@@ -316,9 +406,15 @@ export function createApp(
         response.status(404).json({ error: "scan_not_found" });
         return;
       }
+      logger("info", "scan.cancel.complete", {
+        scanId: logScanId(request.params.scanId),
+      });
       response.status(204).end();
     } catch (error) {
-      console.error("Scan cancellation failed", error);
+      logger("error", "scan.cancel.failed", {
+        scanId: logScanId(request.params.scanId),
+        errorType: errorType(error),
+      });
       response.status(500).json({ error: "scan_cancel_failed" });
     }
   });
@@ -333,7 +429,10 @@ export function createApp(
       }
       response.type("image/webp").sendFile(archivePath);
     } catch (error) {
-      console.error("Scan archive failed", error);
+      logger("error", "scan.archive.failed", {
+        scanId: logScanId(request.params.scanId),
+        errorType: errorType(error),
+      });
       response.status(500).json({ error: "scan_failed" });
     }
   });
@@ -367,7 +466,7 @@ export function createApp(
       response.status(400).json({ error: "invalid_request" });
       return;
     }
-    console.error("Request failed", error);
+    logger("error", "request.failed", { errorType: errorType(error) });
     response.status(500).json({ error: "request_failed" });
   };
   app.use(handleError);

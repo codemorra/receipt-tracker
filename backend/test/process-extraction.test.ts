@@ -87,19 +87,28 @@ test("process endpoint returns a review DTO using current categories and databas
   let nextExtraction: unknown = validExtraction;
   let nextError: Error | undefined;
   let providerCalls = 0;
-  const app = createApp(scans, db, {
-    async extractReceipt(input, onDiagnostics) {
-      providerCalls++;
-      assert.equal(input.plainText, ocrLine.text);
-      assert.deepEqual(input.lines, [ocrLine]);
-      assert.ok(input.categoryNames.includes("groceries"));
-      assert.ok(input.categoryNames.includes("custom"));
-      assert.equal(input.categoryNames.includes("food"), false);
-      if (nextError) throw nextError;
-      onDiagnostics?.({ model: "test-model", promptEvalCount: 250 });
-      return nextExtraction;
+  const events: string[] = [];
+  const app = createApp(
+    scans,
+    db,
+    {
+      async extractReceipt(input, onDiagnostics) {
+        providerCalls++;
+        assert.equal(input.plainText, ocrLine.text);
+        assert.deepEqual(input.lines, [ocrLine]);
+        assert.ok(input.categoryNames.includes("groceries"));
+        assert.ok(input.categoryNames.includes("custom"));
+        assert.equal(input.categoryNames.includes("food"), false);
+        if (nextError) throw nextError;
+        onDiagnostics?.({ model: "test-model", promptEvalCount: 250 });
+        return nextExtraction;
+      },
     },
-  });
+    directory,
+    (level, operation, fields) => {
+      events.push(JSON.stringify({ level, operation, fields }));
+    },
+  );
   const server = app.listen(0);
   t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
   const address = server.address();
@@ -275,7 +284,7 @@ test("process endpoint returns a review DTO using current categories and databas
   assert.equal(unavailable.status, 503);
   assert.deepEqual(await unavailable.json(), { error: "ollama_unavailable" });
 
-  nextError = new OllamaRequestError("model missing");
+  nextError = new OllamaRequestError("private receipt text");
   const failed = await processScan();
   assert.equal(failed.status, 502);
   assert.deepEqual(await failed.json(), { error: "ollama_failed" });
@@ -292,4 +301,18 @@ test("process endpoint returns a review DTO using current categories and databas
   assert.equal(databaseFailure.status, 500);
   assert.deepEqual(await databaseFailure.json(), { error: "scan_failed" });
   assert.equal(providerCalls, 9);
+  assert.ok(
+    events.some((event) => event.includes('"operation":"scan.ocr.complete"')),
+  );
+  assert.ok(
+    events.some((event) => event.includes('"operation":"scan.llm.complete"')),
+  );
+  assert.ok(
+    events.some((event) => event.includes('"operation":"scan.llm.failed"')),
+  );
+  assert.ok(
+    events.some((event) => event.includes('"operation":"scan.process.failed"')),
+  );
+  assert.equal(events.join("\n").includes(ocrLine.text), false);
+  assert.equal(events.join("\n").includes("private receipt text"), false);
 });

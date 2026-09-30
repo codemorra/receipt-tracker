@@ -303,6 +303,33 @@ test("failed entity resolution rolls back reference data and removes the copied 
   );
 });
 
+// Test case for verifying that failed scan cleanup is logged after the receipt has been saved
+test("logs failed scan cleanup after the receipt has been saved", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  t.mock.method(data.scans, "cancel", async () => {
+    throw new Error("private receipt text");
+  });
+  const events: string[] = [];
+  const receiptId = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    validReceipt,
+    (level, operation, fields) => {
+      events.push(JSON.stringify({ level, operation, fields }));
+    },
+  );
+  assert.ok(receiptId > 0);
+  assert.ok(
+    events.some((event) =>
+      event.includes('"operation":"receipt.scan_cleanup.failed"'),
+    ),
+  );
+  assert.equal(events.join("\n").includes("private receipt text"), false);
+});
+
 // Test case for verifying that a missing scan archive prevents receipt data creation
 test("missing scan archive does not create receipt data", async (t) => {
   const data = await fixture();
