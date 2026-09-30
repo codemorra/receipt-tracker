@@ -205,6 +205,20 @@ export class ScanSessionService {
     }
   }
 
+  // Service method for retrieving the file path of the OCR image for a scan session.
+  async cancel(scanId: string): Promise<boolean> {
+    if (!isScanId(scanId)) return false;
+    const directory = join(this.root, scanId);
+    try {
+      await access(join(directory, "session.json"));
+    } catch (error) {
+      if (isMissingFile(error)) return false;
+      throw error;
+    }
+    await rm(directory, { recursive: true });
+    return true;
+  }
+
   // Service method for retrieving the file path of the preview image for a scan session.
   async previewPath(scanId: string): Promise<string | undefined> {
     return this.imagePath(scanId, "preview.webp");

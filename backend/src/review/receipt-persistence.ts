@@ -19,6 +19,10 @@ import {
 } from "../db/schema.js";
 import { normalizeAlias } from "../matching/alias-normalizer.js";
 import type { ScanSessionService } from "../scans/scan-session-service.js";
+import {
+  findDuplicateCandidates,
+  type DuplicateCandidate,
+} from "./duplicate-detection.js";
 import { finalSaveSchema, type FinalSaveDto } from "./final-save.js";
 
 type Database = ReturnType<typeof createDatabase>["db"];
@@ -26,6 +30,11 @@ type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export class ConfirmedEntityNotFoundError extends Error {}
 export class ScanArchiveNotFoundError extends Error {}
+export class DuplicateConfirmationRequiredError extends Error {
+  constructor(readonly candidates: DuplicateCandidate[]) {
+    super("Possible duplicate requires an explicit import decision");
+  }
+}
 
 /**
  * Resolves a merchant by ID or creates a new one if it doesn't exist.
@@ -249,6 +258,15 @@ export function persistReceipt(
   imagePath: string,
 ): number {
   return db.transaction((tx) => {
+    const candidates = findDuplicateCandidates(db, {
+      merchantId: receipt.merchant.id,
+      purchaseDate: receipt.purchaseDate,
+      purchaseTime: receipt.purchaseTime,
+      totalCents: receipt.totalCents,
+    });
+    if (candidates.length > 0 && receipt.duplicateOverride !== true) {
+      throw new DuplicateConfirmationRequiredError(candidates);
+    }
     const now = new Date().toISOString();
     const merchantId = resolveMerchant(tx, receipt.merchant, now);
     learnMerchantAlias(tx, merchantId, receipt.merchant.rawName, now);

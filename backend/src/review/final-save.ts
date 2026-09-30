@@ -71,6 +71,7 @@ export const finalSaveSchema = z
         ),
       ),
     items: z.array(item).min(1),
+    duplicateOverride: z.boolean().optional(),
     discounts: z.array(
       z.strictObject({
         description: z.string().nullable(),

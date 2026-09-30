@@ -15,6 +15,7 @@ import { createReceiptExtractionSchema } from "./extraction/receipt-extraction.j
 import { createReviewDto } from "./review/review-dto.js";
 import {
   ConfirmedEntityNotFoundError,
+  DuplicateConfirmationRequiredError,
   saveReceipt,
   ScanArchiveNotFoundError,
 } from "./review/receipt-persistence.js";
@@ -251,6 +252,11 @@ export function createApp(
           response.status(404).json({ error: "scan_archive_not_found" });
         } else if (error instanceof ConfirmedEntityNotFoundError) {
           response.status(409).json({ error: "confirmed_entity_not_found" });
+        } else if (error instanceof DuplicateConfirmationRequiredError) {
+          response.status(409).json({
+            error: "duplicate_confirmation_required",
+            candidates: error.candidates,
+          });
         } else {
           console.error("Receipt confirmation failed", error);
           response.status(500).json({ error: "receipt_save_failed" });
@@ -258,6 +264,20 @@ export function createApp(
       }
     },
   );
+
+  // Scan OCR image endpoint
+  app.delete("/api/scans/:scanId", async (request, response) => {
+    try {
+      if (!(await scans.cancel(request.params.scanId))) {
+        response.status(404).json({ error: "scan_not_found" });
+        return;
+      }
+      response.status(204).end();
+    } catch (error) {
+      console.error("Scan cancellation failed", error);
+      response.status(500).json({ error: "scan_cancel_failed" });
+    }
+  });
 
   // Scan archive endpoint
   app.get("/api/scans/:scanId/archive", async (request, response) => {
