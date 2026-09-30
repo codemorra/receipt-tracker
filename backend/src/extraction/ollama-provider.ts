@@ -38,6 +38,7 @@ export class OllamaProvider implements ReceiptExtractionProvider {
             createReceiptExtractionSchema(input.categoryNames),
           ),
           stream: false,
+          think: false,
           options: { temperature: 0 },
         }),
         signal: AbortSignal.timeout(120_000),
