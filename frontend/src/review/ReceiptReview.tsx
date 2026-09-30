@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import LookupSelect, { type LookupOption } from "./LookupSelect";
+import DuplicateComparison from "./DuplicateComparison";
 import {
   buildFinalSaveDto,
   chooseProduct,
@@ -9,6 +10,7 @@ import {
   reviewSumStatus,
   warrantyDateIssue,
   type DiscountDraft,
+  type DuplicateCandidate,
   type ItemDraft,
   type LineType,
   type ReviewDraft,
@@ -50,10 +52,11 @@ const defaultCategories = new Set([
 // Default categories used for labeling and validation.
 interface Props {
   review: ReviewDto;
+  onCancelled: () => void;
 }
 
 // Props for the ReceiptReview component.
-function ReceiptReview({ review }: Props) {
+function ReceiptReview({ review, onCancelled }: Props) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<ReviewDraft>(() =>
     createReviewDraft(review),
@@ -65,24 +68,35 @@ function ReceiptReview({ review }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [savedReceiptId, setSavedReceiptId] = useState<number | null>(null);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<
+    DuplicateCandidate[]
+  >(review.duplicateCandidates ?? []);
+  const [cancelling, setCancelling] = useState(false);
   const sumStatus = reviewSumStatus(draft);
   const issues = reviewIssues(draft);
 
   // Function to handle the confirmation of the receipt.
-  async function confirmReceipt() {
+  async function confirmReceipt(duplicateOverride = false) {
     const finalSave = buildFinalSaveDto(draft);
-    if (!finalSave || saving || savedReceiptId !== null) return;
+    if (!finalSave || saving || cancelling || savedReceiptId !== null) return;
     setSaving(true);
     setSaveError("");
     try {
       const response = await fetch(`/api/scans/${review.scanId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(finalSave),
+        body: JSON.stringify({ ...finalSave, duplicateOverride }),
       });
       const result = await response.json();
       if (!response.ok) {
         const error = typeof result.error === "string" ? result.error : "";
+        if (
+          error === "duplicate_confirmation_required" &&
+          Array.isArray(result.candidates)
+        ) {
+          setDuplicateCandidates(result.candidates as DuplicateCandidate[]);
+          return;
+        }
         setSaveError(
           error === "scan_archive_not_found"
             ? "review.saveArchiveMissing"
@@ -99,6 +113,27 @@ function ReceiptReview({ review }: Props) {
       setSaveError("errors.network");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Function to handle the cancellation of the receipt import.
+  async function cancelImport() {
+    if (saving || cancelling) return;
+    setCancelling(true);
+    setSaveError("");
+    try {
+      const response = await fetch(`/api/scans/${review.scanId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok && response.status !== 404) {
+        setSaveError("review.cancelFailed");
+        return;
+      }
+      onCancelled();
+    } catch {
+      setSaveError("errors.network");
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -948,6 +983,17 @@ function ReceiptReview({ review }: Props) {
           </div>
         ))}
       </section>
+      {duplicateCandidates.length > 0 && savedReceiptId === null && (
+        <DuplicateComparison
+          archiveUrl={review.archiveUrl}
+          draft={draft}
+          candidates={duplicateCandidates}
+          busy={saving || cancelling}
+          canImport={issues.length === 0}
+          onCancel={() => void cancelImport()}
+          onImport={() => void confirmReceipt(true)}
+        />
+      )}
       {saveError && (
         <p role="alert" className="text-sm text-red-700">
           {t(saveError)}
@@ -957,7 +1003,7 @@ function ReceiptReview({ review }: Props) {
         <p role="status" className="text-sm text-emerald-800">
           {t("review.saved", { id: savedReceiptId })}
         </p>
-      ) : (
+      ) : duplicateCandidates.length === 0 ? (
         <button
           type="button"
           disabled={saving || issues.length > 0}
@@ -966,7 +1012,7 @@ function ReceiptReview({ review }: Props) {
         >
           {t(saving ? "review.saving" : "review.save")}
         </button>
-      )}
+      ) : null}
       {categoriesFailed && (
         <p role="alert" className="text-sm text-red-700">
           {t("review.categoriesError")}

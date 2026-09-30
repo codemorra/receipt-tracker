@@ -333,7 +333,18 @@ function App() {
         </section>
       )}
 
-      {processed && <ReceiptReview review={processed.review} />}
+      {processed && (
+        <ReceiptReview
+          review={processed.review}
+          onCancelled={() => {
+            setProcessed(null);
+            setScan(null);
+            setFile(null);
+            setCorners(null);
+            setArchiveError(false);
+          }}
+        />
+      )}
     </main>
   );
 }

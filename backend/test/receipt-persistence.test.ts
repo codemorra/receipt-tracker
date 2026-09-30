@@ -18,6 +18,7 @@ import { receipts } from "../src/db/schema.js";
 import { finalSaveSchema } from "../src/review/final-save.js";
 import {
   ConfirmedEntityNotFoundError,
+  DuplicateConfirmationRequiredError,
   saveReceipt,
   ScanArchiveNotFoundError,
 } from "../src/review/receipt-persistence.js";
@@ -223,6 +224,7 @@ test("confirmed existing entities are reused without duplicate aliases", async (
     ...validReceipt,
     merchant: { ...validReceipt.merchant, id: first.merchantId },
     items: [{ ...validReceipt.items[0], productId }],
+    duplicateOverride: true,
   });
   for (const table of [
     "merchant",
@@ -341,4 +343,180 @@ test("confirm API validates requests and returns a saved receipt image", async (
   assert.equal(await image.text(), "archive-image");
   await rm(join(data.dataRoot, "scans", data.scanId, "archive.webp"));
   assert.equal((await confirm(validReceipt)).status, 404);
+});
+
+// Test case for verifying that the final save requires an explicit override for a persisted duplicate
+test("final save requires an explicit override for a persisted duplicate", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const firstId = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    validReceipt,
+  );
+  const merchantId = data.db
+    .select()
+    .from(receipts)
+    .where(eq(receipts.id, firstId))
+    .get()!.merchantId;
+  const duplicate = {
+    ...validReceipt,
+    merchant: { ...validReceipt.merchant, id: merchantId },
+    purchaseTime: "13:15",
+  };
+  await assert.rejects(
+    saveReceipt(data.db, data.scans, data.dataRoot, data.scanId, duplicate),
+    (error: unknown) => {
+      assert.ok(error instanceof DuplicateConfirmationRequiredError);
+      assert.equal(error.candidates[0].receiptId, firstId);
+      assert.equal(error.candidates[0].items[0].rawName, "MILCH 1L");
+      return true;
+    },
+  );
+  assert.equal(
+    (
+      data.sqlite.prepare("SELECT COUNT(*) AS count FROM receipt").get() as {
+        count: number;
+      }
+    ).count,
+    1,
+  );
+  assert.equal((await readdir(join(data.dataRoot, "receipts"))).length, 1);
+  const secondId = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    { ...duplicate, duplicateOverride: true },
+  );
+  assert.notEqual(secondId, firstId);
+  assert.equal(
+    (
+      data.sqlite.prepare("SELECT COUNT(*) AS count FROM receipt").get() as {
+        count: number;
+      }
+    ).count,
+    2,
+  );
+});
+
+// Test case for verifying that a new merchant without a confirmed match skips duplicate comparison
+test("new merchant without a confirmed match skips duplicate comparison", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    validReceipt,
+  );
+  await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    validReceipt,
+  );
+  assert.equal(
+    (
+      data.sqlite.prepare("SELECT COUNT(*) AS count FROM receipt").get() as {
+        count: number;
+      }
+    ).count,
+    2,
+  );
+});
+
+// Test case for verifying that the confirm API returns current duplicate candidates after final edits
+test("confirm API returns current duplicate candidates after final edits", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const firstId = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    validReceipt,
+  );
+  const merchantId = data.db
+    .select()
+    .from(receipts)
+    .where(eq(receipts.id, firstId))
+    .get()!.merchantId;
+  const app = createApp(
+    data.scans,
+    data.db,
+    {
+      async extractReceipt() {
+        throw new Error("unused");
+      },
+    },
+    data.dataRoot,
+  );
+  const server = app.listen(0);
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const url = `http://127.0.0.1:${address.port}/api/scans/${data.scanId}/confirm`;
+  const finalEdit = {
+    ...validReceipt,
+    merchant: { ...validReceipt.merchant, id: merchantId },
+  };
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(finalEdit),
+  });
+  assert.equal(response.status, 409);
+  const body = (await response.json()) as {
+    error: string;
+    candidates: { receiptId: number }[];
+  };
+  assert.equal(body.error, "duplicate_confirmation_required");
+  assert.equal(body.candidates[0].receiptId, firstId);
+  assert.equal(
+    (
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...finalEdit, duplicateOverride: true }),
+      })
+    ).status,
+    201,
+  );
+});
+
+// Test case for verifying that cancelling a scan removes temporary files without storing a receipt
+test("cancel scan removes temporary files without storing a receipt", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const app = createApp(
+    data.scans,
+    data.db,
+    {
+      async extractReceipt() {
+        throw new Error("unused");
+      },
+    },
+    data.dataRoot,
+  );
+  const server = app.listen(0);
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const url = `http://127.0.0.1:${address.port}/api/scans/${data.scanId}`;
+  assert.equal((await fetch(url, { method: "DELETE" })).status, 204);
+  assert.equal((await fetch(url, { method: "DELETE" })).status, 404);
+  assert.deepEqual(await readdir(join(data.dataRoot, "scans")), []);
+  assert.equal(
+    (
+      data.sqlite.prepare("SELECT COUNT(*) AS count FROM receipt").get() as {
+        count: number;
+      }
+    ).count,
+    0,
+  );
 });

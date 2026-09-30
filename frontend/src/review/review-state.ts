@@ -3,6 +3,28 @@ export type Unit = "pcs" | "g" | "kg" | "ml" | "l";
 export type LineType = "product" | "deposit" | "fee" | "other";
 export type WarrantyType = "statutory" | "manufacturer" | "extended";
 
+// Types and interfaces for handling duplicate candidates in the receipt review process.
+export interface DuplicateCandidate {
+  receiptId: number;
+  merchantId: number;
+  merchantName: string;
+  purchaseDate: string;
+  purchaseTime: string | null;
+  totalCents: number;
+  currency: string;
+  imagePath: string;
+  items: {
+    position: number;
+    rawName: string;
+    quantity: number;
+    unit: string | null;
+    unitPriceCents: number | null;
+    totalPriceCents: number;
+    lineType: string;
+    productId: number | null;
+  }[];
+}
+
 // Types and interfaces for managing the state of the receipt review process.
 export interface ReviewDto {
   scanId: string;
@@ -55,6 +77,7 @@ export interface ReviewDto {
     appliesToItemIndex: number | null;
     sourceLineIndexes: number[];
   }[];
+  duplicateCandidates: DuplicateCandidate[];
   warnings: ("possible_duplicate" | "sum_mismatch" | "sum_incomplete")[];
 }
 
