@@ -1,21 +1,19 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import Database from "better-sqlite3";
 import { createDatabase } from "../src/db/database.js";
 
 // Test for database schema and indexes.
-test("the initial migration creates the required schema and indexes", () => {
+test("database initialization applies migrations to a fresh database", () => {
   const directory = mkdtempSync(join(tmpdir(), "receipt-tracker-db-"));
-  const { sqlite, db } = createDatabase(join(directory, "test.sqlite"));
+  const { sqlite } = createDatabase(join(directory, "test.sqlite"));
 
-  // Perform the initial migration and verify the database schema and indexes.
   try {
-    migrate(db, { migrationsFolder: "./drizzle" });
-    migrate(db, { migrationsFolder: "./drizzle" });
-
     // Verify the list of tables in the database.
     const tables = sqlite
       .prepare(
@@ -123,6 +121,83 @@ test("the initial migration creates the required schema and indexes", () => {
     );
   } finally {
     sqlite.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+// Test to ensure that database initialization skips migrations that have already been applied.
+test("database initialization skips migrations already applied", () => {
+  const directory = mkdtempSync(join(tmpdir(), "receipt-tracker-db-"));
+  const filename = join(directory, "test.sqlite");
+
+  try {
+    const first = createDatabase(filename);
+    first.sqlite.close();
+
+    const second = createDatabase(filename);
+    try {
+      const migrationCount = second.sqlite
+        .prepare("SELECT COUNT(*) AS count FROM __drizzle_migrations")
+        .get() as { count: number };
+      const categoryCount = second.sqlite
+        .prepare("SELECT COUNT(*) AS count FROM category")
+        .get() as { count: number };
+      assert.equal(migrationCount.count, 2);
+      assert.equal(categoryCount.count, 13);
+    } finally {
+      second.sqlite.close();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+// Test to ensure that a migration failure prevents the backend from starting up.
+test("migration failure prevents backend startup", () => {
+  const directory = mkdtempSync(join(tmpdir(), "receipt-tracker-db-"));
+  const filename = join(directory, "test.sqlite");
+
+  try {
+    const sqlite = new Database(filename);
+    sqlite.exec("CREATE TABLE category (id INTEGER PRIMARY KEY)");
+    sqlite.close();
+
+    assert.throws(
+      () => createDatabase(filename),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.ok(error.cause instanceof Error);
+        assert.ok(error.cause.message.includes("already exists"));
+        return true;
+      },
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        fileURLToPath(new URL("../src/index.ts", import.meta.url)),
+      ],
+      {
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        env: {
+          ...process.env,
+          DATABASE_FILE: filename,
+          OLLAMA_MODEL: "test-model",
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      },
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.ok(
+      result.stderr.includes(
+        "Backend startup failed during database migration",
+      ),
+    );
+    assert.ok(!result.stdout.includes("Backend listening"));
+  } finally {
     rmSync(directory, { recursive: true, force: true });
   }
 });

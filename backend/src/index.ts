@@ -22,23 +22,28 @@ const worker = new PythonWorkerClient(
 );
 const scans = new ScanSessionService(scansRoot, worker);
 const provider = createOllamaProviderFromEnv();
-const { db, sqlite } = createDatabase();
-const app = createApp(scans, db, provider, resolve(projectRoot, "data"));
-const port = Number(process.env.PORT ?? 3000);
+try {
+  const { db, sqlite } = createDatabase();
+  const app = createApp(scans, db, provider, resolve(projectRoot, "data"));
+  const port = Number(process.env.PORT ?? 3000);
 
-void worker.start().catch((error) => {
-  console.error("Python worker failed to start", error);
-});
+  void worker.start().catch((error) => {
+    console.error("Python worker failed to start", error);
+  });
 
-app.listen(port, () => {
-  console.log(`Backend listening on http://localhost:${port}`);
-});
+  app.listen(port, () => {
+    console.log(`Backend listening on http://localhost:${port}`);
+  });
 
-process.once("SIGTERM", () => {
-  worker.stop();
-  sqlite.close();
-});
-process.once("SIGINT", () => {
-  worker.stop();
-  sqlite.close();
-});
+  process.once("SIGTERM", () => {
+    worker.stop();
+    sqlite.close();
+  });
+  process.once("SIGINT", () => {
+    worker.stop();
+    sqlite.close();
+  });
+} catch (error) {
+  console.error("Backend startup failed during database migration", error);
+  process.exitCode = 1;
+}
