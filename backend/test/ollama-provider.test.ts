@@ -8,6 +8,7 @@ import {
   OllamaUnavailableError,
 } from "../src/extraction/ollama-provider.js";
 import { createReceiptExtractionPrompt } from "../src/extraction/receipt-extraction-prompt.js";
+import type { OllamaDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
 
 // Defines a sample input for receipt extraction tests.
 const input = {
@@ -63,6 +64,39 @@ test("sends only OCR data and categories with the extraction JSON schema", async
   assert.ok(
     messages[0].content.includes(`"lines":${JSON.stringify(input.lines)}`),
   );
+});
+
+// Tests for the extraction of Ollama timing and token metadata.
+test("extracts available Ollama timing and token metadata", async () => {
+  const provider = new OllamaProvider(
+    "http://localhost/api/chat",
+    "test-model",
+    async () =>
+      new Response(
+        JSON.stringify({
+          message: { content: '{"items":[]}' },
+          total_duration: 20_000_000_000,
+          load_duration: 1_500_000_000,
+          prompt_eval_count: 250,
+          prompt_eval_duration: 3_000_000_000,
+          eval_count: 40,
+          eval_duration: 15_000_000_000,
+        }),
+      ),
+  );
+  let diagnostics: OllamaDiagnostics | undefined;
+  await provider.extractReceipt(input, (value) => {
+    diagnostics = value;
+  });
+  assert.deepEqual(diagnostics, {
+    model: "test-model",
+    totalDurationMs: 20_000,
+    loadDurationMs: 1_500,
+    promptEvalCount: 250,
+    promptEvalDurationMs: 3_000,
+    evalCount: 40,
+    evalDurationMs: 15_000,
+  });
 });
 
 // Tests for the receipt extraction prompt creation function.

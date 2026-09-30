@@ -180,6 +180,8 @@ def test_process_request_creates_final_images_and_returns_ocr(tmp_path):
     assert response["requestId"] == "process-1"
     assert response["status"] == "ok"
     assert response["plainText"] == "RECEIPT"
+    assert isinstance(response["ocrDurationMs"], (int, float))
+    assert response["ocrDurationMs"] >= 0
     assert response["lines"] == [{
         "text": "RECEIPT",
         "confidence": 0.95,

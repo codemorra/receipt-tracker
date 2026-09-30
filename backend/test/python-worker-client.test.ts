@@ -42,6 +42,7 @@ test("worker waits for ready and maps sequenced responses by requestId", async (
     "ocr.webp",
   );
   assert.equal(processed.plainText, "RECEIPT");
+  assert.equal(processed.ocrDurationMs, 12.5);
   assert.deepEqual(processed.lines[0], {
     index: 0,
     text: "RECEIPT",

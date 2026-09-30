@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 import traceback
 
 from .final_image import create_final_images
@@ -52,7 +53,9 @@ def handle_request(request):
             request["archivePath"],
             request["ocrPath"],
         )
+        ocr_started = time.perf_counter()
         result.update(recognize_image(initialize_ocr(), request["ocrPath"]))
+        result["ocrDurationMs"] = round((time.perf_counter() - ocr_started) * 1000, 2)
 
     return {"requestId": request_id, "status": "ok", **result}
 
