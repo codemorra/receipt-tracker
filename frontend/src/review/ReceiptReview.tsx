@@ -53,10 +53,11 @@ const defaultCategories = new Set([
 interface Props {
   review: ReviewDto;
   onCancelled: () => void;
+  onSaved: (receiptId: number) => void;
 }
 
 // Props for the ReceiptReview component.
-function ReceiptReview({ review, onCancelled }: Props) {
+function ReceiptReview({ review, onCancelled, onSaved }: Props) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<ReviewDraft>(() =>
     createReviewDraft(review),
@@ -109,6 +110,7 @@ function ReceiptReview({ review, onCancelled }: Props) {
         return;
       }
       setSavedReceiptId(result.receiptId);
+      onSaved(result.receiptId);
     } catch {
       setSaveError("errors.network");
     } finally {
@@ -1013,6 +1015,16 @@ function ReceiptReview({ review, onCancelled }: Props) {
           {t(saving ? "review.saving" : "review.save")}
         </button>
       ) : null}
+      {savedReceiptId === null && duplicateCandidates.length === 0 && (
+        <button
+          type="button"
+          disabled={saving || cancelling}
+          onClick={() => void cancelImport()}
+          className="rounded-lg border border-slate-300 px-5 py-3 font-semibold disabled:opacity-50"
+        >
+          {t("review.cancelImport")}
+        </button>
+      )}
       {categoriesFailed && (
         <p role="alert" className="text-sm text-red-700">
           {t("review.categoriesError")}

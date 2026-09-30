@@ -16,6 +16,7 @@ import { createDatabase } from "../src/db/database.js";
 import { createApp } from "../src/app.js";
 import { receipts } from "../src/db/schema.js";
 import { finalSaveSchema } from "../src/review/final-save.js";
+import { loadReceiptDetail } from "../src/review/receipt-detail.js";
 import {
   ConfirmedEntityNotFoundError,
   DuplicateConfirmationRequiredError,
@@ -67,12 +68,16 @@ async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "receipt-save-"));
   const dataRoot = join(root, "data");
   const scansRoot = join(dataRoot, "scans");
-  const scanId = randomUUID();
-  const scanDirectory = join(scansRoot, scanId);
-  await mkdir(scanDirectory, { recursive: true });
-  await writeFile(join(scanDirectory, "session.json"), "{}");
-  await writeFile(join(scanDirectory, "archive.webp"), "archive-image");
-  const { sqlite, db } = createDatabase(":memory:");
+  async function createScan() {
+    const id = randomUUID();
+    const directory = join(scansRoot, id);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, "session.json"), "{}");
+    await writeFile(join(directory, "archive.webp"), "archive-image");
+    return id;
+  }
+  const scanId = await createScan();
+  const { sqlite, db } = createDatabase(join(root, "test.sqlite"));
   const scans = new ScanSessionService(scansRoot, {
     async requestPreview() {
       throw new Error("unused");
@@ -85,6 +90,7 @@ async function fixture() {
     root,
     dataRoot,
     scanId,
+    createScan,
     scans,
     db,
     sqlite,
@@ -155,6 +161,7 @@ test("save persists confirmed entities, aliases, receipt rows, warranty, and arc
     await readFile(join(data.dataRoot, receipt.imagePath), "utf8"),
     "archive-image",
   );
+  assert.deepEqual(await readdir(join(data.dataRoot, "scans")), []);
   const count = (table: string) =>
     (
       data.sqlite.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as {
@@ -220,12 +227,18 @@ test("confirmed existing entities are reused without duplicate aliases", async (
   const productId = (
     data.sqlite.prepare("SELECT id FROM product").get() as { id: number }
   ).id;
-  await saveReceipt(data.db, data.scans, data.dataRoot, data.scanId, {
-    ...validReceipt,
-    merchant: { ...validReceipt.merchant, id: first.merchantId },
-    items: [{ ...validReceipt.items[0], productId }],
-    duplicateOverride: true,
-  });
+  await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    await data.createScan(),
+    {
+      ...validReceipt,
+      merchant: { ...validReceipt.merchant, id: first.merchantId },
+      items: [{ ...validReceipt.items[0], productId }],
+      duplicateOverride: true,
+    },
+  );
   for (const table of [
     "merchant",
     "merchant_alias",
@@ -341,7 +354,55 @@ test("confirm API validates requests and returns a saved receipt image", async (
   const image = await fetch(`${base}/api/receipts/${receiptId}/image`);
   assert.equal(image.status, 200);
   assert.equal(await image.text(), "archive-image");
-  await rm(join(data.dataRoot, "scans", data.scanId, "archive.webp"));
+  const detailResponse = await fetch(`${base}/api/receipts/${receiptId}`);
+  assert.equal(detailResponse.status, 200);
+  const detail = (await detailResponse.json()) as {
+    merchantName: string;
+    purchaseDate: string;
+    purchaseTime: string;
+    totalCents: number;
+    currency: string;
+    imageUrl: string;
+    items: {
+      quantity: number;
+      unitPriceCents: number;
+      totalPriceCents: number;
+      product: {
+        name: string;
+        brandName: string;
+        productGroupName: string;
+        categoryName: string;
+        packageAmount: number;
+        packageUnit: string;
+      };
+      warranties: { type: string; endDate: string }[];
+    }[];
+    discounts: { amountCents: number; receiptItemId: number }[];
+  };
+  assert.equal(detail.merchantName, "Edeka");
+  assert.equal(detail.purchaseDate, "2026-09-30");
+  assert.equal(detail.purchaseTime, "12:30");
+  assert.equal(detail.totalCents, 199);
+  assert.equal(detail.currency, "EUR");
+  assert.equal(detail.imageUrl, `/api/receipts/${receiptId}/image`);
+  assert.equal(detail.items[0].quantity, 2);
+  assert.equal(detail.items[0].unitPriceCents, 109);
+  assert.equal(detail.items[0].totalPriceCents, 218);
+  assert.deepEqual(detail.items[0].product, {
+    id: 1,
+    name: "Milch",
+    brandName: "Gut & Günstig",
+    productGroupName: "milk",
+    categoryName: "food",
+    packageAmount: 1,
+    packageUnit: "l",
+  });
+  assert.equal(detail.items[0].warranties[0].type, "statutory");
+  assert.equal(detail.items[0].warranties[0].endDate, "2028-09-30");
+  assert.equal(detail.discounts[0].amountCents, 19);
+  assert.ok(detail.discounts[0].receiptItemId > 0);
+  assert.equal((await fetch(`${base}/api/receipts/999999`)).status, 404);
+  assert.deepEqual(await readdir(join(data.dataRoot, "scans")), []);
   assert.equal((await confirm(validReceipt)).status, 404);
 });
 
@@ -366,8 +427,9 @@ test("final save requires an explicit override for a persisted duplicate", async
     merchant: { ...validReceipt.merchant, id: merchantId },
     purchaseTime: "13:15",
   };
+  const duplicateScanId = await data.createScan();
   await assert.rejects(
-    saveReceipt(data.db, data.scans, data.dataRoot, data.scanId, duplicate),
+    saveReceipt(data.db, data.scans, data.dataRoot, duplicateScanId, duplicate),
     (error: unknown) => {
       assert.ok(error instanceof DuplicateConfirmationRequiredError);
       assert.equal(error.candidates[0].receiptId, firstId);
@@ -388,7 +450,7 @@ test("final save requires an explicit override for a persisted duplicate", async
     data.db,
     data.scans,
     data.dataRoot,
-    data.scanId,
+    duplicateScanId,
     { ...duplicate, duplicateOverride: true },
   );
   assert.notEqual(secondId, firstId);
@@ -417,7 +479,7 @@ test("new merchant without a confirmed match skips duplicate comparison", async 
     data.db,
     data.scans,
     data.dataRoot,
-    data.scanId,
+    await data.createScan(),
     validReceipt,
   );
   assert.equal(
@@ -460,7 +522,8 @@ test("confirm API returns current duplicate candidates after final edits", async
   t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
   const address = server.address();
   assert.ok(address && typeof address !== "string");
-  const url = `http://127.0.0.1:${address.port}/api/scans/${data.scanId}/confirm`;
+  const secondScanId = await data.createScan();
+  const url = `http://127.0.0.1:${address.port}/api/scans/${secondScanId}/confirm`;
   const finalEdit = {
     ...validReceipt,
     merchant: { ...validReceipt.merchant, id: merchantId },
@@ -519,4 +582,37 @@ test("cancel scan removes temporary files without storing a receipt", async (t) 
     ).count,
     0,
   );
+});
+
+// Test case for verifying that saved receipt details can be reloaded from a new database connection.
+test("saved receipt detail reloads from a new database connection", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const receiptId = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    {
+      ...validReceipt,
+      discounts: [
+        ...validReceipt.discounts,
+        { description: "Coupon", amountCents: 10, appliesToItemIndex: null },
+      ],
+    },
+  );
+  const reopened = createDatabase(join(data.root, "test.sqlite"));
+  try {
+    const detail = loadReceiptDetail(reopened.db, receiptId);
+    assert.ok(detail);
+    assert.equal(detail.merchantName, "Edeka");
+    assert.equal(detail.items[0].product?.name, "Milch");
+    assert.equal(detail.items[0].warranties[0].startDate, "2026-09-30");
+    assert.equal(detail.discounts[0].amountCents, 19);
+    assert.equal(detail.discounts[1].amountCents, 10);
+    assert.equal(detail.discounts[1].receiptItemId, null);
+    assert.equal(loadReceiptDetail(reopened.db, receiptId + 100), null);
+  } finally {
+    reopened.sqlite.close();
+  }
 });
