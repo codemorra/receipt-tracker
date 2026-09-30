@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import LookupSelect, { type LookupOption } from "./LookupSelect";
 import {
+  buildFinalSaveDto,
   chooseProduct,
   createReviewDraft,
   reviewIssues,
@@ -61,8 +62,45 @@ function ReceiptReview({ review }: Props) {
   const [categoriesFailed, setCategoriesFailed] = useState(false);
   const [openWarrantyIds, setOpenWarrantyIds] = useState<string[]>([]);
   const [openProductIds, setOpenProductIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [savedReceiptId, setSavedReceiptId] = useState<number | null>(null);
   const sumStatus = reviewSumStatus(draft);
   const issues = reviewIssues(draft);
+
+  // Function to handle the confirmation of the receipt.
+  async function confirmReceipt() {
+    const finalSave = buildFinalSaveDto(draft);
+    if (!finalSave || saving || savedReceiptId !== null) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const response = await fetch(`/api/scans/${review.scanId}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(finalSave),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        const error = typeof result.error === "string" ? result.error : "";
+        setSaveError(
+          error === "scan_archive_not_found"
+            ? "review.saveArchiveMissing"
+            : error === "confirmed_entity_not_found"
+              ? "review.saveEntityMissing"
+              : error === "invalid_final_save"
+                ? "review.saveInvalid"
+                : "review.saveFailed",
+        );
+        return;
+      }
+      setSavedReceiptId(result.receiptId);
+    } catch {
+      setSaveError("errors.network");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   // Fetch categories from the API when the component mounts.
   useEffect(() => {
@@ -910,6 +948,25 @@ function ReceiptReview({ review }: Props) {
           </div>
         ))}
       </section>
+      {saveError && (
+        <p role="alert" className="text-sm text-red-700">
+          {t(saveError)}
+        </p>
+      )}
+      {savedReceiptId !== null ? (
+        <p role="status" className="text-sm text-emerald-800">
+          {t("review.saved", { id: savedReceiptId })}
+        </p>
+      ) : (
+        <button
+          type="button"
+          disabled={saving || issues.length > 0}
+          onClick={() => void confirmReceipt()}
+          className="rounded-lg bg-emerald-700 px-5 py-3 font-semibold text-white disabled:opacity-50"
+        >
+          {t(saving ? "review.saving" : "review.save")}
+        </button>
+      )}
       {categoriesFailed && (
         <p role="alert" className="text-sm text-red-700">
           {t("review.categoriesError")}
