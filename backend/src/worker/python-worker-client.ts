@@ -32,6 +32,7 @@ export interface ProcessResult {
   height: number;
   plainText: string;
   lines: OcrLine[];
+  ocrDurationMs: number;
 }
 
 export class WorkerUnavailableError extends Error {}
@@ -137,6 +138,7 @@ export class PythonWorkerClient {
                 height: value.height,
                 plainText: value.plainText,
                 lines: value.lines,
+                ocrDurationMs: value.ocrDurationMs,
               }
             : undefined,
       ),
@@ -322,6 +324,12 @@ function isProcessResult(
   if ((value.width as number) <= 0 || (value.height as number) <= 0)
     return false;
   if (typeof value.plainText !== "string" || !Array.isArray(value.lines))
+    return false;
+  if (
+    typeof value.ocrDurationMs !== "number" ||
+    !Number.isFinite(value.ocrDurationMs) ||
+    value.ocrDurationMs < 0
+  )
     return false;
   return value.lines.every((line: unknown, index: number) => {
     if (!line || typeof line !== "object") return false;

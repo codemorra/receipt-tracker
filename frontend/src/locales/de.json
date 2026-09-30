@@ -41,6 +41,7 @@
   "processReceipt": "Beleg verarbeiten",
   "processing": "Beleg wird verarbeitet…",
   "resultHeading": "Verarbeiteter Beleg",
+  "processingDurations": "OCR: {{ocr}} s · KI-Auswertung: {{llm}} s · Gesamt: {{total}} s",
   "archiveAlt": "Zugeschnittenes Archivbild des Belegs",
   "ocrHeading": "Erkannter Text",
   "noOcrText": "Auf dem Beleg wurde kein Text erkannt.",

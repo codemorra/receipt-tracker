@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createReceiptExtractionSchema } from "./receipt-extraction.js";
 import type {
+  OllamaDiagnostics,
   ReceiptExtractionInput,
   ReceiptExtractionProvider,
 } from "./receipt-extraction-provider.js";
@@ -19,7 +20,10 @@ export class OllamaProvider implements ReceiptExtractionProvider {
   ) {}
 
   // Extracts receipt data from the Ollama LLM using the provided input.
-  async extractReceipt(input: ReceiptExtractionInput): Promise<unknown> {
+  async extractReceipt(
+    input: ReceiptExtractionInput,
+    onDiagnostics?: (diagnostics: OllamaDiagnostics) => void,
+  ): Promise<unknown> {
     let response: Response;
     try {
       response = await this.request(this.endpoint, {
@@ -54,6 +58,34 @@ export class OllamaProvider implements ReceiptExtractionProvider {
       throw new InvalidLlmResponseError(
         "Ollama returned invalid response JSON",
       );
+    }
+
+    // Extract and report diagnostic information from the Ollama response.
+    if (payload && typeof payload === "object") {
+      const values = payload as Record<string, unknown>;
+      const duration = (name: string) => {
+        const value = values[name];
+        return typeof value === "number" && Number.isFinite(value) && value >= 0
+          ? value / 1_000_000
+          : undefined;
+      };
+      const count = (name: string) => {
+        const value = values[name];
+        return typeof value === "number" &&
+          Number.isSafeInteger(value) &&
+          value >= 0
+          ? value
+          : undefined;
+      };
+      onDiagnostics?.({
+        model: this.model,
+        totalDurationMs: duration("total_duration"),
+        loadDurationMs: duration("load_duration"),
+        promptEvalCount: count("prompt_eval_count"),
+        promptEvalDurationMs: duration("prompt_eval_duration"),
+        evalCount: count("eval_count"),
+        evalDurationMs: duration("eval_duration"),
+      });
     }
 
     // Validate the structure of the Ollama response before attempting to parse it.

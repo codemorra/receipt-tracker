@@ -10,7 +10,10 @@ import {
   OllamaRequestError,
   OllamaUnavailableError,
 } from "./extraction/ollama-provider.js";
-import type { ReceiptExtractionProvider } from "./extraction/receipt-extraction-provider.js";
+import type {
+  OllamaDiagnostics,
+  ReceiptExtractionProvider,
+} from "./extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "./extraction/receipt-extraction.js";
 import { createReviewDto } from "./review/review-dto.js";
 import { loadReceiptDetail } from "./review/receipt-detail.js";
@@ -207,6 +210,7 @@ export function createApp(
     express.json({ limit: "16kb" }),
     async (request, response) => {
       try {
+        const processingStarted = performance.now();
         const result = await scans.process(
           request.params.scanId,
           request.body?.corners,
@@ -215,16 +219,35 @@ export function createApp(
           response.status(404).json({ error: "scan_not_found" });
           return;
         }
+        const workerDurationMs = performance.now() - processingStarted;
         const { categoryNames } = loadExtractionReferenceData(db);
-        const extracted = await provider.extractReceipt({
-          plainText: result.plainText,
-          lines: result.lines,
-          categoryNames,
-        });
+        let ollama: OllamaDiagnostics | undefined;
+        const llmStarted = performance.now();
+        const extracted = await provider.extractReceipt(
+          {
+            plainText: result.plainText,
+            lines: result.lines,
+            categoryNames,
+          },
+          (diagnostics) => {
+            ollama = diagnostics;
+          },
+        );
+        const llmDurationMs = performance.now() - llmStarted;
         const extraction =
           createReceiptExtractionSchema(categoryNames).parse(extracted);
         const review = createReviewDto(db, result, extraction);
-        response.json({ ...result, review });
+        response.json({
+          ...result,
+          review,
+          timings: {
+            ocrDurationMs: result.ocrDurationMs,
+            workerDurationMs,
+            llmDurationMs,
+            totalDurationMs: performance.now() - processingStarted,
+            ollama,
+          },
+        });
       } catch (error) {
         if (error instanceof InvalidCornersError) {
           response.status(400).json({ error: "invalid_corners" });

@@ -48,6 +48,7 @@ function previewWorker() {
         width: 100,
         height: 200,
         plainText: "RECEIPT",
+        ocrDurationMs: 12.5,
         lines: [
           {
             index: 0,

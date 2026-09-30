@@ -20,6 +20,11 @@ interface ProcessResponse {
   archiveUrl: string;
   plainText: string;
   review: ReviewDto;
+  timings: {
+    ocrDurationMs: number;
+    llmDurationMs: number;
+    totalDurationMs: number;
+  };
 }
 
 // Maximum allowed upload size and supported file types.
@@ -384,6 +389,19 @@ function App() {
               <h2 id="result-heading" className="text-xl font-semibold">
                 {t("resultHeading")}
               </h2>
+              <p className="mt-3 text-sm text-slate-600">
+                {t("processingDurations", {
+                  ocr: new Intl.NumberFormat(i18n.language, {
+                    maximumFractionDigits: 2,
+                  }).format(processed.timings.ocrDurationMs / 1000),
+                  llm: new Intl.NumberFormat(i18n.language, {
+                    maximumFractionDigits: 2,
+                  }).format(processed.timings.llmDurationMs / 1000),
+                  total: new Intl.NumberFormat(i18n.language, {
+                    maximumFractionDigits: 2,
+                  }).format(processed.timings.totalDurationMs / 1000),
+                })}
+              </p>
               {archiveError && (
                 <p
                   role="alert"

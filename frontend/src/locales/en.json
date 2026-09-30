@@ -41,6 +41,7 @@
   "processReceipt": "Process receipt",
   "processing": "Processing receipt…",
   "resultHeading": "Processed receipt",
+  "processingDurations": "OCR: {{ocr}} s · AI extraction: {{llm}} s · Total: {{total}} s",
   "archiveAlt": "Cropped archive image of the receipt",
   "ocrHeading": "Recognized text",
   "noOcrText": "No text was recognized on this receipt.",

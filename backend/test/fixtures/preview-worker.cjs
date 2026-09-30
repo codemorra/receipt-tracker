@@ -15,6 +15,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
         width: 100,
         height: 200,
         plainText: "RECEIPT",
+        ocrDurationMs: 12.5,
         lines: [{ index: 0, text: "RECEIPT", confidence: 0.95, box: [0, 0, 1, 1] }],
       }) + "\n",
     );

@@ -75,6 +75,7 @@ test("process endpoint returns a review DTO using current categories and databas
         width: 100,
         height: 200,
         plainText: ocrLine.text,
+        ocrDurationMs: 12.5,
         lines: [ocrLine],
       };
     },
@@ -87,7 +88,7 @@ test("process endpoint returns a review DTO using current categories and databas
   let nextError: Error | undefined;
   let providerCalls = 0;
   const app = createApp(scans, db, {
-    async extractReceipt(input) {
+    async extractReceipt(input, onDiagnostics) {
       providerCalls++;
       assert.equal(input.plainText, ocrLine.text);
       assert.deepEqual(input.lines, [ocrLine]);
@@ -95,6 +96,7 @@ test("process endpoint returns a review DTO using current categories and databas
       assert.ok(input.categoryNames.includes("custom"));
       assert.equal(input.categoryNames.includes("food"), false);
       if (nextError) throw nextError;
+      onDiagnostics?.({ model: "test-model", promptEvalCount: 250 });
       return nextExtraction;
     },
   });
@@ -188,6 +190,15 @@ test("process endpoint returns a review DTO using current categories and databas
   assert.equal(result.plainText, ocrLine.text);
   assert.equal(result.archiveUrl, `/api/scans/${scan.scanId}/archive`);
   assert.equal(result.extraction, undefined);
+  assert.equal(result.timings.ocrDurationMs, 12.5);
+  assert.ok(result.timings.workerDurationMs >= 0);
+  assert.ok(result.timings.llmDurationMs >= 0);
+  assert.ok(result.timings.totalDurationMs >= result.timings.workerDurationMs);
+  assert.ok(result.timings.totalDurationMs >= result.timings.llmDurationMs);
+  assert.deepEqual(result.timings.ollama, {
+    model: "test-model",
+    promptEvalCount: 250,
+  });
   assert.equal(result.review.scanId, scan.scanId);
   assert.equal(result.review.archiveUrl, result.archiveUrl);
   assert.deepEqual(result.review.merchant, {
