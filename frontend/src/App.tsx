@@ -1,6 +1,8 @@
 import { useState, type SubmitEvent } from "react";
 import { useTranslation } from "react-i18next";
 import ReceiptImagePreview, { type Corners } from "./scans/ReceiptImagePreview";
+import ReceiptReview from "./review/ReceiptReview";
+import type { ReviewDto } from "./review/review-state";
 import "./App.css";
 
 // Types and constants for handling scan responses and file uploads.
@@ -16,6 +18,7 @@ interface ScanResponse {
 interface ProcessResponse {
   archiveUrl: string;
   plainText: string;
+  review: ReviewDto;
 }
 
 // Maximum allowed upload size and supported file types.
@@ -122,6 +125,10 @@ function App() {
           scan_not_found: "errors.scanNotFound",
           worker_unavailable: "errors.workerUnavailable",
           processing_failed: "errors.processingFailed",
+          ollama_unavailable: "errors.ollamaUnavailable",
+          ollama_failed: "errors.ollamaFailed",
+          invalid_llm_response: "errors.invalidExtraction",
+          invalid_extraction: "errors.invalidExtraction",
         };
         setProcessErrorKey(processErrorKeys[code] ?? "errors.processingFailed");
         return;
@@ -325,6 +332,8 @@ function App() {
           )}
         </section>
       )}
+
+      {processed && <ReceiptReview review={processed.review} />}
     </main>
   );
 }

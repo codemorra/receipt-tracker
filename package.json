@@ -11,7 +11,7 @@
     "format": "prettier --write \"{frontend,backend}/**/*.{ts,tsx,js,json,css,html}\" python_worker/README.md package.json",
     "format:check": "prettier --check \"{frontend,backend}/**/*.{ts,tsx,js,json,css,html}\" python_worker/README.md package.json",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run format:check",
-    "test": "npm --prefix backend run test"
+    "test": "npm --prefix frontend run test && npm --prefix backend run test"
   },
   "devDependencies": {
     "prettier": "3.9.9"
