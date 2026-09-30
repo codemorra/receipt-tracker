@@ -13,6 +13,7 @@ import {
 import type { ReceiptExtractionProvider } from "./extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "./extraction/receipt-extraction.js";
 import { createReviewDto } from "./review/review-dto.js";
+import { loadReceiptDetail } from "./review/receipt-detail.js";
 import {
   ConfirmedEntityNotFoundError,
   DuplicateConfirmationRequiredError,
@@ -90,6 +91,26 @@ export function createApp(
     const query =
       typeof request.query.query === "string" ? request.query.query : "";
     response.json(listProducts(db, query));
+  });
+
+  // Receipts endpoint
+  app.get("/api/receipts/:receiptId", (request, response) => {
+    const receiptId = Number(request.params.receiptId);
+    if (!Number.isSafeInteger(receiptId) || receiptId <= 0) {
+      response.status(404).json({ error: "receipt_not_found" });
+      return;
+    }
+    try {
+      const detail = loadReceiptDetail(db, receiptId);
+      if (!detail) {
+        response.status(404).json({ error: "receipt_not_found" });
+        return;
+      }
+      response.json(detail);
+    } catch (error) {
+      console.error("Receipt detail failed", error);
+      response.status(500).json({ error: "receipt_detail_failed" });
+    }
   });
 
   // Receipt image endpoint

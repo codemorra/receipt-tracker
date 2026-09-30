@@ -360,12 +360,15 @@ export async function saveReceipt(
   const archiveDestination = join(dataRoot, imagePath);
   await mkdir(join(dataRoot, "receipts"), { recursive: true });
   let copied = false;
+  let receiptId: number;
   try {
+    // Copy the receipt image to the archive before persisting the receipt in the database.
     await copyFile(archive, archiveDestination, constants.COPYFILE_EXCL);
     copied = true;
-    return persistReceipt(db, receipt, imagePath);
+    receiptId = persistReceipt(db, receipt, imagePath);
   } catch (error) {
     if (
+      // If the error occurred because the file already exists, rethrow it.
       !copied &&
       error &&
       typeof error === "object" &&
@@ -375,10 +378,18 @@ export async function saveReceipt(
       throw error;
     }
     try {
+      // If the error occurred for any other reason, attempt to clean up the copied file.
       await rm(archiveDestination, { force: true });
     } catch (cleanupError) {
       console.error("Receipt archive cleanup failed", cleanupError);
     }
     throw error;
   }
+  try {
+    // Attempt to cancel the scan session for the saved receipt.
+    await scans.cancel(scanId);
+  } catch (error) {
+    console.error("Saved receipt scan cleanup failed", error);
+  }
+  return receiptId;
 }
