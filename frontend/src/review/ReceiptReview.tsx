@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import LookupSelect, { type LookupOption } from "./LookupSelect";
 import {
+  chooseProduct,
   createReviewDraft,
   reviewIssues,
   reviewSumStatus,
@@ -303,6 +304,7 @@ function ReceiptReview({ review }: Props) {
                     rawName: "",
                     normalizedName: "",
                     productId: null,
+                    selectedProductName: null,
                     matchStatus: null,
                     matchCandidates: null,
                     brand: "",
@@ -376,7 +378,7 @@ function ReceiptReview({ review }: Props) {
                 <input
                   value={
                     item.lineType === "product"
-                      ? item.normalizedName
+                      ? (item.selectedProductName ?? item.normalizedName)
                       : item.rawName
                   }
                   onChange={(event) =>
@@ -386,6 +388,7 @@ function ReceiptReview({ review }: Props) {
                         ? {
                             normalizedName: event.target.value,
                             productId: null,
+                            selectedProductName: null,
                             matchStatus: null,
                           }
                         : { rawName: event.target.value },
@@ -393,6 +396,14 @@ function ReceiptReview({ review }: Props) {
                   }
                   className={inputClass}
                 />
+                {item.lineType === "product" &&
+                  item.rawName &&
+                  item.rawName !==
+                    (item.selectedProductName ?? item.normalizedName) && (
+                    <span className="text-xs font-normal text-slate-500">
+                      {t("review.rawName")}: {item.rawName}
+                    </span>
+                  )}
               </label>
               <p className="text-sm text-slate-600">
                 {t("review.matchStatus")}:{" "}
@@ -527,6 +538,10 @@ function ReceiptReview({ review }: Props) {
                           event.target.value === "product"
                             ? item.productId
                             : null,
+                        selectedProductName:
+                          event.target.value === "product"
+                            ? item.selectedProductName
+                            : null,
                         matchStatus:
                           event.target.value === "product"
                             ? item.matchStatus
@@ -574,119 +589,104 @@ function ReceiptReview({ review }: Props) {
                             .join(" · ")
                         }
                         onSelect={(option) =>
-                          updateItem(item.id, {
-                            productId: option?.id ?? null,
-                            matchStatus: null,
-                            normalizedName: option?.name ?? item.normalizedName,
-                            brand: option
-                              ? (option.brandName ?? "")
-                              : item.brand,
-                            brandId: null,
-                            productGroup:
-                              option?.productGroupName ?? item.productGroup,
-                            productGroupId: null,
-                            category: option?.categoryName ?? item.category,
-                            packageAmount: option
-                              ? option.packageAmount === null ||
-                                option.packageAmount === undefined
-                                ? ""
-                                : String(option.packageAmount)
-                              : item.packageAmount,
-                            packageUnit: option
-                              ? ((option.packageUnit ?? "") as Unit | "")
-                              : item.packageUnit,
-                          })
+                          updateItem(item.id, chooseProduct(item, option))
                         }
                       />
                     </div>
-                    <label className={labelClass}>
-                      <span>{t("review.brandName")}</span>
-                      <input
-                        value={item.brand}
-                        onChange={(event) =>
-                          updateItem(item.id, {
-                            brand: event.target.value,
-                            brandId: null,
-                            productId: null,
-                            matchStatus: null,
-                          })
-                        }
-                        className={inputClass}
-                      />
-                    </label>
-                    <label className={labelClass}>
-                      <span>{t("review.productGroupName")}</span>
-                      <input
-                        value={item.productGroup}
-                        onChange={(event) =>
-                          updateItem(item.id, {
-                            productGroup: event.target.value,
-                            productGroupId: null,
-                            productId: null,
-                            matchStatus: null,
-                          })
-                        }
-                        className={inputClass}
-                      />
-                    </label>
-                    <label className={labelClass}>
-                      <span>{t("review.category")}</span>
-                      <select
-                        value={item.category}
-                        onChange={(event) =>
-                          updateItem(item.id, {
-                            category: event.target.value,
-                            productGroupId: null,
-                            productId: null,
-                            matchStatus: null,
-                          })
-                        }
-                        className={inputClass}
-                      >
-                        <option value="">{t("review.chooseCategory")}</option>
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.name}>
-                            {categoryLabel(category.name)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className={labelClass}>
-                      <span>{t("review.packageAmount")}</span>
-                      <input
-                        inputMode="decimal"
-                        value={item.packageAmount}
-                        onChange={(event) =>
-                          updateItem(item.id, {
-                            packageAmount: event.target.value,
-                            productId: null,
-                            matchStatus: null,
-                          })
-                        }
-                        className={inputClass}
-                      />
-                    </label>
-                    <label className={labelClass}>
-                      <span>{t("review.packageUnit")}</span>
-                      <select
-                        value={item.packageUnit}
-                        onChange={(event) =>
-                          updateItem(item.id, {
-                            packageUnit: event.target.value as Unit | "",
-                            productId: null,
-                            matchStatus: null,
-                          })
-                        }
-                        className={inputClass}
-                      >
-                        <option value="">{t("review.noUnit")}</option>
-                        {units.map((unit) => (
-                          <option key={unit} value={unit}>
-                            {t(`review.units.${unit}`)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {item.productId === null && (
+                      <>
+                        <label className={labelClass}>
+                          <span>{t("review.brandName")}</span>
+                          <input
+                            value={item.brand}
+                            onChange={(event) =>
+                              updateItem(item.id, {
+                                brand: event.target.value,
+                                brandId: null,
+                                productId: null,
+                                matchStatus: null,
+                              })
+                            }
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className={labelClass}>
+                          <span>{t("review.productGroupName")}</span>
+                          <input
+                            value={item.productGroup}
+                            onChange={(event) =>
+                              updateItem(item.id, {
+                                productGroup: event.target.value,
+                                productGroupId: null,
+                                productId: null,
+                                matchStatus: null,
+                              })
+                            }
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className={labelClass}>
+                          <span>{t("review.category")}</span>
+                          <select
+                            value={item.category}
+                            onChange={(event) =>
+                              updateItem(item.id, {
+                                category: event.target.value,
+                                productGroupId: null,
+                                productId: null,
+                                matchStatus: null,
+                              })
+                            }
+                            className={inputClass}
+                          >
+                            <option value="">
+                              {t("review.chooseCategory")}
+                            </option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.name}>
+                                {categoryLabel(category.name)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className={labelClass}>
+                          <span>{t("review.packageAmount")}</span>
+                          <input
+                            inputMode="decimal"
+                            value={item.packageAmount}
+                            onChange={(event) =>
+                              updateItem(item.id, {
+                                packageAmount: event.target.value,
+                                productId: null,
+                                matchStatus: null,
+                              })
+                            }
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className={labelClass}>
+                          <span>{t("review.packageUnit")}</span>
+                          <select
+                            value={item.packageUnit}
+                            onChange={(event) =>
+                              updateItem(item.id, {
+                                packageUnit: event.target.value as Unit | "",
+                                productId: null,
+                                matchStatus: null,
+                              })
+                            }
+                            className={inputClass}
+                          >
+                            <option value="">{t("review.noUnit")}</option>
+                            {units.map((unit) => (
+                              <option key={unit} value={unit}>
+                                {t(`review.units.${unit}`)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </>
+                    )}
                   </>
                 )}
               </div>

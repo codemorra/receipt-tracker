@@ -73,6 +73,7 @@ export interface ItemDraft {
   rawName: string;
   normalizedName: string;
   productId: number | null;
+  selectedProductName: string | null;
   matchStatus: MatchStatus | null;
   matchCandidates: ReviewDto["items"][number]["match"];
   brand: string;
@@ -173,6 +174,12 @@ export function createReviewDraft(review: ReviewDto): ReviewDraft {
       rawName: item.rawName,
       normalizedName: item.normalizedName ?? item.rawName,
       productId: item.match?.productId ?? null,
+      selectedProductName:
+        item.match?.status === "MATCHED"
+          ? (item.match.candidates.find(
+              (candidate) => candidate.productId === item.match?.productId,
+            )?.name ?? null)
+          : null,
       matchStatus: item.match?.status ?? null,
       matchCandidates: item.match,
       brand: item.brand ?? "",
@@ -199,6 +206,24 @@ export function createReviewDraft(review: ReviewDto): ReviewDraft {
       appliesToItemIndex: discount.appliesToItemIndex,
       sourceLineIndexes: discount.sourceLineIndexes,
     })),
+  };
+}
+
+/**
+ * Chooses a product for a given item draft, updating its product ID, selected product name, and match status.
+ * @param item The item draft to update.
+ * @param product The product to choose, or null to clear the selection.
+ * @returns The updated item draft.
+ */
+export function chooseProduct(
+  item: ItemDraft,
+  product: { id: number; name: string } | null,
+): ItemDraft {
+  return {
+    ...item,
+    productId: product?.id ?? null,
+    selectedProductName: product?.name ?? null,
+    matchStatus: null,
   };
 }
 
