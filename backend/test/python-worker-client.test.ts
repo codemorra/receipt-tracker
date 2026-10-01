@@ -49,6 +49,9 @@ test("worker waits for ready and maps sequenced responses by requestId", async (
     confidence: 0.95,
     box: [0, 0, 1, 1],
   });
+  assert.deepEqual(processed.rows, [
+    { rowIndex: 0, segments: [{ text: "RECEIPT", x: 0 }], lineIndexes: [0] },
+  ]);
 
   worker.stop();
   assert.equal(worker.state, "stopped");
@@ -101,4 +104,72 @@ test("worker starts in the configured working directory", async (t) => {
 
   await worker.start();
   assert.equal(worker.state, "ready");
+});
+
+// Test for the Python worker client rejecting rows that lose, duplicate, or alter OCR evidence.
+test("worker rejects rows that lose, duplicate, or alter OCR evidence", async (t) => {
+  const lines = [
+    { index: 0, text: "Snack", confidence: 0.9, box: [0.1, 0.2, 0.5, 0.3] },
+    { index: 1, text: "0,99", confidence: 0.9, box: [0.7, 0.2, 0.9, 0.3] },
+  ];
+  const segments = [
+    { text: "Snack", x: 0.1 },
+    { text: "0,99", x: 0.7 },
+  ];
+  const invalidRows = [
+    [],
+    [{ rowIndex: 0, segments: [segments[0]], lineIndexes: [0] }],
+    [{ rowIndex: 0, segments, lineIndexes: [0, 0] }],
+    [{ rowIndex: 0, segments, lineIndexes: [1, 0] }],
+    [
+      {
+        rowIndex: 0,
+        segments: [segments[0], { text: "9,99", x: 0.7 }],
+        lineIndexes: [0, 1],
+      },
+    ],
+    [
+      {
+        rowIndex: 0,
+        segments: [segments[0], { text: "0,99", x: 0.2 }],
+        lineIndexes: [0, 1],
+      },
+    ],
+  ];
+  for (const rows of invalidRows) {
+    const result = {
+      status: "ok",
+      width: 100,
+      height: 200,
+      plainText: "Snack\n0,99",
+      lines,
+      rows,
+      ocrDurationMs: 1,
+    };
+    const script = `
+      process.stdout.write(JSON.stringify({ type: "ready" }) + "\\n");
+      require("node:readline").createInterface({ input: process.stdin }).on("line", (line) => {
+        const request = JSON.parse(line);
+        process.stdout.write(JSON.stringify({ ...${JSON.stringify(result)}, requestId: request.requestId }) + "\\n");
+      });
+    `;
+    const worker = new PythonWorkerClient(process.execPath, ["-e", script]);
+    t.after(() => worker.stop());
+    await worker.start();
+    await assert.rejects(
+      worker.requestProcess(
+        "receipt.png",
+        {
+          topLeft: [0, 0],
+          topRight: [1, 0],
+          bottomRight: [1, 1],
+          bottomLeft: [0, 1],
+        },
+        "archive.webp",
+        "ocr.webp",
+      ),
+      { message: "Invalid worker response" },
+    );
+    worker.stop();
+  }
 });

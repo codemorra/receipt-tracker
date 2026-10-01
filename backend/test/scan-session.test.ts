@@ -49,6 +49,13 @@ function previewWorker() {
         height: 200,
         plainText: "RECEIPT",
         ocrDurationMs: 12.5,
+        rows: [
+          {
+            rowIndex: 0,
+            segments: [{ text: "RECEIPT", x: 0 }],
+            lineIndexes: [0],
+          },
+        ],
         lines: [
           {
             index: 0,

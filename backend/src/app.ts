@@ -274,6 +274,7 @@ export function createApp(
           {
             plainText: result.plainText,
             lines: result.lines,
+            rows: result.rows,
             categoryNames,
           },
           (diagnostics) => {

@@ -17,6 +17,10 @@ const input = {
     { index: 0, text: "EDEKA", confidence: 0.98, box: [0, 0, 1, 0.1] },
     { index: 1, text: "MILCH 1L" },
   ],
+  rows: [
+    { rowIndex: 0, segments: [{ text: "EDEKA", x: 0 }], lineIndexes: [0] },
+    { rowIndex: 1, segments: [{ text: "MILCH 1L", x: 0.1 }], lineIndexes: [1] },
+  ],
   categoryNames: ["food", "custom"],
 };
 
@@ -41,7 +45,7 @@ test("sends only OCR data and categories with the extraction JSON schema", async
   assert.ok(requestBody);
   assert.equal(requestBody.model, "test-model");
   assert.equal(requestBody.stream, false);
-  assert.equal(requestBody.think, false);
+  assert.equal(requestBody.think, true);
   assert.deepEqual(requestBody.options, { temperature: 0 });
   const format = requestBody.format as {
     properties: Record<string, unknown>;
@@ -58,10 +62,14 @@ test("sends only OCR data and categories with the extraction JSON schema", async
     messages[0].content.includes('Current categories: ["food","custom"]'),
   );
   assert.equal(messages[0].content.includes('"plainText"'), false);
+  assert.equal(messages[0].content.includes('"lines"'), false);
+  assert.equal(messages[0].content.includes('"confidence"'), false);
+  assert.equal(messages[0].content.includes('"box"'), false);
+  assert.equal(messages[0].content.includes('"left"'), false);
   assert.equal(messages[0].content.includes("productAliases"), false);
   assert.equal(messages[0].content.includes("Private Merchant"), false);
   assert.ok(
-    messages[0].content.includes(`"lines":${JSON.stringify(input.lines)}`),
+    messages[0].content.includes('[0; x=0] "EDEKA"\n[1; x=0.1] "MILCH 1L"'),
   );
 });
 
@@ -113,7 +121,9 @@ test("prompt tells the model how to use unknown values and source indexes", () =
     ),
   );
   assert.ok(prompt.includes("Use lineType product, deposit, fee, or other"));
-  assert.ok(prompt.includes("sourceLineIndexes refer to OCR line indexes"));
+  assert.ok(
+    prompt.includes("sourceLineIndexes refer to the original OCR line indexes"),
+  );
   assert.ok(
     prompt.includes("appliesToItemIndex refers to a zero-based item position"),
   );

@@ -16,7 +16,16 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
         height: 200,
         plainText: "RECEIPT",
         ocrDurationMs: 12.5,
-        lines: [{ index: 0, text: "RECEIPT", confidence: 0.95, box: [0, 0, 1, 1] }],
+        lines: [
+          { index: 0, text: "RECEIPT", confidence: 0.95, box: [0, 0, 1, 1] },
+        ],
+        rows: [
+          {
+            rowIndex: 0,
+            segments: [{ text: "RECEIPT", x: 0 }],
+            lineIndexes: [0],
+          },
+        ],
       }) + "\n",
     );
     return;

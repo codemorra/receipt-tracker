@@ -23,6 +23,7 @@ class PaddleOCR:
             "use_textline_orientation": False,
             "text_det_limit_side_len": 16384,
             "text_det_limit_type": "max",
+            "text_det_box_thresh": 0.4,
         }
         if options != expected:
             raise ValueError("Unexpected PaddleOCR configuration")
