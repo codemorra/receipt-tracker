@@ -38,10 +38,10 @@ export class OllamaProvider implements ReceiptExtractionProvider {
             createReceiptExtractionSchema(input.categoryNames),
           ),
           stream: false,
-          think: false,
+          think: true,
           options: { temperature: 0 },
         }),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(240_000),
       });
     } catch {
       throw new OllamaUnavailableError("Ollama is unavailable or timed out");

@@ -1,9 +1,10 @@
-import type { OcrLine } from "../worker/python-worker-client.js";
+import type { OcrLine, OcrRow } from "../worker/python-worker-client.js";
 
 // Defines the interfaces for receipt extraction input and provider.
 export interface ReceiptExtractionInput {
   plainText: string;
   lines: readonly Pick<OcrLine, "index" | "text">[];
+  rows: readonly OcrRow[];
   categoryNames: readonly string[];
 }
 

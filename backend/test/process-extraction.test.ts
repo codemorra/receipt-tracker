@@ -76,6 +76,13 @@ test("process endpoint returns a review DTO using current categories and databas
         height: 200,
         plainText: ocrLine.text,
         ocrDurationMs: 12.5,
+        rows: [
+          {
+            rowIndex: 0,
+            segments: [{ text: ocrLine.text, x: 0 }],
+            lineIndexes: [0],
+          },
+        ],
         lines: [ocrLine],
       };
     },
@@ -96,6 +103,13 @@ test("process endpoint returns a review DTO using current categories and databas
         providerCalls++;
         assert.equal(input.plainText, ocrLine.text);
         assert.deepEqual(input.lines, [ocrLine]);
+        assert.deepEqual(input.rows, [
+          {
+            rowIndex: 0,
+            segments: [{ text: ocrLine.text, x: 0 }],
+            lineIndexes: [0],
+          },
+        ]);
         assert.ok(input.categoryNames.includes("groceries"));
         assert.ok(input.categoryNames.includes("custom"));
         assert.equal(input.categoryNames.includes("food"), false);

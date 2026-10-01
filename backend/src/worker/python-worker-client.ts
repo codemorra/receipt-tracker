@@ -27,12 +27,20 @@ export interface OcrLine {
   box: [number, number, number, number];
 }
 
+// Interface representing a single row of OCR result from the Python worker.
+export interface OcrRow {
+  rowIndex: number;
+  segments: { text: string; x: number }[];
+  lineIndexes: number[];
+}
+
 // Result of a process request from the Python worker.
 export interface ProcessResult {
   width: number;
   height: number;
   plainText: string;
   lines: OcrLine[];
+  rows: OcrRow[];
   ocrDurationMs: number;
 }
 
@@ -143,6 +151,7 @@ export class PythonWorkerClient {
                 height: value.height,
                 plainText: value.plainText,
                 lines: value.lines,
+                rows: value.rows,
                 ocrDurationMs: value.ocrDurationMs,
               }
             : undefined,
@@ -328,7 +337,11 @@ function isProcessResult(
     return false;
   if ((value.width as number) <= 0 || (value.height as number) <= 0)
     return false;
-  if (typeof value.plainText !== "string" || !Array.isArray(value.lines))
+  if (
+    typeof value.plainText !== "string" ||
+    !Array.isArray(value.lines) ||
+    !Array.isArray(value.rows)
+  )
     return false;
   if (
     typeof value.ocrDurationMs !== "number" ||
@@ -336,7 +349,7 @@ function isProcessResult(
     value.ocrDurationMs < 0
   )
     return false;
-  return value.lines.every((line: unknown, index: number) => {
+  const validLines = value.lines.every((line: unknown, index: number) => {
     if (!line || typeof line !== "object") return false;
     const item = line as Record<string, unknown>;
     if (
@@ -358,4 +371,51 @@ function isProcessResult(
         coordinate <= 1,
     );
   });
+  const validRows =
+    validLines &&
+    value.rows.every((row: unknown, index: number) => {
+      if (!row || typeof row !== "object") return false;
+      const item = row as Record<string, unknown>;
+      return (
+        item.rowIndex === index &&
+        Array.isArray(item.segments) &&
+        item.segments.length > 0 &&
+        item.segments.every((segment: unknown) => {
+          if (!segment || typeof segment !== "object") return false;
+          const entry = segment as Record<string, unknown>;
+          return (
+            typeof entry.text === "string" &&
+            typeof entry.x === "number" &&
+            Number.isFinite(entry.x) &&
+            entry.x >= 0 &&
+            entry.x <= 1
+          );
+        }) &&
+        Array.isArray(item.lineIndexes) &&
+        item.lineIndexes.length === item.segments.length &&
+        item.lineIndexes.every(
+          (lineIndex: unknown) =>
+            Number.isInteger(lineIndex) &&
+            (lineIndex as number) >= 0 &&
+            (lineIndex as number) < (value.lines as unknown[]).length,
+        )
+      );
+    });
+  if (!validRows) return false;
+  const lines = value.lines as OcrLine[];
+  const rows = value.rows as OcrRow[];
+  const indexes = rows.flatMap((row) => row.lineIndexes);
+  return (
+    indexes.length === lines.length &&
+    indexes.every((lineIndex, index) => lineIndex === index) &&
+    rows.every((row) =>
+      row.segments.every((segment, index) => {
+        const line = lines[row.lineIndexes[index]]!;
+        return (
+          segment.text === line.text &&
+          Math.abs(segment.x - line.box[0]) <= 0.000501
+        );
+      }),
+    )
+  );
 }

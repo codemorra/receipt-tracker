@@ -188,6 +188,9 @@ def test_process_request_creates_final_images_and_returns_ocr(tmp_path):
         "box": [0.0, 0.0, 1.0, 1.0],
         "index": 0,
     }]
+    assert response["rows"] == [
+        {"rowIndex": 0, "segments": [{"text": "RECEIPT", "x": 0.0}], "lineIndexes": [0]}
+    ]
     assert (response["width"], response["height"]) == (100, 200)
     with Image.open(archive) as image:
         assert image.mode == "RGB"
