@@ -265,3 +265,53 @@ def test_ocr_failure_returns_error_and_worker_keeps_running(tmp_path):
     assert "OCR prediction failed" in messages[1]["error"]
     assert messages[2]["status"] == "ok"
     assert preview.exists()
+
+
+def test_worker_auto_rotation_is_used_by_process_and_does_not_pollute_protocol(tmp_path):
+    """Test that the worker uses auto rotation for processing and does not include it in the protocol.
+    
+    Args:
+        tmp_path (pathlib.Path): Temporary directory provided by pytest for creating test files.
+    """
+    original = tmp_path / "original.png"
+    preview = tmp_path / "preview.webp"
+    archive = tmp_path / "archive.webp"
+    ocr_image = tmp_path / "ocr.webp"
+    Image.new("RGB", (200, 100), "white").save(original)
+    corners = {"topLeft": [0, 0], "topRight": [1, 0], "bottomRight": [1, 1], "bottomLeft": [0, 1]}
+    result = run_worker([
+        {"requestId": "preview", "type": "preview", "originalPath": str(original), "previewPath": str(preview)},
+        {"requestId": "process", "type": "process", "originalPath": str(original),
+         "archivePath": str(archive), "ocrPath": str(ocr_image), "corners": corners, "rotation": 90},
+    ], {"ORIENTATION_TEST_ANGLE": "270"})
+
+    ready, preview_result, process_result = [json.loads(line) for line in result.stdout.splitlines()]
+    assert ready == {"type": "ready"}
+    assert preview_result["rotation"] == 90
+    assert (preview_result["width"], preview_result["height"]) == (100, 200)
+    assert (process_result["width"], process_result["height"]) == (100, 200)
+    with Image.open(preview) as preview_image, Image.open(archive) as archive_image, Image.open(ocr_image) as ocr:
+        assert preview_image.size == archive_image.size == ocr.size == (100, 200)
+    assert result.stderr.count("Orientation initialized") == 1
+    assert "Native orientation prediction log" in result.stderr
+    assert result.stderr.count("PaddleOCR predicted") == 1
+
+
+@pytest.mark.parametrize("failure", ["ORIENTATION_TEST_FAIL_START", "ORIENTATION_TEST_FAIL_PREDICT"])
+def test_worker_orientation_failure_keeps_preview_available(tmp_path, failure):
+    """Test that orientation failures keep the preview available and do not affect the protocol.
+
+    Args:
+        tmp_path (pathlib.Path): Temporary directory provided by pytest for creating test files.
+    """
+    original = tmp_path / "original.png"
+    Image.new("RGB", (100, 200), "white").save(original)
+    result = run_worker([
+        {"requestId": "preview", "type": "preview", "originalPath": str(original), "previewPath": str(tmp_path / "preview.webp")}
+    ], {failure: "1"})
+
+    response = json.loads(result.stdout.splitlines()[1])
+    assert response["status"] == "ok"
+    assert response["rotation"] == 0
+    assert (response["width"], response["height"]) == (100, 200)
+    assert "failed: RuntimeError" in result.stderr

@@ -10,8 +10,10 @@ import { createApp } from "../src/app.js";
 import {
   WorkerRequestError,
   WorkerUnavailableError,
+  type Rotation,
 } from "../src/worker/python-worker-client.js";
 import {
+  InvalidRotationError,
   isScanId,
   MAX_UPLOAD_BYTES,
   ScanSessionService,
@@ -28,20 +30,27 @@ const suggestedCorners = {
 };
 
 // Mock preview worker for testing purposes.
-function previewWorker() {
+function previewWorker(expectedRotation: Rotation = 0) {
   return {
     async requestPreview(_originalPath: string, previewPath: string) {
       await writeFile(previewPath, "preview");
-      return { width: 100, height: 200, suggestedCorners };
+      return {
+        width: 100,
+        height: 200,
+        suggestedCorners,
+        rotation: 0 as const,
+      };
     },
     async requestProcess(
       originalPath: string,
       corners: typeof suggestedCorners,
       archivePath: string,
       ocrPath: string,
+      rotation: Rotation = 0,
     ) {
       assert.ok(originalPath.endsWith("original.png"));
       assert.deepEqual(corners, suggestedCorners);
+      assert.equal(rotation, expectedRotation);
       await writeFile(archivePath, "archive");
       await writeFile(ocrPath, "ocr");
       return {
@@ -138,7 +147,7 @@ test("scan API creates a session and serves its preview", async (t) => {
   t.after(() => sqlite.close());
   migrate(db, { migrationsFolder: "./drizzle" });
   const app = createApp(
-    new ScanSessionService(directory, previewWorker()),
+    new ScanSessionService(directory, previewWorker(90)),
     db,
     {
       async extractReceipt() {
@@ -167,6 +176,7 @@ test("scan API creates a session and serves its preview", async (t) => {
   });
   assert.equal(upload.status, 201);
   const scan = await upload.json();
+  assert.equal(scan.rotation, 0);
   const preview = await fetch(base + scan.previewUrl);
   assert.equal(preview.status, 200);
   assert.equal(preview.headers.get("content-type"), "image/webp");
@@ -175,7 +185,7 @@ test("scan API creates a session and serves its preview", async (t) => {
   const processed = await fetch(base + `/api/scans/${scan.scanId}/process`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ corners: suggestedCorners }),
+    body: JSON.stringify({ corners: suggestedCorners, rotation: 90 }),
   });
   assert.equal(processed.status, 200);
   const result = await processed.json();
@@ -198,6 +208,17 @@ test("scan API creates a session and serves its preview", async (t) => {
   );
   assert.equal(invalidCorners.status, 400);
   assert.equal((await invalidCorners.json()).error, "invalid_corners");
+
+  const invalidRotation = await fetch(
+    base + `/api/scans/${scan.scanId}/process`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ corners: suggestedCorners, rotation: 45 }),
+    },
+  );
+  assert.equal(invalidRotation.status, 400);
+  assert.equal((await invalidRotation.json()).error, "invalid_rotation");
 
   const missing = await fetch(base + `/api/scans/${randomUUID()}/process`, {
     method: "POST",
@@ -245,4 +266,42 @@ test("failed reprocessing keeps the previous archive and removes temporary files
     "preview.webp",
     "session.json",
   ]);
+});
+
+// Test case for verifying that the scan orientation defaults to its automatic correction and accepts a manual override.
+test("scan orientation defaults to its automatic correction and accepts a manual override", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "receipt-scan-orientation-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const rotations: number[] = [];
+  const worker = previewWorker();
+  const service = new ScanSessionService(directory, {
+    async requestPreview(original, preview) {
+      return {
+        ...(await worker.requestPreview(original, preview)),
+        rotation: 90,
+      };
+    },
+    async requestProcess(original, corners, archive, ocr, rotation) {
+      rotations.push(rotation ?? 0);
+      return worker.requestProcess(original, corners, archive, ocr);
+    },
+  });
+  const scan = await service.create("image/png", png);
+  assert.equal(scan.rotation, 90);
+  const metadata = JSON.parse(
+    await readFile(join(directory, scan.scanId, "session.json"), "utf8"),
+  );
+  assert.equal(metadata.rotation, 90);
+
+  await service.process(scan.scanId, suggestedCorners);
+  await service.process(scan.scanId, suggestedCorners, 180);
+  await service.process(scan.scanId, suggestedCorners, 0);
+  assert.deepEqual(rotations, [90, 180, 0]);
+  for (const rotation of [-90, 45, 360, "90", null, true]) {
+    await assert.rejects(
+      service.process(scan.scanId, suggestedCorners, rotation),
+      InvalidRotationError,
+    );
+  }
+  assert.deepEqual(rotations, [90, 180, 0]);
 });

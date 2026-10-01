@@ -43,3 +43,25 @@ class PaddleOCR:
             "rec_scores": [0.95],
             "rec_boxes": [[0, 0, width, height]],
         }})]
+
+
+class DocImgOrientationClassification:
+    """Mock implementation of the DocImgOrientationClassification class for testing purposes."""
+    def __init__(self, **options):
+        if options != {"model_name": "PP-LCNet_x1_0_doc_ori", "device": "cpu", "enable_hpi": True}:
+            raise ValueError("Unexpected orientation configuration")
+        if os.environ.get("ORIENTATION_TEST_FAIL_START"):
+            raise RuntimeError("Orientation model unavailable")
+        print("Orientation initialized")
+        os.write(1, b"Native orientation initialization log\n")
+
+    def predict(self, pixels):
+        """Mock predict method for the DocImgOrientationClassification class."""
+        if os.environ.get("ORIENTATION_TEST_FAIL_PREDICT"):
+            raise RuntimeError("Orientation prediction failed")
+        print("Orientation predicted")
+        os.write(1, b"Native orientation prediction log\n")
+        return [SimpleNamespace(json={"res": {
+            "label_names": [os.environ.get("ORIENTATION_TEST_ANGLE", "0")],
+            "scores": [float(os.environ.get("ORIENTATION_TEST_CONFIDENCE", "0.95"))],
+        }})]
