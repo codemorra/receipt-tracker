@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createBackendLifecycle } from "./startup.js";
 import { createApp } from "./app.js";
 import { createDatabase } from "./db/database.js";
 import { createOllamaProviderFromEnv } from "./extraction/ollama-provider.js";
@@ -61,33 +62,23 @@ try {
   );
   const port = Number(process.env.PORT ?? 3000);
 
-  // Start the Python worker and log its status.
-  logger("info", "worker.starting");
-  void worker.start().then(
-    () => logger("info", "worker.ready"),
-    (error) =>
-      logger("error", "worker.start.failed", { errorType: errorType(error) }),
+  // Create the backend lifecycle manager, which controls the worker, HTTP server, and database connection.
+  const lifecycle = createBackendLifecycle(
+    worker,
+    () => app.listen(port),
+    () => sqlite.close(),
   );
-
-  // Start the Express application and listen on the specified port.
-  app.listen(port, () => {
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    process.once(signal, () => {
+      logger("info", "backend.stopping", { signal });
+      lifecycle.stop();
+    });
+  }
+  startupPhase = "worker readiness and HTTP startup";
+  if (await lifecycle.start()) {
     logger("info", "backend.listening", { port });
     console.log(`Backend listening on http://localhost:${port}`);
-  });
-
-  // Handle SIGTERM signal for graceful shutdown.
-  process.once("SIGTERM", () => {
-    logger("info", "backend.stopping", { signal: "SIGTERM" });
-    worker.stop();
-    sqlite.close();
-  });
-
-  // Handle SIGINT signal for graceful shutdown.
-  process.once("SIGINT", () => {
-    logger("info", "backend.stopping", { signal: "SIGINT" });
-    worker.stop();
-    sqlite.close();
-  });
+  }
 } catch (error) {
   logger("error", "backend.start.failed", {
     phase: startupPhase,
