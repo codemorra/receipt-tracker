@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  symlink,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -16,6 +26,7 @@ import {
   InvalidRotationError,
   isScanId,
   MAX_UPLOAD_BYTES,
+  STALE_SCAN_AGE_MS,
   ScanSessionService,
   validateUpload,
 } from "../src/scans/scan-session-service.js";
@@ -304,4 +315,153 @@ test("scan orientation defaults to its automatic correction and accepts a manual
     );
   }
   assert.deepEqual(rotations, [90, 180, 0]);
+});
+
+// Test case for verifying that stale scan sessions are correctly cleaned up based on their modification times.
+test("stale cleanup removes old complete and incomplete sessions but keeps recent changes", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "receipt-stale-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const scansRoot = join(root, "scans");
+  const now = Date.parse("2026-10-01T12:00:00Z");
+  const old = new Date(now - STALE_SCAN_AGE_MS - 1000);
+  const boundary = new Date(now - STALE_SCAN_AGE_MS);
+  const recent = new Date(now - STALE_SCAN_AGE_MS + 1000);
+  const ids = Array.from({ length: 5 }, () => randomUUID());
+  for (const id of ids) await mkdir(join(scansRoot, id), { recursive: true });
+  await writeFile(join(scansRoot, ids[0], "session.json"), "{}");
+  await writeFile(join(scansRoot, ids[1], "original.jpg"), "incomplete");
+  await writeFile(
+    join(scansRoot, ids[3], "session.json"),
+    JSON.stringify({ createdAt: old.toISOString() }),
+  );
+  await writeFile(
+    join(scansRoot, ids[3], "archive.webp"),
+    "recently processed",
+  );
+  for (const [index, date] of [
+    old,
+    old,
+    boundary,
+    recent,
+    new Date(now),
+  ].entries()) {
+    await utimes(join(scansRoot, ids[index]), date, date);
+  }
+  const archiveRoot = join(root, "receipts");
+  await mkdir(archiveRoot);
+  await writeFile(join(archiveRoot, "saved.webp"), "saved receipt");
+  const events: { operation: string; fields: unknown }[] = [];
+  const service = new ScanSessionService(
+    scansRoot,
+    previewWorker(),
+    (_level, operation, fields) => events.push({ operation, fields }),
+  );
+  assert.equal(await service.cleanupStaleSessions(now), 3);
+  assert.deepEqual((await readdir(scansRoot)).sort(), ids.slice(3).sort());
+  assert.equal(
+    await readFile(join(archiveRoot, "saved.webp"), "utf8"),
+    "saved receipt",
+  );
+  assert.deepEqual(events, [
+    {
+      operation: "scan.stale_cleanup.complete",
+      fields: { removedSessions: 3 },
+    },
+  ]);
+  assert.equal(await service.cleanupStaleSessions(now), 0);
+});
+
+// Test case for verifying that stale cleanup correctly ignores non-scan directories and symbolic links.
+test("stale cleanup skips foreign entries and symlinks", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "receipt-stale-entries-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const scansRoot = join(root, "scans");
+  await mkdir(scansRoot);
+  const outside = join(root, "outside");
+  await mkdir(outside);
+  await writeFile(join(outside, "keep.txt"), "keep");
+  const names = ["foreign", randomUUID(), randomUUID()];
+  await mkdir(join(scansRoot, names[0]));
+  await writeFile(join(scansRoot, names[1]), "regular file");
+  await symlink(outside, join(scansRoot, names[2]));
+  const old = new Date(Date.now() - STALE_SCAN_AGE_MS - 1000);
+  await utimes(join(scansRoot, names[0]), old, old);
+  await utimes(join(scansRoot, names[1]), old, old);
+  await utimes(outside, old, old);
+  assert.equal(
+    await new ScanSessionService(
+      scansRoot,
+      previewWorker(),
+    ).cleanupStaleSessions(),
+    0,
+  );
+  assert.deepEqual((await readdir(scansRoot)).sort(), names.sort());
+  assert.equal(await readFile(join(outside, "keep.txt"), "utf8"), "keep");
+});
+
+// Test case for verifying that stale cleanup tolerates a missing scan directory and logs listing errors.
+test("stale cleanup tolerates a missing scan directory and logs listing errors", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "receipt-stale-root-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const events: string[] = [];
+  const logger = (_level: string, operation: string) => events.push(operation);
+  assert.equal(
+    await new ScanSessionService(
+      join(root, "missing"),
+      previewWorker(),
+      logger,
+    ).cleanupStaleSessions(),
+    0,
+  );
+  assert.deepEqual(events, ["scan.stale_cleanup.complete"]);
+  events.length = 0;
+  const file = join(root, "file");
+  await writeFile(file, "not a directory");
+  assert.equal(
+    await new ScanSessionService(
+      file,
+      previewWorker(),
+      logger,
+    ).cleanupStaleSessions(),
+    0,
+  );
+  assert.deepEqual(events, [
+    "scan.stale_cleanup.failed",
+    "scan.stale_cleanup.complete",
+  ]);
+});
+
+// Test case for verifying that stale cleanup continues even when removing one session fails.
+test("stale cleanup continues when removing one session fails", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "receipt-stale-failure-"));
+  const blocked = randomUUID();
+  const removable = randomUUID();
+  const blockedPath = join(root, blocked);
+  t.after(async () => {
+    await chmod(blockedPath, 0o700);
+    await rm(root, { recursive: true, force: true });
+  });
+  await mkdir(blockedPath);
+  await writeFile(join(blockedPath, "original.jpg"), "blocked image");
+  await mkdir(join(root, removable));
+  const old = new Date(Date.now() - STALE_SCAN_AGE_MS - 1000);
+  await utimes(blockedPath, old, old);
+  await utimes(join(root, removable), old, old);
+  await chmod(blockedPath, 0);
+  const events: { operation: string; scanId?: string }[] = [];
+  const service = new ScanSessionService(
+    root,
+    previewWorker(),
+    (_level, operation, fields) =>
+      events.push({ operation, scanId: fields?.scanId }),
+  );
+  assert.equal(await service.cleanupStaleSessions(), 1);
+  assert.deepEqual(await readdir(root), [blocked]);
+  assert.ok(
+    events.some(
+      (event) =>
+        event.operation === "scan.stale_cleanup.failed" &&
+        event.scanId === blocked,
+    ),
+  );
 });

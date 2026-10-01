@@ -7,6 +7,7 @@ export type LogLevel = "info" | "warn" | "error";
 export interface LogFields {
   scanId?: string;
   receiptId?: number;
+  removedSessions?: number;
   durationMs?: number;
   ocrDurationMs?: number;
   workerDurationMs?: number;

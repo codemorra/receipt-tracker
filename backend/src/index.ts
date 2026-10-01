@@ -52,7 +52,7 @@ try {
     projectRoot,
     logger,
   );
-  const scans = new ScanSessionService(scansRoot, worker);
+  const scans = new ScanSessionService(scansRoot, worker, logger);
   const app = createApp(
     scans,
     db,
@@ -61,6 +61,9 @@ try {
     logger,
   );
   const port = Number(process.env.PORT ?? 3000);
+
+  startupPhase = "scan cleanup";
+  await scans.cleanupStaleSessions();
 
   // Create the backend lifecycle manager, which controls the worker, HTTP server, and database connection.
   const lifecycle = createBackendLifecycle(
