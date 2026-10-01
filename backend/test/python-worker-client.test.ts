@@ -339,3 +339,112 @@ test("stopping a recovering worker rejects the new request", async (t) => {
   await recovering;
   assert.equal(worker.state, "stopped");
 });
+
+// Test case for verifying that a recovering worker correctly forces termination after the grace period and shares the next startup.
+test("recovery forces termination after the grace period and shares the next startup", async (t) => {
+  const events: string[] = [];
+  const worker = new PythonWorkerClient(
+    process.execPath,
+    [fixture, "ignore-term"],
+    undefined,
+    (_level, operation) => events.push(operation),
+  );
+  await worker.start();
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  t.after(() => {
+    worker.stop();
+    t.mock.timers.tick(5_000);
+  });
+  const hanging = assert.rejects(
+    worker.requestPreview("hang-request", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  t.mock.timers.tick(60_000);
+  await hanging;
+  const first = worker.requestPreview("10", "first.webp");
+  const second = worker.requestPreview("20", "second.webp");
+  assert.equal(worker.state, "starting");
+  t.mock.timers.tick(4_999);
+  assert.equal(events.includes("worker.termination.forced"), false);
+  t.mock.timers.tick(1);
+  const results = await Promise.all([first, second]);
+  assert.deepEqual(
+    results.map((result) => result.width),
+    [10, 20],
+  );
+  assert.equal(
+    events.filter((event) => event === "worker.termination.forced").length,
+    1,
+  );
+  assert.equal(
+    events.filter((event) => event === "worker.restarting").length,
+    1,
+  );
+  t.mock.timers.tick(5_000);
+  assert.equal(worker.state, "ready");
+  assert.equal((await worker.requestPreview("30", "third.webp")).width, 30);
+});
+
+// Test case for verifying that normal termination of a worker clears its forced termination timer before the replacement worker starts.
+test("normal termination clears its timer before the replacement worker starts", async (t) => {
+  const events: string[] = [];
+  const worker = new PythonWorkerClient(
+    process.execPath,
+    [fixture],
+    undefined,
+    (_level, operation) => events.push(operation),
+  );
+  await worker.start();
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  t.after(() => worker.stop());
+  const hanging = assert.rejects(
+    worker.requestPreview("hang-request", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  t.mock.timers.tick(60_000);
+  await hanging;
+  assert.equal((await worker.requestPreview("10", "preview.webp")).width, 10);
+  t.mock.timers.tick(5_000);
+  assert.equal(events.includes("worker.termination.forced"), false);
+  assert.equal((await worker.requestPreview("20", "preview.webp")).width, 20);
+});
+
+// Test case for verifying that explicitly stopping a stubborn worker forces it to exit without triggering recovery.
+test("explicit stop also forces a stubborn worker to exit without recovery", async (t) => {
+  let forced!: () => void;
+  const forceObserved = new Promise<void>((resolve) => {
+    forced = resolve;
+  });
+  const events: string[] = [];
+  const worker = new PythonWorkerClient(
+    process.execPath,
+    [fixture, "ignore-term"],
+    undefined,
+    (_level, operation) => {
+      events.push(operation);
+      if (operation === "worker.termination.forced") forced();
+    },
+  );
+  await worker.start();
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  t.after(() => {
+    worker.stop();
+    t.mock.timers.tick(5_000);
+  });
+  worker.stop();
+  worker.stop();
+  t.mock.timers.tick(5_000);
+  await forceObserved;
+  assert.equal(worker.state, "stopped");
+  await assert.rejects(
+    worker.requestPreview("10", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  assert.equal(events.includes("worker.restarting"), false);
+  assert.equal(
+    events.filter((event) => event === "worker.termination.forced").length,
+    1,
+  );
+});
