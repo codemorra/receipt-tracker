@@ -2,55 +2,24 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import LookupSelect, { type LookupOption } from "./LookupSelect";
 import DuplicateComparison from "./DuplicateComparison";
+import ReceiptItemEditor from "./ReceiptItemEditor";
 import {
   buildFinalSaveDto,
-  chooseProduct,
-  changeLineType,
   createReviewDraft,
   reviewIssues,
   reviewSumStatus,
-  warrantyDateIssue,
   type DiscountDraft,
   type DuplicateCandidate,
   type ItemDraft,
-  type LineType,
   type ReviewDraft,
   type ReviewDto,
-  type Unit,
   type WarrantyDraft,
-  type WarrantyType,
 } from "./review-state";
 
-// Types for categories and products used in the receipt review.
+// Type for categories used in the receipt review.
 type Category = LookupOption;
-interface Product extends LookupOption {
-  brandName?: string | null;
-  productGroupName?: string;
-  categoryName?: string;
-  packageAmount?: number | null;
-  packageUnit?: string | null;
-}
 
-const units: Unit[] = ["pcs", "g", "kg", "ml", "l"];
-const lineTypes: LineType[] = ["product", "deposit", "fee", "other"];
-const warrantyTypes: WarrantyType[] = ["statutory", "manufacturer", "extended"];
-const defaultCategories = new Set([
-  "food",
-  "beverages",
-  "drugstore",
-  "household",
-  "pet_supplies",
-  "electronics",
-  "clothing",
-  "home_and_garden",
-  "automotive",
-  "leisure",
-  "gastronomy",
-  "services",
-  "other",
-]);
-
-// Default categories used for labeling and validation.
+// Props for the ReceiptReview component.
 interface Props {
   review: ReviewDto;
   onCancelled: () => void;
@@ -219,11 +188,6 @@ function ReceiptReview({ review, onCancelled, onSaved }: Props) {
         discount.id === id ? { ...discount, ...changes } : discount,
       ),
     }));
-  }
-
-  // Get the display label for a category, using a default translation if available.
-  function categoryLabel(name: string) {
-    return defaultCategories.has(name) ? t(`review.categories.${name}`) : name;
   }
 
   const inputClass =
@@ -408,462 +372,35 @@ function ReceiptReview({ review, onCancelled, onSaved }: Props) {
         </div>
 
         {draft.items.map((item, index) => (
-          <article
+          <ReceiptItemEditor
             key={item.id}
-            className="space-y-4 rounded-xl border border-slate-200 p-4"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="font-semibold">
-                {t("review.itemNumber", { number: index + 1 })}
-              </h4>
-              <button
-                type="button"
-                onClick={() =>
-                  setDraft((current) => ({
-                    ...current,
-                    items: current.items.filter(
-                      (entry) => entry.id !== item.id,
-                    ),
-                    discounts: current.discounts.map((discount) => ({
-                      ...discount,
-                      appliesToItemIndex:
-                        discount.appliesToItemIndex === index
-                          ? null
-                          : discount.appliesToItemIndex !== null &&
-                              discount.appliesToItemIndex > index
-                            ? discount.appliesToItemIndex - 1
-                            : discount.appliesToItemIndex,
-                    })),
-                  }))
-                }
-                className="text-sm text-red-700"
-              >
-                {t("review.removeItem")}
-              </button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-              <label className={labelClass}>
-                <span>
-                  {t(
-                    item.lineType === "product"
-                      ? "review.productName"
-                      : "review.rawName",
-                  )}
-                </span>
-                <input
-                  value={
-                    item.lineType === "product"
-                      ? (item.selectedProductName ?? item.normalizedName)
-                      : item.rawName
-                  }
-                  onChange={(event) =>
-                    updateItem(
-                      item.id,
-                      item.lineType === "product"
-                        ? {
-                            normalizedName: event.target.value,
-                            productId: null,
-                            selectedProductName: null,
-                            matchStatus: null,
-                          }
-                        : { rawName: event.target.value },
-                    )
-                  }
-                  className={inputClass}
-                />
-                {item.lineType === "product" &&
-                  item.rawName &&
-                  item.rawName !==
-                    (item.selectedProductName ?? item.normalizedName) && (
-                    <span className="text-xs font-normal text-slate-500">
-                      {t("review.rawName")}: {item.rawName}
-                    </span>
-                  )}
-              </label>
-              <p className="text-sm text-slate-600">
-                {t("review.matchStatus")}:{" "}
-                {item.lineType !== "product"
-                  ? t("review.noProductMatch")
-                  : item.matchStatus
-                    ? t(`review.match.${item.matchStatus}`)
-                    : item.productId !== null
-                      ? t("review.matchManual")
-                      : t("review.match.NEW")}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <label className={labelClass}>
-                <span>{t("review.quantity")}</span>
-                <input
-                  inputMode="decimal"
-                  value={item.quantity}
-                  onChange={(event) =>
-                    updateItem(item.id, { quantity: event.target.value })
-                  }
-                  className={inputClass}
-                />
-              </label>
-              <label className={labelClass}>
-                <span>{t("review.unit")}</span>
-                <select
-                  value={item.unit}
-                  onChange={(event) =>
-                    updateItem(item.id, {
-                      unit: event.target.value as Unit | "",
-                    })
-                  }
-                  className={inputClass}
-                >
-                  <option value="">{t("review.noUnit")}</option>
-                  {units.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {t(`review.units.${unit}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className={labelClass}>
-                <span>{t("review.unitPrice")}</span>
-                <input
-                  inputMode="decimal"
-                  value={item.unitPrice}
-                  onChange={(event) =>
-                    updateItem(item.id, { unitPrice: event.target.value })
-                  }
-                  className={inputClass}
-                />
-              </label>
-              <label className={labelClass}>
-                <span>{t("review.itemTotal")}</span>
-                <input
-                  inputMode="decimal"
-                  value={item.totalPrice}
-                  onChange={(event) =>
-                    updateItem(item.id, { totalPrice: event.target.value })
-                  }
-                  className={inputClass}
-                />
-              </label>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-              <button
-                type="button"
-                aria-expanded={openProductIds.includes(item.id)}
-                aria-controls={`product-details-${item.id}`}
-                onClick={() => toggleProductDetails(item.id)}
-                className="text-sm font-medium text-emerald-800"
-              >
-                {t(
-                  openProductIds.includes(item.id)
-                    ? "review.hideProductDetails"
-                    : "review.productDetails",
-                )}
-              </button>
-              {item.lineType === "product" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    updateItem(item.id, {
-                      warranties: [
-                        ...item.warranties,
-                        {
-                          id: crypto.randomUUID(),
-                          type: "statutory",
-                          startDate: draft.purchaseDate,
-                          endDate: "",
-                          notes: "",
-                        },
-                      ],
-                    });
-                    setWarrantyOpen(item.id, true);
-                  }}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                >
-                  {t("review.addWarranty")}
-                </button>
-              )}
-            </div>
-
-            <div
-              id={`product-details-${item.id}`}
-              hidden={!openProductIds.includes(item.id)}
-            >
-              <div className="grid gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
-                <label className={labelClass}>
-                  <span>{t("review.rawName")}</span>
-                  <input
-                    value={item.rawName}
-                    onChange={(event) =>
-                      updateItem(item.id, {
-                        rawName: event.target.value,
-                        matchStatus: null,
-                      })
-                    }
-                    className={inputClass}
-                  />
-                </label>
-                <label className={labelClass}>
-                  <span>{t("review.lineType")}</span>
-                  <select
-                    value={item.lineType}
-                    onChange={(event) => {
-                      const lineType = event.target.value as LineType;
-                      updateItem(item.id, changeLineType(item, lineType));
-                      if (lineType !== "product")
-                        setWarrantyOpen(item.id, false);
-                    }}
-                    className={inputClass}
-                  >
-                    {lineTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {t(`review.lineTypes.${type}`)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                {item.lineType === "product" && (
-                  <>
-                    <div className="md:col-span-2">
-                      <LookupSelect<Product>
-                        label={t("review.existingProduct")}
-                        selectedLabel={t("review.selectedProduct")}
-                        endpoint="/api/products"
-                        selectedId={item.productId}
-                        initialOptions={
-                          item.matchCandidates?.candidates.map((candidate) => ({
-                            id: candidate.productId,
-                            name: candidate.name,
-                            brandName: candidate.brand,
-                            productGroupName: candidate.productGroup,
-                            packageAmount: candidate.packageAmount,
-                            packageUnit: candidate.packageUnit,
-                          })) ?? []
-                        }
-                        optionLabel={(option) =>
-                          [
-                            option.name,
-                            option.brandName,
-                            option.productGroupName,
-                            option.packageAmount && option.packageUnit
-                              ? `${option.packageAmount} ${option.packageUnit}`
-                              : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")
-                        }
-                        onSelect={(option) =>
-                          updateItem(item.id, chooseProduct(item, option))
-                        }
-                      />
-                    </div>
-                    {item.productId === null && (
-                      <>
-                        <label className={labelClass}>
-                          <span>{t("review.brandName")}</span>
-                          <input
-                            value={item.brand}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                brand: event.target.value,
-                                brandId: null,
-                                productId: null,
-                                matchStatus: null,
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className={labelClass}>
-                          <span>{t("review.productGroupName")}</span>
-                          <input
-                            value={item.productGroup}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                productGroup: event.target.value,
-                                productGroupId: null,
-                                productId: null,
-                                matchStatus: null,
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className={labelClass}>
-                          <span>{t("review.category")}</span>
-                          <select
-                            value={item.category}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                category: event.target.value,
-                                productGroupId: null,
-                                productId: null,
-                                matchStatus: null,
-                              })
-                            }
-                            className={inputClass}
-                          >
-                            <option value="">
-                              {t("review.chooseCategory")}
-                            </option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.name}>
-                                {categoryLabel(category.name)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className={labelClass}>
-                          <span>{t("review.packageAmount")}</span>
-                          <input
-                            inputMode="decimal"
-                            value={item.packageAmount}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                packageAmount: event.target.value,
-                                productId: null,
-                                matchStatus: null,
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className={labelClass}>
-                          <span>{t("review.packageUnit")}</span>
-                          <select
-                            value={item.packageUnit}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                packageUnit: event.target.value as Unit | "",
-                                productId: null,
-                                matchStatus: null,
-                              })
-                            }
-                            className={inputClass}
-                          >
-                            <option value="">{t("review.noUnit")}</option>
-                            {units.map((unit) => (
-                              <option key={unit} value={unit}>
-                                {t(`review.units.${unit}`)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {item.lineType === "product" && item.warranties.length > 0 && (
-              <details
-                open={openWarrantyIds.includes(item.id)}
-                onToggle={(event) => {
-                  setWarrantyOpen(item.id, event.currentTarget.open);
-                }}
-                className="rounded-lg bg-slate-50 p-3"
-              >
-                <summary className="cursor-pointer text-sm font-medium">
-                  {t("review.warrantyCount", {
-                    count: item.warranties.length,
-                  })}
-                </summary>
-                <div className="mt-4 space-y-4">
-                  {item.warranties.map((warranty) => {
-                    const issue = warrantyDateIssue(warranty);
-                    return (
-                      <div
-                        key={warranty.id}
-                        className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-2"
-                      >
-                        <label className={labelClass}>
-                          <span>{t("review.warrantyType")}</span>
-                          <select
-                            value={warranty.type}
-                            onChange={(event) =>
-                              updateWarranty(item.id, warranty.id, {
-                                type: event.target.value as WarrantyType,
-                              })
-                            }
-                            className={inputClass}
-                          >
-                            {warrantyTypes.map((type) => (
-                              <option key={type} value={type}>
-                                {t(`review.warrantyTypes.${type}`)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateItem(item.id, {
-                              warranties: item.warranties.filter(
-                                (entry) => entry.id !== warranty.id,
-                              ),
-                            })
-                          }
-                          className="self-end justify-self-start text-sm text-red-700"
-                        >
-                          {t("review.removeWarranty")}
-                        </button>
-                        <label className={labelClass}>
-                          <span>{t("review.startDate")}</span>
-                          <input
-                            type="date"
-                            value={warranty.startDate}
-                            onChange={(event) =>
-                              updateWarranty(item.id, warranty.id, {
-                                startDate: event.target.value,
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className={labelClass}>
-                          <span>{t("review.endDate")}</span>
-                          <input
-                            type="date"
-                            value={warranty.endDate}
-                            onChange={(event) =>
-                              updateWarranty(item.id, warranty.id, {
-                                endDate: event.target.value,
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className={`${labelClass} md:col-span-2`}>
-                          <span>{t("review.notes")}</span>
-                          <textarea
-                            value={warranty.notes}
-                            onChange={(event) =>
-                              updateWarranty(item.id, warranty.id, {
-                                notes: event.target.value,
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </label>
-                        {issue && (
-                          <p
-                            role="alert"
-                            className="text-sm text-red-700 md:col-span-2"
-                          >
-                            {t(`review.warrantyIssues.${issue}`)}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </details>
-            )}
-          </article>
+            item={item}
+            index={index}
+            categories={categories}
+            purchaseDate={draft.purchaseDate}
+            productDetailsOpen={openProductIds.includes(item.id)}
+            warrantyOpen={openWarrantyIds.includes(item.id)}
+            toggleProductDetails={toggleProductDetails}
+            setWarrantyOpen={setWarrantyOpen}
+            updateItem={updateItem}
+            updateWarranty={updateWarranty}
+            onRemove={() =>
+              setDraft((current) => ({
+                ...current,
+                items: current.items.filter((entry) => entry.id !== item.id),
+                discounts: current.discounts.map((discount) => ({
+                  ...discount,
+                  appliesToItemIndex:
+                    discount.appliesToItemIndex === index
+                      ? null
+                      : discount.appliesToItemIndex !== null &&
+                          discount.appliesToItemIndex > index
+                        ? discount.appliesToItemIndex - 1
+                        : discount.appliesToItemIndex,
+                })),
+              }))
+            }
+          />
         ))}
       </section>
 
