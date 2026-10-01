@@ -24,8 +24,8 @@ A final processing request uses the original image and confirmed normalized corn
 
 Its response contains `width`, `height`, `plainText`, visual `rows`, and ordered `lines` with `index`, `text`, `confidence`, and normalized `box` coordinates. The backend exposes this through `POST /api/scans/:scanId/process` with a JSON body containing `corners` and the final selected `rotation`. If the API request omits `rotation`, the backend uses the scan's automatic correction, or 0 for older scan sessions. The worker applies the selected rotation to the EXIF-corrected original before cropping and creates both archive and OCR images from that same crop. It does not classify the orientation again during processing. The original file remains unchanged. The response includes an `archiveUrl` for the processed image.
 
-The worker uses Pillow for EXIF correction, gentle brightness and contrast adjustment, and WebP output. OpenCV provides optional corner suggestions.
-If OpenCV is unavailable or no convincing contour is found, the worker selects the full image without an inset; the user can adjust the corners.
+The worker uses Pillow for EXIF correction, gentle brightness and contrast adjustment, and WebP output. OpenCV is a required dependency for receipt corner detection and perspective correction.
+If no convincing contour is found, the worker selects the full image without an inset; the user can adjust the corners.
 
 Run the worker tests with:
 

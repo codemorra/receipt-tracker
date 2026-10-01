@@ -9,7 +9,7 @@ from .orientation import rotate_corners, rotate_image
 def suggested_corners(image):
     """Suggests the corners of a receipt in the given image.
 
-    If the necessary libraries (OpenCV and NumPy) are not available, or if a clear receipt outline
+    OpenCV and NumPy are required dependencies of the worker. If a clear receipt outline
     cannot be detected, default corners are returned.
 
     Args:

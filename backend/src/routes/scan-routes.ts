@@ -285,7 +285,7 @@ export function registerScanRoutes(
     },
   );
 
-  // Scan OCR image endpoint
+  // Scan cancellation endpoint
   app.delete("/api/scans/:scanId", async (request, response) => {
     try {
       if (!(await scans.cancel(request.params.scanId))) {
