@@ -13,11 +13,14 @@ import type {
   PreviewResult,
   ProcessResult,
   PythonWorkerClient,
+  Rotation,
 } from "../worker/python-worker-client.js";
+import { isRotation } from "../worker/python-worker-client.js";
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export class InvalidCornersError extends Error {}
+export class InvalidRotationError extends Error {}
 
 export class InvalidUploadError extends Error {
   constructor(
@@ -160,22 +163,30 @@ export class ScanSessionService {
   async process(
     scanId: string,
     corners: unknown,
+    rotation?: unknown,
   ): Promise<ProcessedScan | undefined> {
     if (!isScanId(scanId)) return undefined;
     if (!isCorners(corners)) throw new InvalidCornersError("Invalid corners");
+    if (rotation !== undefined && !isRotation(rotation)) {
+      throw new InvalidRotationError("Invalid rotation");
+    }
 
     const directory = join(this.root, scanId);
-    let session: { originalName: string };
+    let session: { originalName: string; rotation?: Rotation };
     try {
       session = JSON.parse(
         await readFile(join(directory, "session.json"), "utf8"),
-      ) as { originalName: string };
+      ) as { originalName: string; rotation?: Rotation };
     } catch (error) {
       if (isMissingFile(error)) return undefined;
       throw error;
     }
     if (typeof session.originalName !== "string") {
       throw new Error("Invalid scan session metadata");
+    }
+    const selectedRotation = rotation ?? session.rotation ?? 0;
+    if (!isRotation(selectedRotation)) {
+      throw new Error("Invalid scan session rotation");
     }
 
     const archivePath = join(directory, "archive.webp");
@@ -189,6 +200,7 @@ export class ScanSessionService {
         corners,
         temporaryArchive,
         temporaryOcr,
+        selectedRotation,
       );
       await rename(temporaryOcr, ocrPath);
       await rename(temporaryArchive, archivePath);

@@ -2,6 +2,9 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageOps
 
+from .final_image import rectify_image
+from .orientation import rotate_corners, rotate_image
+
 
 def suggested_corners(image):
     """Suggests the corners of a receipt in the given image.
@@ -126,7 +129,7 @@ def default_corners():
     }
 
 
-def create_preview(original_path, preview_path):
+def create_preview(original_path, preview_path, orientation_detector=None):
     """Creates a preview image from the original image, enhancing brightness and contrast, and suggesting receipt corners.
 
     Args:
@@ -144,7 +147,17 @@ def create_preview(original_path, preview_path):
     image = ImageEnhance.Brightness(image).enhance(1.04)
     image = ImageEnhance.Contrast(image).enhance(1.06)
     corners = suggested_corners(image)
+    rotation = 0
+    if orientation_detector is not None:
+        rotation = orientation_detector(rectify_image(image, corners))
+        image = rotate_image(image, rotation)
+        corners = rotate_corners(corners, rotation)
 
     Path(preview_path).parent.mkdir(parents=True, exist_ok=True)
     image.save(preview_path, format="WEBP", quality=82)
-    return {"width": image.width, "height": image.height, "suggestedCorners": corners}
+    return {
+        "width": image.width,
+        "height": image.height,
+        "suggestedCorners": corners,
+        "rotation": rotation,
+    }

@@ -6,6 +6,7 @@ import traceback
 
 from .final_image import create_final_images
 from .ocr import initialize_ocr, recognize_image
+from .orientation import detect_rotation
 from .preview import create_preview
 
 
@@ -42,7 +43,7 @@ def handle_request(request):
     if request.get("type") == "preview":
         if not isinstance(request.get("previewPath"), str) or not request["previewPath"]:
             raise ValueError("previewPath must be a non-empty string")
-        result = create_preview(request["originalPath"], request["previewPath"])
+        result = create_preview(request["originalPath"], request["previewPath"], detect_rotation)
     else:
         for name in ("archivePath", "ocrPath"):
             if not isinstance(request.get(name), str) or not request[name]:
@@ -52,6 +53,7 @@ def handle_request(request):
             request.get("corners"),
             request["archivePath"],
             request["ocrPath"],
+            request.get("rotation", 0),
         )
         ocr_started = time.perf_counter()
         result.update(recognize_image(initialize_ocr(), request["ocrPath"]))

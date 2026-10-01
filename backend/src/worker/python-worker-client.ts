@@ -3,6 +3,16 @@ import { randomUUID } from "node:crypto";
 import { errorType, silentLogger, type Logger } from "../logger.js";
 
 export type Corner = [number, number];
+export type Rotation = 0 | 90 | 180 | 270;
+
+/**
+ * Checks if a value is a valid rotation.
+ * @param value The value to check.
+ * @returns True if the value is a valid rotation, false otherwise.
+ */
+export function isRotation(value: unknown): value is Rotation {
+  return value === 0 || value === 90 || value === 180 || value === 270;
+}
 
 // Types and interfaces for the Python worker client.
 export interface Corners {
@@ -17,6 +27,7 @@ export interface PreviewResult {
   width: number;
   height: number;
   suggestedCorners: Corners;
+  rotation: Rotation;
 }
 
 // Interface representing a single line of OCR result from the Python worker.
@@ -129,6 +140,7 @@ export class PythonWorkerClient {
                 width: value.width,
                 height: value.height,
                 suggestedCorners: value.suggestedCorners,
+                rotation: value.rotation,
               }
             : undefined,
       ),
@@ -140,10 +152,18 @@ export class PythonWorkerClient {
     corners: Corners,
     archivePath: string,
     ocrPath: string,
+    rotation: Rotation = 0,
   ): Promise<ProcessResult> {
     return this.enqueue(() =>
       this.sendRequest(
-        { type: "process", originalPath, corners, archivePath, ocrPath },
+        {
+          type: "process",
+          originalPath,
+          corners,
+          archivePath,
+          ocrPath,
+          rotation,
+        },
         (value) =>
           isProcessResult(value)
             ? {
@@ -309,6 +329,7 @@ function isPreviewResult(
     return false;
   if ((value.width as number) <= 0 || (value.height as number) <= 0)
     return false;
+  if (!isRotation(value.rotation)) return false;
   if (!value.suggestedCorners || typeof value.suggestedCorners !== "object")
     return false;
   const corners = value.suggestedCorners as Record<string, unknown>;

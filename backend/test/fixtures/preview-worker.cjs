@@ -12,8 +12,8 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       JSON.stringify({
         requestId: request.requestId,
         status: "ok",
-        width: 100,
-        height: 200,
+        width: request.rotation === 90 || request.rotation === 270 ? 200 : 100,
+        height: request.rotation === 90 || request.rotation === 270 ? 100 : 200,
         plainText: "RECEIPT",
         ocrDurationMs: 12.5,
         lines: [
@@ -36,6 +36,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       status: "ok",
       width: Number(request.originalPath),
       height: 200,
+      rotation: 0,
       suggestedCorners: {
         topLeft: [0, 0],
         topRight: [1, 0],

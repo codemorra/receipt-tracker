@@ -66,7 +66,12 @@ test("process endpoint returns a review DTO using current categories and databas
   const scans = new ScanSessionService(directory, {
     async requestPreview(_originalPath, previewPath) {
       await writeFile(previewPath, "preview");
-      return { width: 100, height: 200, suggestedCorners: corners };
+      return {
+        width: 100,
+        height: 200,
+        suggestedCorners: corners,
+        rotation: 0,
+      };
     },
     async requestProcess(_originalPath, _corners, archivePath, ocrPath) {
       await writeFile(archivePath, "archive");

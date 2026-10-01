@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent, type PointerEvent } from "react";
 import { useTranslation } from "react-i18next";
+import type { Rotation } from "./scan-orientation";
 
 // Types and utilities for handling receipt image corners and preview.
 export type Corner = [number, number];
@@ -18,6 +19,7 @@ interface Props {
   width: number;
   height: number;
   corners: Corners;
+  rotation?: Rotation;
   onChange: (corners: Corners) => void;
   onImageError: () => void;
   disabled?: boolean;
@@ -29,12 +31,14 @@ function ReceiptImagePreview({
   width,
   height,
   corners,
+  rotation = 0,
   onChange,
   onImageError,
   disabled = false,
 }: Props) {
   const { t } = useTranslation();
   const imageRef = useRef<HTMLImageElement>(null);
+  const sideways = rotation === 90 || rotation === 270;
   const polygon = cornerNames
     .map((name) => corners[name].map((value) => value * 100).join(","))
     .join(" ");
@@ -101,14 +105,21 @@ function ReceiptImagePreview({
   return (
     <div
       className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-xl bg-slate-900 shadow-lg"
-      style={{ aspectRatio: width / height }}
+      style={{ aspectRatio: sideways ? height / width : width / height }}
     >
       <img
         ref={imageRef}
         src={previewUrl}
         alt={t("previewAlt")}
         onError={onImageError}
-        className="block h-full w-full"
+        className="absolute max-w-none"
+        style={{
+          width: sideways ? `${(width / height) * 100}%` : "100%",
+          height: sideways ? `${(height / width) * 100}%` : "100%",
+          left: "50%",
+          top: "50%",
+          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+        }}
         draggable={false}
       />
       <svg

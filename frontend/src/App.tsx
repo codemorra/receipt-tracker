@@ -1,6 +1,11 @@
 import { useEffect, useState, type SubmitEvent } from "react";
 import { useTranslation } from "react-i18next";
 import ReceiptImagePreview, { type Corners } from "./scans/ReceiptImagePreview";
+import {
+  addRotation,
+  rotateCorners,
+  type Rotation,
+} from "./scans/scan-orientation";
 import ReceiptReview from "./review/ReceiptReview";
 import SavedReceiptDetail from "./receipts/SavedReceiptDetail";
 import type { ReviewDto } from "./review/review-state";
@@ -13,6 +18,7 @@ interface ScanResponse {
   width: number;
   height: number;
   suggestedCorners: Corners;
+  rotation: Rotation;
 }
 
 // Interface representing the response from processing a scan.
@@ -53,6 +59,7 @@ function App() {
   const [file, setFile] = useState<File | null>(null);
   const [scan, setScan] = useState<ScanResponse | null>(null);
   const [corners, setCorners] = useState<Corners | null>(null);
+  const [rotation, setRotation] = useState<Rotation>(0);
   const [uploading, setUploading] = useState(false);
   const [errorKey, setErrorKey] = useState("");
   const [previewError, setPreviewError] = useState(false);
@@ -77,6 +84,7 @@ function App() {
     setScan(null);
     setFile(null);
     setCorners(null);
+    setRotation(0);
     setArchiveError(false);
     setProcessErrorKey("");
   }
@@ -160,6 +168,7 @@ function App() {
       const createdScan = result as ScanResponse;
       setScan(createdScan);
       setCorners(createdScan.suggestedCorners);
+      setRotation(createdScan.rotation);
       setPreviewError(false);
     } catch {
       // Handle network or unexpected errors during the upload process.
@@ -168,6 +177,16 @@ function App() {
       // Reset the uploading state regardless of success or failure.
       setUploading(false);
     }
+  }
+
+  // Function to handle the rotation of the receipt preview.
+  function rotatePreview(turn: Rotation) {
+    if (!corners || processing) return;
+    setCorners(rotateCorners(corners, turn));
+    setRotation(addRotation(rotation, turn));
+    setProcessed(null);
+    setProcessErrorKey("");
+    setArchiveError(false);
   }
 
   // Function to handle the processing of a scan after it has been uploaded.
@@ -182,7 +201,7 @@ function App() {
       const response = await fetch(`/api/scans/${scan.scanId}/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ corners }),
+        body: JSON.stringify({ corners, rotation }),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -190,6 +209,7 @@ function App() {
         const code = typeof result.error === "string" ? result.error : "";
         const processErrorKeys: Record<string, string> = {
           invalid_corners: "errors.invalidCorners",
+          invalid_rotation: "errors.invalidRotation",
           scan_not_found: "errors.scanNotFound",
           worker_unavailable: "errors.workerUnavailable",
           processing_failed: "errors.processingFailed",
@@ -335,6 +355,7 @@ function App() {
                 previewUrl={scan.previewUrl}
                 width={scan.width}
                 height={scan.height}
+                rotation={((rotation - scan.rotation + 360) % 360) as Rotation}
                 corners={corners}
                 onChange={(nextCorners) => {
                   setCorners(nextCorners);
@@ -346,6 +367,22 @@ function App() {
                 disabled={processing}
               />
               <div className="mt-5 flex flex-wrap items-center gap-4">
+                <button
+                  type="button"
+                  disabled={processing || previewError}
+                  onClick={() => rotatePreview(270)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 font-semibold disabled:opacity-50"
+                >
+                  {t("rotateLeft")}
+                </button>
+                <button
+                  type="button"
+                  disabled={processing || previewError}
+                  onClick={() => rotatePreview(90)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 font-semibold disabled:opacity-50"
+                >
+                  {t("rotateRight")}
+                </button>
                 {!processed && (
                   <button
                     type="button"

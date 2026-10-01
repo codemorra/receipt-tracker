@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
+from .orientation import rotate_image
+
 CORNER_NAMES = ("topLeft", "topRight", "bottomRight", "bottomLeft")
 
 
@@ -77,7 +79,31 @@ def transformed_size(points):
     return width, height
 
 
-def create_final_images(original_path, corners, archive_path, ocr_path):
+def rectify_image(image, corners):
+    """
+    Rectifies the image based on the provided corner points.
+
+    Args:
+        image (PIL.Image.Image): The original image to be rectified.
+        corners (dict): A dictionary containing the normalized corner points.
+
+    Returns:
+        PIL.Image.Image: The rectified image.
+    """
+    points = confirmed_points(corners, image.width, image.height)
+    width, height = transformed_size(points)
+    target = np.asarray(
+        [[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]],
+        dtype=np.float32,
+    )
+    transform = cv2.getPerspectiveTransform(points, target)
+    pixels = cv2.warpPerspective(
+        np.asarray(image), transform, (width, height), flags=cv2.INTER_LINEAR
+    )
+    return Image.fromarray(pixels)
+
+
+def create_final_images(original_path, corners, archive_path, ocr_path, rotation=0):
     """
     Creates the final archive and OCR images from the original image and its corner points.
 
@@ -94,21 +120,12 @@ def create_final_images(original_path, corners, archive_path, ocr_path):
         source.load()
         original = ImageOps.exif_transpose(source).convert("RGB")
 
-    points = confirmed_points(corners, original.width, original.height)
-    width, height = transformed_size(points)
-    target = np.asarray(
-        [[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]],
-        dtype=np.float32,
-    )
-    transform = cv2.getPerspectiveTransform(points, target)
-    pixels = cv2.warpPerspective(
-        np.asarray(original), transform, (width, height), flags=cv2.INTER_LINEAR
-    )
-    archive = Image.fromarray(pixels)
+    original = rotate_image(original, rotation)
+    archive = rectify_image(original, corners)
     ocr = ImageOps.autocontrast(ImageOps.grayscale(archive), cutoff=1)
 
     Path(archive_path).parent.mkdir(parents=True, exist_ok=True)
     Path(ocr_path).parent.mkdir(parents=True, exist_ok=True)
     archive.save(archive_path, format="WEBP", quality=90)
     ocr.save(ocr_path, format="WEBP", lossless=True)
-    return {"width": width, "height": height}
+    return {"width": archive.width, "height": archive.height}

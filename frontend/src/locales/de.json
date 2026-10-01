@@ -36,7 +36,8 @@
     "archiveUnavailable": "Das verarbeitete Belegbild konnte nicht geladen werden.",
     "ollamaUnavailable": "Die Texterkennung ist momentan nicht verfügbar. Versuche es später erneut.",
     "ollamaFailed": "Die Belegdaten konnten nicht ausgewertet werden. Versuche es erneut.",
-    "invalidExtraction": "Die erkannten Belegdaten konnten nicht verarbeitet werden. Versuche es erneut."
+    "invalidExtraction": "Die erkannten Belegdaten konnten nicht verarbeitet werden. Versuche es erneut.",
+    "invalidRotation": "Die Bildausrichtung ist ungültig. Lade das Bild erneut hoch."
   },
   "processReceipt": "Beleg verarbeiten",
   "processing": "Beleg wird verarbeitet…",
@@ -207,5 +208,7 @@
     "selectedProduct": "Zugeordnetes Produkt",
     "selectedMerchant": "Zugeordneter Händler",
     "clearSelection": "Zuordnung aufheben"
-  }
+  },
+  "rotateLeft": "Links drehen",
+  "rotateRight": "Rechts drehen"
 }

@@ -37,6 +37,7 @@ import {
 } from "./worker/python-worker-client.js";
 import {
   InvalidCornersError,
+  InvalidRotationError,
   InvalidUploadError,
   isScanId,
   MAX_UPLOAD_BYTES,
@@ -253,6 +254,7 @@ export function createApp(
         const result = await scans.process(
           request.params.scanId,
           request.body?.corners,
+          request.body?.rotation,
         );
         if (!result) {
           response.status(404).json({ error: "scan_not_found" });
@@ -339,6 +341,8 @@ export function createApp(
         });
         if (error instanceof InvalidCornersError) {
           response.status(400).json({ error: "invalid_corners" });
+        } else if (error instanceof InvalidRotationError) {
+          response.status(400).json({ error: "invalid_rotation" });
         } else if (error instanceof WorkerUnavailableError) {
           response.status(503).json({ error: "worker_unavailable" });
         } else if (error instanceof WorkerRequestError) {

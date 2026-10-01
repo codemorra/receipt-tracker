@@ -173,3 +173,26 @@ test("worker rejects rows that lose, duplicate, or alter OCR evidence", async (t
     worker.stop();
   }
 });
+
+// Test case for verifying that the worker carries the preview orientation and sends the selected process rotation.
+test("worker carries preview orientation and sends the selected process rotation", async (t) => {
+  const worker = new PythonWorkerClient(process.execPath, [fixture]);
+  t.after(() => worker.stop());
+  await worker.start();
+  const preview = await worker.requestPreview("100", "preview.webp");
+  assert.equal(preview.rotation, 0);
+  const result = await worker.requestProcess(
+    "receipt.png",
+    {
+      topLeft: [0, 0],
+      topRight: [1, 0],
+      bottomRight: [1, 1],
+      bottomLeft: [0, 1],
+    },
+    "archive.webp",
+    "ocr.webp",
+    90,
+  );
+  assert.equal(result.width, 200);
+  assert.equal(result.height, 100);
+});

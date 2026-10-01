@@ -36,7 +36,8 @@
     "archiveUnavailable": "The processed receipt image could not be loaded.",
     "ollamaUnavailable": "Receipt extraction is unavailable right now. Try again later.",
     "ollamaFailed": "The receipt data could not be extracted. Try again.",
-    "invalidExtraction": "The extracted receipt data could not be processed. Try again."
+    "invalidExtraction": "The extracted receipt data could not be processed. Try again.",
+    "invalidRotation": "The image orientation is invalid. Upload the image again."
   },
   "processReceipt": "Process receipt",
   "processing": "Processing receipt…",
@@ -207,5 +208,7 @@
     "selectedProduct": "Selected product",
     "selectedMerchant": "Selected merchant",
     "clearSelection": "Clear selection"
-  }
+  },
+  "rotateLeft": "Rotate left",
+  "rotateRight": "Rotate right"
 }
