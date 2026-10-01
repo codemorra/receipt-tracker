@@ -150,3 +150,55 @@ test("rejects invalid dates, times, amounts, units, and source indexes", () => {
     assert.equal(schema.safeParse(receipt).success, false);
   }
 });
+
+// Test for validating that item and discount references correctly use the provided sparse OCR indexes.
+test("item and discount references use the same actual sparse OCR indexes", () => {
+  const schema = createReceiptExtractionSchema(["food"], [7, 21]);
+  const extraction = {
+    ...validExtraction,
+    items: [{ ...validExtraction.items[0], sourceLineIndexes: [7, 21] }],
+    discounts: [
+      { ...validExtraction.discounts[0], sourceLineIndexes: [21, 7] },
+    ],
+  };
+  assert.deepEqual(schema.parse(extraction), extraction);
+  for (const field of ["items", "discounts"] as const) {
+    for (const lineIndex of [0, 1, 8, 999]) {
+      const invalid = schema.safeParse({
+        ...extraction,
+        [field]: [{ ...extraction[field][0], sourceLineIndexes: [lineIndex] }],
+      });
+      assert.equal(invalid.success, false);
+      if (!invalid.success) {
+        assert.deepEqual(invalid.error.issues[0].path, [
+          field,
+          0,
+          "sourceLineIndexes",
+          0,
+        ]);
+      }
+    }
+  }
+});
+
+// Test for validating that empty source references remain valid even when no OCR lines are provided.
+test("empty source references remain valid even without OCR lines", () => {
+  const extraction = {
+    ...validExtraction,
+    items: [{ ...validExtraction.items[0], sourceLineIndexes: [] }],
+    discounts: [{ ...validExtraction.discounts[0], sourceLineIndexes: [] }],
+  };
+  assert.deepEqual(
+    createReceiptExtractionSchema(["food"], []).parse(extraction),
+    extraction,
+  );
+  assert.deepEqual(
+    createReceiptExtractionSchema(["food"], [7, 21]).parse(extraction),
+    extraction,
+  );
+  assert.equal(
+    createReceiptExtractionSchema(["food"], []).safeParse(validExtraction)
+      .success,
+    false,
+  );
+});

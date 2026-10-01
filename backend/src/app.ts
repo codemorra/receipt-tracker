@@ -296,8 +296,10 @@ export function createApp(
           evalDurationMs: ollama?.evalDurationMs,
         });
         stage = "review";
-        const extraction =
-          createReceiptExtractionSchema(categoryNames).parse(extracted);
+        const extraction = createReceiptExtractionSchema(
+          categoryNames,
+          result.lines.map((line) => line.index),
+        ).parse(extracted);
         const review = createReviewDto(db, result, extraction);
         const totalDurationMs = performance.now() - processingStarted;
         logger("info", "scan.process.complete", {

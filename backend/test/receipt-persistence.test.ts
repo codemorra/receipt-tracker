@@ -138,6 +138,27 @@ test("final save rejects incomplete products, invalid warranties, and invalid di
   );
 });
 
+// Test for validating that the final save schema correctly enforces product line warranties.
+test("final save only accepts warranties on product lines", () => {
+  assert.equal(finalSaveSchema.safeParse(validReceipt).success, true);
+  for (const lineType of ["deposit", "fee", "other"]) {
+    assert.equal(
+      finalSaveSchema.safeParse({
+        ...validReceipt,
+        items: [{ ...validReceipt.items[0], lineType }],
+      }).success,
+      false,
+    );
+    assert.equal(
+      finalSaveSchema.safeParse({
+        ...validReceipt,
+        items: [{ ...validReceipt.items[0], lineType, warranties: [] }],
+      }).success,
+      true,
+    );
+  }
+});
+
 // Test case for verifying that saveReceipt correctly persists all related entities and the receipt archive
 test("save persists confirmed entities, aliases, receipt rows, warranty, and archive", async (t) => {
   const data = await fixture();
