@@ -1,5 +1,14 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { dirname } from "node:path";
+
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+const LOG_BACKUPS = 3;
 
 export type LogLevel = "info" | "warn" | "error";
 
@@ -42,6 +51,32 @@ export function errorType(error: unknown): string {
 }
 
 /**
+ * Rotates the log file by renaming existing backups and removing the oldest one if necessary.
+ * @param filename - The path to the log file.
+ * @param entryBytes - The size of the new log entry in bytes.
+ */
+function rotateLog(filename: string, entryBytes: number): void {
+  const size = statSync(filename, { throwIfNoEntry: false })?.size ?? 0;
+  if (size === 0 || size + entryBytes <= MAX_LOG_BYTES) return;
+  rmSync(`${filename}.${LOG_BACKUPS}`, { force: true });
+  for (let index = LOG_BACKUPS; index >= 1; index--) {
+    const source = index === 1 ? filename : `${filename}.${index - 1}`;
+    try {
+      renameSync(source, `${filename}.${index}`);
+    } catch (error) {
+      if (!(
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "ENOENT"
+      )) {
+        throw error;
+      }
+    }
+  }
+}
+
+/**
  * Creates a logger that writes log entries to the specified file.
  * @param filename - The path to the log file.
  * @returns A logger function that writes log entries to the file.
@@ -55,8 +90,14 @@ export function createFileLogger(filename: string): Logger {
       operation,
       ...fields,
     });
+    const entry = `${line}\n`;
     try {
-      appendFileSync(filename, `${line}\n`, { encoding: "utf8", mode: 0o600 });
+      rotateLog(filename, Buffer.byteLength(entry, "utf8"));
+    } catch (error) {
+      console.error("Application log rotation failed", errorType(error));
+    }
+    try {
+      appendFileSync(filename, entry, { encoding: "utf8", mode: 0o600 });
     } catch (error) {
       console.error("Application log write failed", errorType(error));
     }
