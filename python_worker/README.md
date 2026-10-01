@@ -23,7 +23,7 @@ A final processing request uses the original image and confirmed normalized corn
 Its response contains `width`, `height`, `plainText`, visual `rows`, and ordered `lines` with `index`, `text`, `confidence`, and normalized `box` coordinates. The backend exposes this through `POST /api/scans/:scanId/process` with a JSON body containing `corners`; the response includes an `archiveUrl` for the processed image.
 
 The worker uses Pillow for EXIF correction, gentle brightness and contrast adjustment, and WebP output. OpenCV provides optional corner suggestions.
-If OpenCV is unavailable or no convincing contour is found, the worker suggests an inset frame that the user can adjust.
+If OpenCV is unavailable or no convincing contour is found, the worker selects the full image without an inset; the user can adjust the corners.
 
 Run the worker tests with:
 
