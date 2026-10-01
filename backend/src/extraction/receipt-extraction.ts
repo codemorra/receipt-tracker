@@ -61,45 +61,71 @@ function isPurchaseTime(value: string): boolean {
  */
 export function createReceiptExtractionSchema(
   categoryNames: readonly string[],
+  ocrLineIndexes?: readonly number[],
 ) {
-  return z
-    .strictObject({
-      merchant: merchantSchema,
-      purchaseDate: z.iso.date().nullable(),
-      purchaseTime: z.string().refine(isPurchaseTime).nullable(),
-      currency: z
-        .string()
-        .length(3)
-        .refine((value) =>
-          [...value].every((character) =>
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ".includes(character),
+  const availableIndexes =
+    ocrLineIndexes === undefined ? undefined : new Set(ocrLineIndexes);
+  return (
+    z
+      .strictObject({
+        merchant: merchantSchema,
+        purchaseDate: z.iso.date().nullable(),
+        purchaseTime: z.string().refine(isPurchaseTime).nullable(),
+        currency: z
+          .string()
+          .length(3)
+          .refine((value) =>
+            [...value].every((character) =>
+              "ABCDEFGHIJKLMNOPQRSTUVWXYZ".includes(character),
+            ),
+          )
+          .nullable(),
+        totalCents: centsSchema.nullable(),
+        items: z.array(
+          itemSchema.refine(
+            (item) =>
+              item.category === null || categoryNames.includes(item.category),
+            { path: ["category"], message: "Unknown category" },
           ),
-        )
-        .nullable(),
-      totalCents: centsSchema.nullable(),
-      items: z.array(
-        itemSchema.refine(
-          (item) =>
-            item.category === null || categoryNames.includes(item.category),
-          { path: ["category"], message: "Unknown category" },
         ),
-      ),
-      discounts: z.array(discountSchema),
-    })
-    .superRefine((receipt, context) => {
-      receipt.discounts.forEach((discount, index) => {
-        if (
-          discount.appliesToItemIndex !== null &&
-          discount.appliesToItemIndex >= receipt.items.length
-        ) {
-          context.addIssue({
-            code: "custom",
-            path: ["discounts", index, "appliesToItemIndex"],
-            message: "Item index is out of range",
-          });
+        discounts: z.array(discountSchema),
+      })
+      // Super refinement to validate OCR line indexes and discount item references.
+      .superRefine((receipt, context) => {
+        if (availableIndexes !== undefined) {
+          for (const field of ["items", "discounts"] as const) {
+            receipt[field].forEach((entry, entryIndex) => {
+              entry.sourceLineIndexes.forEach((lineIndex, referenceIndex) => {
+                if (!availableIndexes.has(lineIndex)) {
+                  context.addIssue({
+                    code: "custom",
+                    path: [
+                      field,
+                      entryIndex,
+                      "sourceLineIndexes",
+                      referenceIndex,
+                    ],
+                    message: "Unknown OCR line index",
+                  });
+                }
+              });
+            });
+          }
         }
-      });
-    });
+        receipt.discounts.forEach((discount, index) => {
+          if (
+            discount.appliesToItemIndex !== null &&
+            discount.appliesToItemIndex >= receipt.items.length
+          ) {
+            context.addIssue({
+              code: "custom",
+              path: ["discounts", index, "appliesToItemIndex"],
+              message: "Item index is out of range",
+            });
+          }
+        });
+      })
+  );
 }
 
 // Type representing the structure of extracted receipt data based on the schema.

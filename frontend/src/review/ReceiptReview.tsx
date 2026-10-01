@@ -5,6 +5,7 @@ import DuplicateComparison from "./DuplicateComparison";
 import {
   buildFinalSaveDto,
   chooseProduct,
+  changeLineType,
   createReviewDraft,
   reviewIssues,
   reviewSumStatus,
@@ -561,27 +562,29 @@ function ReceiptReview({ review, onCancelled, onSaved }: Props) {
                     : "review.productDetails",
                 )}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  updateItem(item.id, {
-                    warranties: [
-                      ...item.warranties,
-                      {
-                        id: crypto.randomUUID(),
-                        type: "statutory",
-                        startDate: draft.purchaseDate,
-                        endDate: "",
-                        notes: "",
-                      },
-                    ],
-                  });
-                  setWarrantyOpen(item.id, true);
-                }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              >
-                {t("review.addWarranty")}
-              </button>
+              {item.lineType === "product" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateItem(item.id, {
+                      warranties: [
+                        ...item.warranties,
+                        {
+                          id: crypto.randomUUID(),
+                          type: "statutory",
+                          startDate: draft.purchaseDate,
+                          endDate: "",
+                          notes: "",
+                        },
+                      ],
+                    });
+                    setWarrantyOpen(item.id, true);
+                  }}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  {t("review.addWarranty")}
+                </button>
+              )}
             </div>
 
             <div
@@ -606,23 +609,12 @@ function ReceiptReview({ review, onCancelled, onSaved }: Props) {
                   <span>{t("review.lineType")}</span>
                   <select
                     value={item.lineType}
-                    onChange={(event) =>
-                      updateItem(item.id, {
-                        lineType: event.target.value as LineType,
-                        productId:
-                          event.target.value === "product"
-                            ? item.productId
-                            : null,
-                        selectedProductName:
-                          event.target.value === "product"
-                            ? item.selectedProductName
-                            : null,
-                        matchStatus:
-                          event.target.value === "product"
-                            ? item.matchStatus
-                            : null,
-                      })
-                    }
+                    onChange={(event) => {
+                      const lineType = event.target.value as LineType;
+                      updateItem(item.id, changeLineType(item, lineType));
+                      if (lineType !== "product")
+                        setWarrantyOpen(item.id, false);
+                    }}
                     className={inputClass}
                   >
                     {lineTypes.map((type) => (
@@ -767,7 +759,7 @@ function ReceiptReview({ review, onCancelled, onSaved }: Props) {
               </div>
             </div>
 
-            {item.warranties.length > 0 && (
+            {item.lineType === "product" && item.warranties.length > 0 && (
               <details
                 open={openWarrantyIds.includes(item.id)}
                 onToggle={(event) => {

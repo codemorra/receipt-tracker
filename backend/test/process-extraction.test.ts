@@ -298,6 +298,50 @@ test("process endpoint returns a review DTO using current categories and databas
   assert.equal(invalid.status, 502);
   assert.deepEqual(await invalid.json(), { error: "invalid_extraction" });
 
+  for (const extraction of [
+    {
+      ...validExtraction,
+      items: [{ ...validExtraction.items[0], sourceLineIndexes: [1] }],
+    },
+    {
+      ...validExtraction,
+      discounts: [
+        {
+          rawName: "RABATT",
+          description: null,
+          amountCents: 10,
+          appliesToItemIndex: null,
+          sourceLineIndexes: [1],
+        },
+      ],
+    },
+  ]) {
+    nextExtraction = extraction;
+    const invalidReferences = await processScan();
+    assert.equal(invalidReferences.status, 502);
+    assert.deepEqual(await invalidReferences.json(), {
+      error: "invalid_extraction",
+    });
+  }
+  nextExtraction = {
+    ...validExtraction,
+    items: [{ ...validExtraction.items[0], sourceLineIndexes: [] }],
+    discounts: [
+      {
+        rawName: "RABATT",
+        description: null,
+        amountCents: 10,
+        appliesToItemIndex: null,
+        sourceLineIndexes: [],
+      },
+    ],
+  };
+  const emptyReferences = await processScan();
+  assert.equal(emptyReferences.status, 200);
+  const emptyReview = (await emptyReferences.json()).review;
+  assert.deepEqual(emptyReview.items[0].sourceLineIndexes, []);
+  assert.deepEqual(emptyReview.discounts[0].sourceLineIndexes, []);
+
   nextError = new OllamaUnavailableError("unavailable");
   const unavailable = await processScan();
   assert.equal(unavailable.status, 503);
@@ -319,7 +363,7 @@ test("process endpoint returns a review DTO using current categories and databas
   const databaseFailure = await processScan();
   assert.equal(databaseFailure.status, 500);
   assert.deepEqual(await databaseFailure.json(), { error: "scan_failed" });
-  assert.equal(providerCalls, 9);
+  assert.equal(providerCalls, 12);
   assert.ok(
     events.some((event) => event.includes('"operation":"scan.ocr.complete"')),
   );

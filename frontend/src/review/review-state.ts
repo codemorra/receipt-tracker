@@ -251,6 +251,24 @@ export function chooseProduct(
 }
 
 /**
+ * Changes the line type of an item draft, updating related fields accordingly.
+ * @param item The item draft to update.
+ * @param lineType The new line type to set.
+ * @returns The updated item draft.
+ */
+export function changeLineType(item: ItemDraft, lineType: LineType): ItemDraft {
+  return {
+    ...item,
+    lineType,
+    productId: lineType === "product" ? item.productId : null,
+    selectedProductName:
+      lineType === "product" ? item.selectedProductName : null,
+    matchStatus: lineType === "product" ? item.matchStatus : null,
+    warranties: lineType === "product" ? item.warranties : [],
+  };
+}
+
+/**
  * Determines the sum status of the review draft by comparing the total with the sum of item totals minus discounts.
  * @param draft The review draft to evaluate.
  * @returns "MATCH" if the totals match, "MISMATCH" if they don't, or "INCOMPLETE" if the data is insufficient.

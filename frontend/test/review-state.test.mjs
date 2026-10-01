@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildFinalSaveDto,
   chooseProduct,
+  changeLineType,
   createReviewDraft,
   formatCents,
   isValidDate,
@@ -218,4 +219,56 @@ test("final save data contains confirmed associations, cents, and warranties", (
   ]);
   draft.items[0].warranties[0].endDate = "2025-01-01";
   assert.equal(buildFinalSaveDto(draft), null);
+});
+
+// Test for verifying that changing a product line to a non-product type removes warranties and clears the product selection.
+test("changing a product line to another type removes warranties and its selection", () => {
+  for (const lineType of ["deposit", "fee", "other"]) {
+    const draft = createReviewDraft(review);
+    const product = draft.items[0];
+    product.warranties = [
+      {
+        id: "warranty",
+        type: "manufacturer",
+        startDate: "2026-09-29",
+        endDate: "2028-09-29",
+        notes: "",
+      },
+    ];
+    const changed = changeLineType(product, lineType);
+    assert.equal(changed.lineType, lineType);
+    assert.equal(changed.productId, null);
+    assert.equal(changed.selectedProductName, null);
+    assert.equal(changed.matchStatus, null);
+    assert.deepEqual(changed.warranties, []);
+    assert.equal(changed.rawName, product.rawName);
+    assert.equal(changed.totalPrice, product.totalPrice);
+    draft.items[0] = changed;
+    assert.deepEqual(reviewIssues(draft), []);
+    assert.deepEqual(buildFinalSaveDto(draft).items[0].warranties, []);
+    const restored = changeLineType(changed, "product");
+    assert.deepEqual(restored.warranties, []);
+    assert.equal(restored.productId, null);
+    assert.equal(product.warranties.length, 1);
+    assert.deepEqual(changeLineType(product, "product"), product);
+  }
+});
+
+// Test for verifying that the review validation correctly rejects warranties on non-product lines.
+test("review validation still rejects warranties on non-product lines", () => {
+  for (const lineType of ["deposit", "fee", "other"]) {
+    const draft = createReviewDraft(review);
+    draft.items[0].lineType = lineType;
+    draft.items[0].warranties = [
+      {
+        id: "warranty",
+        type: "manufacturer",
+        startDate: "2026-09-29",
+        endDate: "2028-09-29",
+        notes: "",
+      },
+    ];
+    assert.ok(reviewIssues(draft).some((issue) => issue.code === "warranty"));
+    assert.equal(buildFinalSaveDto(draft), null);
+  }
 });
