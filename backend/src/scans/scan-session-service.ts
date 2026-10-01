@@ -2,12 +2,15 @@ import { randomUUID } from "node:crypto";
 import {
   access,
   mkdir,
+  lstat,
+  readdir,
   readFile,
   rename,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { join } from "node:path";
+import { errorType, silentLogger, type Logger } from "../logger.js";
 import type {
   Corners,
   PreviewResult,
@@ -18,6 +21,7 @@ import type {
 import { isRotation } from "../worker/python-worker-client.js";
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+export const STALE_SCAN_AGE_MS = 24 * 60 * 60 * 1000;
 
 export class InvalidCornersError extends Error {}
 export class InvalidRotationError extends Error {}
@@ -115,8 +119,47 @@ export class ScanSessionService {
       PythonWorkerClient,
       "requestPreview" | "requestProcess"
     >,
+    private readonly logger: Logger = silentLogger,
   ) {}
 
+  // Cleans up stale scan sessions that have not been modified within the defined stale age.
+  async cleanupStaleSessions(now = Date.now()): Promise<number> {
+    let removedSessions = 0;
+    try {
+      const entries = await readdir(this.root, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || !isScanId(entry.name)) continue;
+        const directory = join(this.root, entry.name);
+        try {
+          const information = await lstat(directory);
+          if (
+            !information.isDirectory() ||
+            information.mtimeMs > now - STALE_SCAN_AGE_MS
+          )
+            continue;
+          await rm(directory, { recursive: true });
+          removedSessions++;
+        } catch (error) {
+          if (!isMissingFile(error)) {
+            this.logger("warn", "scan.stale_cleanup.failed", {
+              scanId: entry.name,
+              errorType: errorType(error),
+            });
+          }
+        }
+      }
+    } catch (error) {
+      if (!isMissingFile(error)) {
+        this.logger("warn", "scan.stale_cleanup.failed", {
+          errorType: errorType(error),
+        });
+      }
+    }
+    this.logger("info", "scan.stale_cleanup.complete", { removedSessions });
+    return removedSessions;
+  }
+
+  // Service method for creating a new scan session with the provided image data.
   async create(
     contentType: string | undefined,
     data: unknown,
