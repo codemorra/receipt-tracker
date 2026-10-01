@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   PythonWorkerClient,
   WorkerUnavailableError,
+  WorkerRequestError,
 } from "../src/worker/python-worker-client.js";
 
 // Path to the fixture Python worker script.
@@ -62,7 +63,7 @@ test("worker waits for ready and maps sequenced responses by requestId", async (
 });
 
 // Test for the Python worker client handling unexpected worker exits and failure states.
-test("unexpected worker exit enters failed state and rejects requests", async () => {
+test("unexpected worker exit rejects old requests and recovers on the next attempt", async (t) => {
   const events: string[] = [];
   const worker = new PythonWorkerClient(
     process.execPath,
@@ -72,17 +73,27 @@ test("unexpected worker exit enters failed state and rejects requests", async ()
       events.push(operation);
     },
   );
+  t.after(() => worker.stop());
   await worker.start();
 
-  await assert.rejects(
-    worker.requestPreview("crash", "preview.webp"),
-    WorkerUnavailableError,
-  );
+  const crash = worker.requestPreview("crash", "preview.webp");
+  const queued = worker.requestPreview("20", "queued.webp");
+  await Promise.all([
+    assert.rejects(crash, WorkerUnavailableError),
+    assert.rejects(queued, WorkerUnavailableError),
+  ]);
   assert.equal(worker.state, "failed");
   assert.ok(events.includes("worker.exited"));
-  await assert.rejects(
+  const [first, second] = await Promise.all([
     worker.requestPreview("10", "preview.webp"),
-    WorkerUnavailableError,
+    worker.requestPreview("30", "preview-2.webp"),
+  ]);
+  assert.equal(first.width, 10);
+  assert.equal(second.width, 30);
+  assert.equal(worker.state, "ready");
+  assert.equal(
+    events.filter((event) => event === "worker.restarting").length,
+    1,
   );
 });
 
@@ -195,4 +206,136 @@ test("worker carries preview orientation and sends the selected process rotation
   );
   assert.equal(result.width, 200);
   assert.equal(result.height, 100);
+});
+
+// Test case for verifying that requests wait for the worker to become ready if it is delayed.
+test("requests wait for delayed worker readiness", async (t) => {
+  const worker = new PythonWorkerClient(process.execPath, [fixture, "50"]);
+  t.after(() => worker.stop());
+  const starting = worker.start();
+  assert.equal(worker.state, "starting");
+  const preview = worker.requestPreview("10", "preview.webp");
+  await starting;
+  assert.equal((await preview).width, 10);
+});
+
+// Test case for verifying that the worker correctly handles failed recovery and rejects subsequent requests without entering a retry loop.
+test("failed recovery rejects requests without starting a retry loop", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "receipt-worker-recovery-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const events: string[] = [];
+  const worker = new PythonWorkerClient(
+    process.execPath,
+    [fixture, "fail-recovery", join(directory, "started")],
+    undefined,
+    (_level, operation) => events.push(operation),
+  );
+  t.after(() => worker.stop());
+  await worker.start();
+  await assert.rejects(
+    worker.requestPreview("crash", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  await Promise.all([
+    assert.rejects(
+      worker.requestPreview("10", "a.webp"),
+      WorkerUnavailableError,
+    ),
+    assert.rejects(
+      worker.requestPreview("20", "b.webp"),
+      WorkerUnavailableError,
+    ),
+  ]);
+  assert.equal(worker.state, "failed");
+  assert.equal(
+    events.filter((event) => event === "worker.restarting").length,
+    1,
+  );
+});
+
+// Test case for verifying that request errors do not leave the worker in a failed state and it remains ready for subsequent requests.
+test("request errors leave the worker ready", async (t) => {
+  const worker = new PythonWorkerClient(process.execPath, [fixture]);
+  t.after(() => worker.stop());
+  await worker.start();
+  await assert.rejects(
+    worker.requestPreview("request-error", "preview.webp"),
+    WorkerRequestError,
+  );
+  assert.equal(worker.state, "ready");
+  assert.equal((await worker.requestPreview("10", "preview.webp")).width, 10);
+});
+
+// Test case for verifying that stopping the worker during initialization prevents it from recovering.
+test("stopping during initialization prevents recovery", async (t) => {
+  const worker = new PythonWorkerClient(process.execPath, [fixture, "100"]);
+  t.after(() => worker.stop());
+  const starting = worker.start();
+  worker.stop();
+  await assert.rejects(starting, WorkerUnavailableError);
+  await assert.rejects(
+    worker.requestPreview("10", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  assert.equal(worker.state, "stopped");
+});
+
+// Test case for verifying that a startup timeout correctly fails the worker and rejects any waiting requests.
+test("startup timeout fails the worker and rejects waiting requests", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const worker = new PythonWorkerClient(process.execPath, [
+    "-e",
+    "process.stdin.resume()",
+  ]);
+  t.after(() => worker.stop());
+  const starting = assert.rejects(worker.start(), {
+    message: "Worker startup timed out",
+  });
+  const preview = assert.rejects(
+    worker.requestPreview("10", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  t.mock.timers.tick(30_000);
+  await Promise.all([starting, preview]);
+  assert.equal(worker.state, "failed");
+});
+
+// Test case for verifying that a request timeout correctly rejects queued work and allows a fresh attempt.
+test("request timeout rejects queued work and allows a fresh attempt", async (t) => {
+  const worker = new PythonWorkerClient(process.execPath, [fixture]);
+  t.after(() => worker.stop());
+  await worker.start();
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const hanging = assert.rejects(
+    worker.requestPreview("hang-request", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  const queued = assert.rejects(
+    worker.requestPreview("20", "queued.webp"),
+    WorkerUnavailableError,
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  t.mock.timers.tick(60_000);
+  await Promise.all([hanging, queued]);
+  assert.equal(worker.state, "failed");
+  assert.equal((await worker.requestPreview("10", "preview.webp")).width, 10);
+});
+
+// Test case for verifying that stopping a recovering worker rejects any new requests.
+test("stopping a recovering worker rejects the new request", async (t) => {
+  const worker = new PythonWorkerClient(process.execPath, [fixture]);
+  t.after(() => worker.stop());
+  await worker.start();
+  await assert.rejects(
+    worker.requestPreview("crash", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  const recovering = assert.rejects(
+    worker.requestPreview("10", "preview.webp"),
+    WorkerUnavailableError,
+  );
+  worker.stop();
+  await recovering;
+  assert.equal(worker.state, "stopped");
 });

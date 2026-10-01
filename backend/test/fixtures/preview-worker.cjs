@@ -1,11 +1,32 @@
 const readline = require("node:readline");
 
-process.stdout.write(JSON.stringify({ type: "ready" }) + "\n");
+if (process.argv[2] === "fail-recovery") {
+  const fs = require("node:fs");
+  if (fs.existsSync(process.argv[3])) process.exit(2);
+  fs.writeFileSync(process.argv[3], "started");
+}
+setTimeout(
+  () => {
+    process.stdout.write(JSON.stringify({ type: "ready" }) + "\n");
+  },
+  Number(process.argv[2]) || 0,
+);
 
 readline.createInterface({ input: process.stdin }).on("line", (line) => {
   const request = JSON.parse(line);
+  if (request.originalPath === "hang-request") return;
   if (request.originalPath === "crash") {
     process.exit(2);
+  }
+  if (request.originalPath === "request-error") {
+    process.stdout.write(
+      JSON.stringify({
+        requestId: request.requestId,
+        status: "error",
+        error: "Invalid image",
+      }) + "\n",
+    );
+    return;
   }
   if (request.type === "process") {
     process.stdout.write(

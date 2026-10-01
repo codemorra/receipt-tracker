@@ -74,6 +74,9 @@ export class PythonWorkerClient {
   private pending?: PendingRequest;
   private queue: Promise<void> = Promise.resolve();
   private started = false;
+  private generation = 0;
+  private readyPromise?: Promise<void>;
+  private processClosed: Promise<void> = Promise.resolve();
   private readyResolve?: () => void;
   private readyReject?: (error: Error) => void;
   private startupTimeout?: NodeJS.Timeout;
@@ -85,46 +88,67 @@ export class PythonWorkerClient {
     private readonly logger: Logger = silentLogger,
   ) {}
 
-  // Starts the Python worker process and initializes the client.
+  // Starts the Python worker process and returns a promise that resolves when the worker is ready.
   start(): Promise<void> {
-    if (this.started) {
-      throw new Error("Worker can only be started once");
+    if (this.state === "starting" && this.readyPromise)
+      return this.readyPromise;
+    if (this.started && this.state !== "failed") {
+      throw new Error("Worker is already started or explicitly stopped");
     }
+    const recovering = this.started;
     this.started = true;
     this.state = "starting";
-
-    return new Promise<void>((resolve, reject) => {
-      this.readyResolve = resolve;
-      this.readyReject = reject;
-      try {
-        const child = spawn(this.command, this.args, {
-          stdio: "pipe",
-          cwd: this.cwd,
-        });
-        this.process = child;
-        child.stdout.setEncoding("utf8");
-        child.stdout.on("data", (chunk: string) => this.onOutput(chunk));
-        child.stderr.on("data", (chunk: Buffer) => {
-          process.stderr.write(`[python-worker] ${chunk.toString()}`);
-        });
-        child.on("error", (error) => this.fail(error));
-        child.on("exit", (code) => {
-          if (this.state === "failed" || this.state === "stopped") return;
-          this.state = code === 0 ? "stopped" : "failed";
-          this.logger(code === 0 ? "warn" : "error", "worker.exited", {
-            exitCode: code ?? undefined,
-          });
-          this.rejectOutstanding(
-            new WorkerUnavailableError(`Worker stopped with code ${code}`),
-          );
-        });
-        this.startupTimeout = setTimeout(() => {
-          this.fail(new WorkerUnavailableError("Worker startup timed out"));
-        }, 30_000);
-      } catch (error) {
-        this.fail(error instanceof Error ? error : new Error(String(error)));
+    this.output = "";
+    const generation = ++this.generation;
+    this.logger("info", recovering ? "worker.restarting" : "worker.starting");
+    this.readyPromise = this.processClosed.then(() => {
+      if (this.state !== "starting" || generation !== this.generation) {
+        throw new WorkerUnavailableError("Worker stopped");
       }
+      return new Promise<void>((resolve, reject) => {
+        this.readyResolve = resolve;
+        this.readyReject = reject;
+        try {
+          const child = spawn(this.command, this.args, {
+            stdio: "pipe",
+            cwd: this.cwd,
+          });
+          this.process = child;
+          this.processClosed = new Promise<void>((closed) =>
+            child.once("close", closed),
+          );
+          const current = () =>
+            generation === this.generation &&
+            this.state !== "stopped" &&
+            this.state !== "failed";
+          child.stdout.setEncoding("utf8");
+          child.stdout.on("data", (chunk: string) => {
+            if (current()) this.onOutput(chunk);
+          });
+          child.stderr.on("data", (chunk: Buffer) => {
+            process.stderr.write(`[python-worker] ${chunk.toString()}`);
+          });
+          child.on("error", (error) => {
+            if (current()) this.fail(error);
+          });
+          child.on("exit", (code) => {
+            if (!current() || this.state === "failed") return;
+            this.logger("error", "worker.exited", {
+              exitCode: code ?? undefined,
+            });
+            this.fail(
+              new WorkerUnavailableError(`Worker stopped with code ${code}`),
+            );
+          });
+          this.startupTimeout = setTimeout(() => {
+            this.fail(new WorkerUnavailableError("Worker startup timed out"));
+          }, 30_000);
+        } catch (error) {
+          this.fail(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
     });
+    return this.readyPromise;
   }
 
   requestPreview(
@@ -180,7 +204,21 @@ export class PythonWorkerClient {
   }
 
   private enqueue<T>(send: () => Promise<T>): Promise<T> {
-    const result = this.queue.then(send);
+    const readiness =
+      this.state === "failed"
+        ? this.start()
+        : this.state === "starting"
+          ? this.readyPromise
+          : undefined;
+    const generation = this.generation;
+    const result = Promise.all([this.queue, readiness]).then(() => {
+      if (generation !== this.generation) {
+        throw new WorkerUnavailableError(
+          "Worker request belongs to a failed process",
+        );
+      }
+      return send();
+    });
     this.queue = result.then(
       () => undefined,
       () => undefined,
@@ -190,7 +228,7 @@ export class PythonWorkerClient {
 
   // Stops the Python worker process.
   stop(): void {
-    if (this.state === "stopped" || this.state === "failed") return;
+    if (this.state === "stopped") return;
     this.state = "stopped";
     this.rejectOutstanding(new WorkerUnavailableError("Worker stopped"));
     this.process?.kill();
@@ -206,6 +244,7 @@ export class PythonWorkerClient {
       );
     }
 
+    const generation = this.generation;
     const requestId = randomUUID();
     return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -224,7 +263,7 @@ export class PythonWorkerClient {
       this.process!.stdin.write(
         JSON.stringify({ requestId, ...request }) + "\n",
         (error) => {
-          if (error) this.fail(error);
+          if (error && generation === this.generation) this.fail(error);
         },
       );
     });
@@ -258,6 +297,7 @@ export class PythonWorkerClient {
     const value = message as Record<string, unknown>;
     if (this.state === "starting" && value.type === "ready") {
       this.state = "ready";
+      this.logger("info", "worker.ready");
       clearTimeout(this.startupTimeout);
       this.readyResolve?.();
       this.readyResolve = undefined;
