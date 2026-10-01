@@ -260,7 +260,7 @@ export class ScanSessionService {
     }
   }
 
-  // Service method for retrieving the file path of the OCR image for a scan session.
+  // Service method for cancelling a scan session and removing its temporary files.
   async cancel(scanId: string): Promise<boolean> {
     if (!isScanId(scanId)) return false;
     const directory = join(this.root, scanId);
