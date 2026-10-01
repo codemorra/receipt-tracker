@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import LookupSelect, { type LookupOption } from "./LookupSelect";
 import DuplicateComparison from "./DuplicateComparison";
 import ReceiptItemEditor from "./ReceiptItemEditor";
+import DiscountEditor from "./DiscountEditor";
 import {
   buildFinalSaveDto,
   createReviewDraft,
@@ -404,116 +405,33 @@ function ReceiptReview({ review, onCancelled, onSaved }: Props) {
         ))}
       </section>
 
-      <section aria-labelledby="discounts-heading" className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 id="discounts-heading" className="text-lg font-semibold">
-            {t("review.discounts")}
-          </h3>
-          <button
-            type="button"
-            onClick={() =>
-              setDraft((current) => ({
-                ...current,
-                discounts: [
-                  ...current.discounts,
-                  {
-                    id: crypto.randomUUID(),
-                    rawName: "",
-                    description: "",
-                    amount: "",
-                    appliesToItemIndex: null,
-                    sourceLineIndexes: [],
-                  },
-                ],
-              }))
-            }
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold"
-          >
-            {t("review.addDiscount")}
-          </button>
-        </div>
-        {draft.discounts.map((discount) => (
-          <div
-            key={discount.id}
-            className="grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2"
-          >
-            <label className={labelClass}>
-              <span>{t("review.discountRawName")}</span>
-              <input
-                value={discount.rawName}
-                onChange={(event) =>
-                  updateDiscount(discount.id, {
-                    rawName: event.target.value,
-                  })
-                }
-                className={inputClass}
-              />
-            </label>
-            <label className={labelClass}>
-              <span>{t("review.discountDescription")}</span>
-              <input
-                value={discount.description}
-                onChange={(event) =>
-                  updateDiscount(discount.id, {
-                    description: event.target.value,
-                  })
-                }
-                className={inputClass}
-              />
-            </label>
-            <label className={labelClass}>
-              <span>{t("review.discountAmount")}</span>
-              <input
-                inputMode="decimal"
-                value={discount.amount}
-                onChange={(event) =>
-                  updateDiscount(discount.id, {
-                    amount: event.target.value,
-                  })
-                }
-                className={inputClass}
-              />
-            </label>
-            <label className={labelClass}>
-              <span>{t("review.appliesTo")}</span>
-              <select
-                value={discount.appliesToItemIndex ?? ""}
-                onChange={(event) =>
-                  updateDiscount(discount.id, {
-                    appliesToItemIndex:
-                      event.target.value === ""
-                        ? null
-                        : Number(event.target.value),
-                  })
-                }
-                className={inputClass}
-              >
-                <option value="">{t("review.wholeReceipt")}</option>
-                {draft.items.map((item, index) => (
-                  <option key={item.id} value={index}>
-                    {t("review.itemNumber", { number: index + 1 })}:{" "}
-                    {item.rawName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() =>
-                setDraft((current) => ({
-                  ...current,
-                  discounts: current.discounts.filter(
-                    (entry) => entry.id !== discount.id,
-                  ),
-                }))
-              }
-              className="justify-self-start text-sm text-red-700"
-            >
-              {t("review.removeDiscount")}
-            </button>
-          </div>
-        ))}
-      </section>
+      <DiscountEditor
+        discounts={draft.discounts}
+        items={draft.items}
+        updateDiscount={updateDiscount}
+        onAdd={() =>
+          setDraft((current) => ({
+            ...current,
+            discounts: [
+              ...current.discounts,
+              {
+                id: crypto.randomUUID(),
+                rawName: "",
+                description: "",
+                amount: "",
+                appliesToItemIndex: null,
+                sourceLineIndexes: [],
+              },
+            ],
+          }))
+        }
+        onRemove={(id) =>
+          setDraft((current) => ({
+            ...current,
+            discounts: current.discounts.filter((entry) => entry.id !== id),
+          }))
+        }
+      />
       {duplicateCandidates.length > 0 && savedReceiptId === null && (
         <DuplicateComparison
           archiveUrl={review.archiveUrl}
