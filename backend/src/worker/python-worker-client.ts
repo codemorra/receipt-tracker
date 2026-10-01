@@ -70,6 +70,7 @@ interface PendingRequest {
 export class PythonWorkerClient {
   state: "starting" | "ready" | "stopped" | "failed" = "stopped";
   private process?: ChildProcessWithoutNullStreams;
+  private terminating?: ChildProcessWithoutNullStreams;
   private output = "";
   private pending?: PendingRequest;
   private queue: Promise<void> = Promise.resolve();
@@ -231,7 +232,7 @@ export class PythonWorkerClient {
     if (this.state === "stopped") return;
     this.state = "stopped";
     this.rejectOutstanding(new WorkerUnavailableError("Worker stopped"));
-    this.process?.kill();
+    this.terminateProcess();
   }
 
   private sendRequest<T>(
@@ -340,7 +341,36 @@ export class PythonWorkerClient {
     this.state = "failed";
     this.logger("error", "worker.failed", { errorType: errorType(error) });
     this.rejectOutstanding(new WorkerUnavailableError(error.message));
-    this.process?.kill();
+    this.terminateProcess();
+  }
+
+  // Terminates the Python worker process, attempting a graceful shutdown first and forcing termination if necessary.
+  private terminateProcess(): void {
+    const child = this.process;
+    if (
+      !child ||
+      child.pid === undefined ||
+      child.exitCode !== null ||
+      child.signalCode !== null ||
+      this.terminating === child
+    )
+      return;
+    this.terminating = child;
+    const timeout = setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        if (child.kill("SIGKILL")) {
+          this.logger("warn", "worker.termination.forced", {
+            signal: "SIGKILL",
+          });
+        }
+      }
+    }, 5_000);
+    child.once("exit", () => clearTimeout(timeout));
+    child.once("close", () => {
+      clearTimeout(timeout);
+      if (this.terminating === child) this.terminating = undefined;
+    });
+    child.kill("SIGTERM");
   }
 
   // Rejects any outstanding requests to the Python worker with the given error.

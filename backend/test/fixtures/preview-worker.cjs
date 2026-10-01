@@ -1,5 +1,7 @@
 const readline = require("node:readline");
 
+if (process.argv[2] === "ignore-term") process.on("SIGTERM", () => {});
+
 if (process.argv[2] === "fail-recovery") {
   const fs = require("node:fs");
   if (fs.existsSync(process.argv[3])) process.exit(2);
