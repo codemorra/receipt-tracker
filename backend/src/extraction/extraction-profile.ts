@@ -4,3 +4,10 @@ export const ollamaExtractionProfile = {
   think: true,
   timeoutMs: 240_000,
 } as const;
+
+// Extraction profile for the Mistral LLM provider
+export const mistralExtractionProfile = {
+  temperature: 0,
+  timeoutMs: 240_000,
+  responseFormat: "json_schema",
+} as const;
