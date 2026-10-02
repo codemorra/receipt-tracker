@@ -8,6 +8,7 @@ import test from "node:test";
 import { createReceiptExtractionProviderFromEnv } from "../src/extraction/create-provider.js";
 import { MistralProvider } from "../src/extraction/mistral-provider.js";
 import { OllamaProvider } from "../src/extraction/ollama-provider.js";
+import { OpenAiProvider } from "../src/extraction/openai-provider.js";
 
 const input = { plainText: "", lines: [], rows: [], categoryNames: ["food"] };
 const mistralEnv = {
@@ -103,12 +104,12 @@ test("configures Mistral using only Mistral variables and preserves base URL pat
 
 // Tests for error handling when environment variables are missing or invalid
 test("rejects unsupported providers, missing models and keys, and invalid URLs without exposing values", () => {
-  for (const LLM_PROVIDER of ["", "openai", "anthropic", "test-only-secret"]) {
+  for (const LLM_PROVIDER of ["", "anthropic", "test-only-secret"]) {
     assert.throws(
       () =>
         createReceiptExtractionProviderFromEnv({ ...mistralEnv, LLM_PROVIDER }),
       {
-        message: "LLM_PROVIDER must be ollama or mistral",
+        message: "LLM_PROVIDER must be ollama, mistral or openai",
       },
     );
   }
@@ -136,6 +137,27 @@ test("rejects unsupported providers, missing models and keys, and invalid URLs w
       },
     );
   }
+  const openaiEnv = {
+    LLM_PROVIDER: "openai",
+    OPENAI_MODEL: "test-model",
+    OPENAI_API_KEY: "test-only-key",
+  };
+  assert.throws(
+    () =>
+      createReceiptExtractionProviderFromEnv({
+        ...openaiEnv,
+        OPENAI_MODEL: "",
+      }),
+    { message: "OPENAI_MODEL must name an OpenAI model" },
+  );
+  assert.throws(
+    () =>
+      createReceiptExtractionProviderFromEnv({
+        ...openaiEnv,
+        OPENAI_API_KEY: "",
+      }),
+    { message: "OPENAI_API_KEY must be set for the OpenAI provider" },
+  );
   for (const MISTRAL_BASE_URL of [
     "",
     "test-only-secret",
@@ -217,4 +239,16 @@ test("invalid Mistral configuration stops backend startup before migration witho
       );
     }
   }
+});
+
+// Test for selecting OpenAI provider with its own configuration
+test("selects OpenAI with its own configuration", () => {
+  const provider = createReceiptExtractionProviderFromEnv({
+    ...mistralEnv,
+    LLM_PROVIDER: " openai ",
+    OPENAI_MODEL: " test-model ",
+    OPENAI_API_KEY: " test-only-key ",
+    MISTRAL_BASE_URL: "invalid ignored URL",
+  });
+  assert.ok(provider instanceof OpenAiProvider);
 });

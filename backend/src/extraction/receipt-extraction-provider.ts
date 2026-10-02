@@ -20,7 +20,7 @@ export interface OllamaDiagnostics {
 }
 
 // Defines the names of the supported receipt extraction providers.
-export type ReceiptExtractionProviderName = "ollama" | "mistral";
+export type ReceiptExtractionProviderName = "ollama" | "mistral" | "openai";
 
 // Defines the structure of diagnostic information for receipt extraction.
 export interface ReceiptExtractionDiagnostics {
