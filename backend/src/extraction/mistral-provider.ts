@@ -24,7 +24,17 @@ const responseSchema = z.object({
           content: z.union([
             z.string(),
             z
-              .array(z.object({ type: z.literal("text"), text: z.string() }))
+              .array(
+                z.discriminatedUnion("type", [
+                  z.object({ type: z.literal("text"), text: z.string() }),
+                  z.object({
+                    type: z.literal("thinking"),
+                    thinking: z.array(
+                      z.object({ type: z.literal("text"), text: z.string() }),
+                    ),
+                  }),
+                ]),
+              )
               .min(1),
           ]),
         }),
@@ -74,6 +84,10 @@ export class MistralProvider implements ReceiptExtractionProvider {
       ],
       temperature: profile.temperature,
       random_seed: profile.randomSeed,
+      ...("topP" in profile ? { top_p: profile.topP } : {}),
+      ...("reasoningEffort" in profile
+        ? { reasoning_effort: profile.reasoningEffort }
+        : {}),
       stream: false,
       response_format: {
         type: profile.responseFormat,
@@ -165,7 +179,10 @@ export class MistralProvider implements ReceiptExtractionProvider {
     const text =
       typeof content === "string"
         ? content
-        : content.map((chunk) => chunk.text).join("");
+        : content
+            .filter((chunk) => chunk.type === "text")
+            .map((chunk) => chunk.text)
+            .join("");
     try {
       return JSON.parse(text) as unknown;
     } catch {
