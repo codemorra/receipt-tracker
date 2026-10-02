@@ -22,3 +22,21 @@ export const mistralExtractionProfile = {
   randomSeed: 42,
   responseFormat: "json_schema",
 } as const;
+
+// Mistral small extraction profile overrides and additions
+export const mistralSmallExtractionProfile = {
+  ...mistralExtractionProfile,
+  instructions: [
+    "Finalize the complete items array, including deposits and negative deposit returns, before resolving discounts. Never omit a printed deposit return.",
+    "For EACH discount independently identify its product from the OCR, then LOOK UP that product's zero-based index in the final items array. The discount's position in the discounts array is irrelevant. Consecutive discounts may share the same preceding item: items A, B, C with discounts for A, A, B, C must reference 0, 0, 1, 2, never 0, 1, 2, 3.",
+    "Internally verify every non-null discount reference is less than items.length and points to its actual product. Recheck the product lookup rather than replacing an invalid index with null; null is for receipt-level or genuinely ambiguous discounts.",
+    "Use packageAmount/packageUnit only for intrinsic package contents explicitly printed on the receipt. A price or purchase multiplication is not package content; do not assume bottle volumes or turn deposit prices into package sizes.",
+  ].join("\n"),
+} as const;
+
+// Returns the appropriate extraction profile based on the model name.
+export function getMistralExtractionProfile(model: string) {
+  return model === "mistral-small-2603"
+    ? mistralSmallExtractionProfile
+    : mistralExtractionProfile;
+}
