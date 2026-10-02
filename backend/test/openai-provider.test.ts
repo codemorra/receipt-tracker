@@ -36,6 +36,23 @@ const completion = (output: unknown[] = [finalMessage]) => ({
   usage: { input_tokens: 123, output_tokens: 45, total_tokens: 168 },
 });
 
+// Test for the OpenAiProvider using no reasoning for the Luna receipt request
+test("uses no reasoning for the Luna receipt request", async () => {
+  const provider = new OpenAiProvider(
+    "gpt-6-luna",
+    "test-only-key",
+    async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      assert.deepEqual(body.reasoning, { effort: "none" });
+      assert.equal(body.input, createReceiptExtractionPrompt(input));
+      assert.equal(body.store, false);
+      assert.equal(body.tools, undefined);
+      return Response.json(completion());
+    },
+  );
+  assert.deepEqual(await provider.extractReceipt(input), extraction);
+});
+
 // Test for the OpenAiProvider extracting a receipt with diagnostics
 test("sends a stateless structured receipt request and returns final JSON with diagnostics", async () => {
   let calls = 0;
