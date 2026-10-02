@@ -4,7 +4,7 @@ import {
   LlmRequestError,
   LlmUnavailableError,
 } from "./extraction-errors.js";
-import { mistralExtractionProfile } from "./extraction-profile.js";
+import { getMistralExtractionProfile } from "./extraction-profile.js";
 import { createReceiptExtractionPrompt } from "./receipt-extraction-prompt.js";
 import type {
   ReceiptExtractionDiagnostics,
@@ -62,18 +62,21 @@ export class MistralProvider implements ReceiptExtractionProvider {
     input: ReceiptExtractionInput,
     onDiagnostics?: (diagnostics: ReceiptExtractionDiagnostics) => void,
   ): Promise<unknown> {
-    const signal = AbortSignal.timeout(mistralExtractionProfile.timeoutMs);
+    const profile = getMistralExtractionProfile(this.model);
+    const signal = AbortSignal.timeout(profile.timeoutMs);
     const body = JSON.stringify({
       model: this.model,
       messages: [
-        { role: "system", content: mistralExtractionProfile.instructions },
+        ...(profile.instructions
+          ? [{ role: "system", content: profile.instructions }]
+          : []),
         { role: "user", content: createReceiptExtractionPrompt(input) },
       ],
-      temperature: mistralExtractionProfile.temperature,
-      random_seed: mistralExtractionProfile.randomSeed,
+      temperature: profile.temperature,
+      random_seed: profile.randomSeed,
       stream: false,
       response_format: {
-        type: mistralExtractionProfile.responseFormat,
+        type: profile.responseFormat,
         json_schema: {
           name: "receipt_extraction",
           strict: true,
