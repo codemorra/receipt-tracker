@@ -66,9 +66,11 @@ export class MistralProvider implements ReceiptExtractionProvider {
     const body = JSON.stringify({
       model: this.model,
       messages: [
+        { role: "system", content: mistralExtractionProfile.instructions },
         { role: "user", content: createReceiptExtractionPrompt(input) },
       ],
       temperature: mistralExtractionProfile.temperature,
+      random_seed: mistralExtractionProfile.randomSeed,
       stream: false,
       response_format: {
         type: mistralExtractionProfile.responseFormat,

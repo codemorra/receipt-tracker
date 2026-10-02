@@ -7,6 +7,7 @@ import {
   LlmUnavailableError,
 } from "../src/extraction/extraction-errors.js";
 import { MistralProvider } from "../src/extraction/mistral-provider.js";
+import { mistralExtractionProfile } from "../src/extraction/extraction-profile.js";
 import { createReceiptExtractionPrompt } from "../src/extraction/receipt-extraction-prompt.js";
 import type { ReceiptExtractionDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "../src/extraction/receipt-extraction.js";
@@ -66,9 +67,11 @@ test("sends the shared prompt and Zod JSON schema to the configured model and en
       assert.deepEqual(JSON.parse(String(init?.body)), {
         model: "configured-model",
         messages: [
+          { role: "system", content: mistralExtractionProfile.instructions },
           { role: "user", content: createReceiptExtractionPrompt(input) },
         ],
         temperature: 0,
+        random_seed: 42,
         stream: false,
         response_format: {
           type: "json_schema",
@@ -126,6 +129,54 @@ test("supports structured JSON returned as text chunks", async () => {
       ),
   );
   assert.deepEqual(await provider.extractReceipt(input), extraction);
+});
+
+// Tests for preserving discount indexes through parsing and validation
+test("preserves zero and full-array discount indexes through parsing and validation", async () => {
+  const receipt = {
+    ...extraction,
+    items: ["product", "deposit", "fee", "other"].map((lineType) => ({
+      rawName: lineType,
+      normalizedName: null,
+      brand: null,
+      productGroup: null,
+      category: null,
+      packageAmount: null,
+      packageUnit: null,
+      quantity: 1,
+      unit: "pcs",
+      unitPriceCents: 25,
+      totalPriceCents: 25,
+      lineType,
+      sourceLineIndexes: [7],
+    })),
+    discounts: [0, 1, 2, 3, null].map((appliesToItemIndex) => ({
+      rawName: "Discount",
+      description: null,
+      amountCents: 1,
+      appliesToItemIndex,
+      sourceLineIndexes: [7],
+    })),
+    totalCents: 95,
+  };
+  const text = JSON.stringify(receipt);
+  for (const content of [text, [{ type: "text", text }]]) {
+    const provider = new MistralProvider(
+      endpoint,
+      "test-model",
+      apiKey,
+      async () => Response.json(completion(content)),
+    );
+    const parsed = createReceiptExtractionSchema(
+      input.categoryNames,
+      [7],
+    ).parse(await provider.extractReceipt(input));
+    assert.deepEqual(parsed, receipt);
+    assert.deepEqual(
+      parsed.discounts.map((discount) => discount.appliesToItemIndex),
+      [0, 1, 2, 3, null],
+    );
+  }
 });
 
 // Additional tests for edge cases and error handling
