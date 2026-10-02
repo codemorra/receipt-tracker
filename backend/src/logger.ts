@@ -28,6 +28,11 @@ export interface LogFields {
   evalCount?: number;
   evalDurationMs?: number;
   model?: string;
+  provider?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  httpStatus?: number;
   errorType?: string;
   stage?: string;
   phase?: string;

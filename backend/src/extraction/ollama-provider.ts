@@ -1,15 +1,23 @@
 import { z } from "zod";
 import { createReceiptExtractionSchema } from "./receipt-extraction.js";
 import type {
-  OllamaDiagnostics,
+  ReceiptExtractionDiagnostics,
   ReceiptExtractionInput,
   ReceiptExtractionProvider,
 } from "./receipt-extraction-provider.js";
 import { createReceiptExtractionPrompt } from "./receipt-extraction-prompt.js";
+import { ollamaExtractionProfile } from "./extraction-profile.js";
+import {
+  OllamaUnavailableError,
+  OllamaRequestError,
+  InvalidLlmResponseError,
+} from "./extraction-errors.js";
 
-export class OllamaUnavailableError extends Error {}
-export class OllamaRequestError extends Error {}
-export class InvalidLlmResponseError extends Error {}
+export {
+  OllamaUnavailableError,
+  OllamaRequestError,
+  InvalidLlmResponseError,
+} from "./extraction-errors.js";
 
 // Provider implementation for interacting with the Ollama LLM for receipt extraction.
 export class OllamaProvider implements ReceiptExtractionProvider {
@@ -22,7 +30,7 @@ export class OllamaProvider implements ReceiptExtractionProvider {
   // Extracts receipt data from the Ollama LLM using the provided input.
   async extractReceipt(
     input: ReceiptExtractionInput,
-    onDiagnostics?: (diagnostics: OllamaDiagnostics) => void,
+    onDiagnostics?: (diagnostics: ReceiptExtractionDiagnostics) => void,
   ): Promise<unknown> {
     let response: Response;
     try {
@@ -38,17 +46,20 @@ export class OllamaProvider implements ReceiptExtractionProvider {
             createReceiptExtractionSchema(input.categoryNames),
           ),
           stream: false,
-          think: true,
-          options: { temperature: 0 },
+          think: ollamaExtractionProfile.think,
+          options: { temperature: ollamaExtractionProfile.temperature },
         }),
-        signal: AbortSignal.timeout(240_000),
+        signal: AbortSignal.timeout(ollamaExtractionProfile.timeoutMs),
       });
     } catch {
       throw new OllamaUnavailableError("Ollama is unavailable or timed out");
     }
 
     if (!response.ok) {
-      throw new OllamaRequestError(`Ollama returned HTTP ${response.status}`);
+      throw new OllamaRequestError(
+        `Ollama returned HTTP ${response.status}`,
+        response.status,
+      );
     }
 
     // Attempt to parse the response payload as JSON.
@@ -79,13 +90,19 @@ export class OllamaProvider implements ReceiptExtractionProvider {
           : undefined;
       };
       onDiagnostics?.({
+        provider: "ollama",
         model: this.model,
-        totalDurationMs: duration("total_duration"),
-        loadDurationMs: duration("load_duration"),
-        promptEvalCount: count("prompt_eval_count"),
-        promptEvalDurationMs: duration("prompt_eval_duration"),
-        evalCount: count("eval_count"),
-        evalDurationMs: duration("eval_duration"),
+        inputTokens: count("prompt_eval_count"),
+        outputTokens: count("eval_count"),
+        ollama: {
+          model: this.model,
+          totalDurationMs: duration("total_duration"),
+          loadDurationMs: duration("load_duration"),
+          promptEvalCount: count("prompt_eval_count"),
+          promptEvalDurationMs: duration("prompt_eval_duration"),
+          evalCount: count("eval_count"),
+          evalDurationMs: duration("eval_duration"),
+        },
       });
     }
 

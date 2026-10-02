@@ -19,10 +19,23 @@ export interface OllamaDiagnostics {
   evalDurationMs?: number;
 }
 
+// Defines the names of the supported receipt extraction providers.
+export type ReceiptExtractionProviderName = "ollama" | "mistral";
+
+// Defines the structure of diagnostic information for receipt extraction.
+export interface ReceiptExtractionDiagnostics {
+  provider: ReceiptExtractionProviderName;
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  ollama?: OllamaDiagnostics;
+}
+
 // Defines the interface for a receipt extraction provider.
 export interface ReceiptExtractionProvider {
   extractReceipt(
     input: ReceiptExtractionInput,
-    onDiagnostics?: (diagnostics: OllamaDiagnostics) => void,
+    onDiagnostics?: (diagnostics: ReceiptExtractionDiagnostics) => void,
   ): Promise<unknown>;
 }
