@@ -12,6 +12,11 @@ import {
   OllamaRequestError,
   OllamaUnavailableError,
 } from "../src/extraction/ollama-provider.js";
+import {
+  LlmRequestError,
+  LlmUnavailableError,
+} from "../src/extraction/extraction-errors.js";
+import type { ReceiptExtractionDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
 
 const corners = {
@@ -98,6 +103,12 @@ test("process endpoint returns a review DTO using current categories and databas
   );
   let nextExtraction: unknown = validExtraction;
   let nextError: Error | undefined;
+  let nextDiagnostics: ReceiptExtractionDiagnostics = {
+    provider: "ollama",
+    model: "test-model",
+    inputTokens: 250,
+    ollama: { model: "test-model", promptEvalCount: 250 },
+  };
   let providerCalls = 0;
   const events: string[] = [];
   const app = createApp(
@@ -119,7 +130,7 @@ test("process endpoint returns a review DTO using current categories and databas
         assert.ok(input.categoryNames.includes("custom"));
         assert.equal(input.categoryNames.includes("food"), false);
         if (nextError) throw nextError;
-        onDiagnostics?.({ model: "test-model", promptEvalCount: 250 });
+        onDiagnostics?.(nextDiagnostics);
         return nextExtraction;
       },
     },
@@ -227,6 +238,7 @@ test("process endpoint returns a review DTO using current categories and databas
     model: "test-model",
     promptEvalCount: 250,
   });
+  assert.deepEqual(result.timings.llm, nextDiagnostics);
   assert.equal(result.review.scanId, scan.scanId);
   assert.equal(result.review.archiveUrl, result.archiveUrl);
   assert.deepEqual(result.review.merchant, {
@@ -359,11 +371,62 @@ test("process endpoint returns a review DTO using current categories and databas
 
   nextError = undefined;
   nextExtraction = validExtraction;
+  nextDiagnostics = {
+    provider: "mistral",
+    model: "external-test-model",
+    inputTokens: 123,
+    outputTokens: 45,
+    totalTokens: 168,
+  };
+  const external = await processScan();
+  assert.equal(external.status, 200);
+  const externalResult = await external.json();
+  assert.deepEqual(externalResult.timings.llm, nextDiagnostics);
+  assert.equal(externalResult.timings.ollama, undefined);
+  assert.deepEqual(externalResult.review, result.review);
+
+  nextError = new LlmUnavailableError("mistral", "secret-external-key");
+  const externalUnavailable = await processScan();
+  assert.equal(externalUnavailable.status, 503);
+  assert.deepEqual(await externalUnavailable.json(), {
+    error: "llm_unavailable",
+  });
+
+  nextError = new LlmRequestError("mistral", "secret-external-key", 401);
+  const externalFailed = await processScan();
+  assert.equal(externalFailed.status, 502);
+  assert.deepEqual(await externalFailed.json(), { error: "llm_failed" });
+
+  assert.ok(
+    events.some((event) => {
+      const entry = JSON.parse(event);
+      return (
+        entry.operation === "scan.llm.complete" &&
+        entry.fields.provider === "mistral" &&
+        entry.fields.model === "external-test-model" &&
+        entry.fields.inputTokens === 123 &&
+        entry.fields.outputTokens === 45 &&
+        entry.fields.totalTokens === 168
+      );
+    }),
+  );
+  assert.ok(
+    events.some((event) => {
+      const entry = JSON.parse(event);
+      return (
+        entry.operation === "scan.llm.failed" &&
+        entry.fields.provider === "mistral" &&
+        entry.fields.httpStatus === 401
+      );
+    }),
+  );
+  assert.equal(events.join("\n").includes("secret-external-key"), false);
+  nextError = undefined;
   sqlite.exec("DROP TABLE merchant_alias");
   const databaseFailure = await processScan();
   assert.equal(databaseFailure.status, 500);
   assert.deepEqual(await databaseFailure.json(), { error: "scan_failed" });
-  assert.equal(providerCalls, 12);
+  assert.equal(providerCalls, 15);
   assert.ok(
     events.some((event) => event.includes('"operation":"scan.ocr.complete"')),
   );

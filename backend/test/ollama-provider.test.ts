@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
+import { z } from "zod";
 import {
   createOllamaProviderFromEnv,
   InvalidLlmResponseError,
@@ -8,7 +10,8 @@ import {
   OllamaUnavailableError,
 } from "../src/extraction/ollama-provider.js";
 import { createReceiptExtractionPrompt } from "../src/extraction/receipt-extraction-prompt.js";
-import type { OllamaDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
+import type { ReceiptExtractionDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
+import { createReceiptExtractionSchema } from "../src/extraction/receipt-extraction.js";
 
 // Defines a sample input for receipt extraction tests.
 const input = {
@@ -25,7 +28,12 @@ const input = {
 };
 
 // Tests for the OllamaProvider class and its interaction with receipt extraction prompts.
-test("sends only OCR data and categories with the extraction JSON schema", async () => {
+test("sends only OCR data and categories with the extraction JSON schema", async (t) => {
+  const signal = new AbortController().signal;
+  t.mock.method(AbortSignal, "timeout", (delay: number) => {
+    assert.equal(delay, 240_000);
+    return signal;
+  });
   let requestBody: Record<string, unknown> | undefined;
   const provider = new OllamaProvider(
     "http://127.0.0.1:11434/api/chat",
@@ -33,6 +41,8 @@ test("sends only OCR data and categories with the extraction JSON schema", async
     async (url, init) => {
       assert.equal(url, "http://127.0.0.1:11434/api/chat");
       assert.equal(init?.method, "POST");
+      assert.deepEqual(init?.headers, { "content-type": "application/json" });
+      assert.equal(init?.signal, signal);
       requestBody = JSON.parse(String(init?.body));
       return new Response(
         JSON.stringify({ message: { content: '{"items":[]}' } }),
@@ -43,6 +53,14 @@ test("sends only OCR data and categories with the extraction JSON schema", async
 
   assert.deepEqual(await provider.extractReceipt(input), { items: [] });
   assert.ok(requestBody);
+  assert.deepEqual(requestBody, {
+    model: "test-model",
+    messages: [{ role: "user", content: createReceiptExtractionPrompt(input) }],
+    format: z.toJSONSchema(createReceiptExtractionSchema(input.categoryNames)),
+    stream: false,
+    think: true,
+    options: { temperature: 0 },
+  });
   assert.equal(requestBody.model, "test-model");
   assert.equal(requestBody.stream, false);
   assert.equal(requestBody.think, true);
@@ -91,24 +109,34 @@ test("extracts available Ollama timing and token metadata", async () => {
         }),
       ),
   );
-  let diagnostics: OllamaDiagnostics | undefined;
+  let diagnostics: ReceiptExtractionDiagnostics | undefined;
   await provider.extractReceipt(input, (value) => {
     diagnostics = value;
   });
   assert.deepEqual(diagnostics, {
+    provider: "ollama",
     model: "test-model",
-    totalDurationMs: 20_000,
-    loadDurationMs: 1_500,
-    promptEvalCount: 250,
-    promptEvalDurationMs: 3_000,
-    evalCount: 40,
-    evalDurationMs: 15_000,
+    inputTokens: 250,
+    outputTokens: 40,
+    ollama: {
+      model: "test-model",
+      totalDurationMs: 20_000,
+      loadDurationMs: 1_500,
+      promptEvalCount: 250,
+      promptEvalDurationMs: 3_000,
+      evalCount: 40,
+      evalDurationMs: 15_000,
+    },
   });
 });
 
 // Tests for the receipt extraction prompt creation function.
 test("prompt tells the model how to use unknown values and source indexes", () => {
   const prompt = createReceiptExtractionPrompt(input);
+  assert.equal(
+    createHash("sha256").update(prompt).digest("hex"),
+    "b993b255f1db74d21c5c54759bbfda0b39dfa414ec8231534cb94ad59ef4e6b5",
+  );
   assert.ok(prompt.includes("Use null for unknown or uncertain values"));
   assert.ok(
     prompt.includes(

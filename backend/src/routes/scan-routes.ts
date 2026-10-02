@@ -5,11 +5,11 @@ import { errorType, type Logger } from "../logger.js";
 import { loadExtractionReferenceData } from "../extraction/extraction-reference-data.js";
 import {
   InvalidLlmResponseError,
-  OllamaRequestError,
-  OllamaUnavailableError,
-} from "../extraction/ollama-provider.js";
+  LlmRequestError,
+  LlmUnavailableError,
+} from "../extraction/extraction-errors.js";
 import type {
-  OllamaDiagnostics,
+  ReceiptExtractionDiagnostics,
   ReceiptExtractionProvider,
 } from "../extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "../extraction/receipt-extraction.js";
@@ -148,7 +148,7 @@ export function registerScanRoutes(
         stage = "reference_data";
         const { categoryNames } = loadExtractionReferenceData(db);
         stage = "llm";
-        let ollama: OllamaDiagnostics | undefined;
+        let llm: ReceiptExtractionDiagnostics | undefined;
         logger("info", "scan.llm.start", { scanId: result.scanId });
         llmStarted = performance.now();
         const extracted = await provider.extractReceipt(
@@ -159,20 +159,24 @@ export function registerScanRoutes(
             categoryNames,
           },
           (diagnostics) => {
-            ollama = diagnostics;
+            llm = diagnostics;
           },
         );
         const llmDurationMs = performance.now() - llmStarted;
         logger("info", "scan.llm.complete", {
           scanId: result.scanId,
           durationMs: llmDurationMs,
-          model: ollama?.model,
-          ollamaTotalDurationMs: ollama?.totalDurationMs,
-          loadDurationMs: ollama?.loadDurationMs,
-          promptEvalCount: ollama?.promptEvalCount,
-          promptEvalDurationMs: ollama?.promptEvalDurationMs,
-          evalCount: ollama?.evalCount,
-          evalDurationMs: ollama?.evalDurationMs,
+          provider: llm?.provider,
+          model: llm?.model,
+          inputTokens: llm?.inputTokens,
+          outputTokens: llm?.outputTokens,
+          totalTokens: llm?.totalTokens,
+          ollamaTotalDurationMs: llm?.ollama?.totalDurationMs,
+          loadDurationMs: llm?.ollama?.loadDurationMs,
+          promptEvalCount: llm?.ollama?.promptEvalCount,
+          promptEvalDurationMs: llm?.ollama?.promptEvalDurationMs,
+          evalCount: llm?.ollama?.evalCount,
+          evalDurationMs: llm?.ollama?.evalDurationMs,
         });
         stage = "review";
         const extraction = createReceiptExtractionSchema(
@@ -196,7 +200,8 @@ export function registerScanRoutes(
             workerDurationMs,
             llmDurationMs,
             totalDurationMs,
-            ollama,
+            llm,
+            ollama: llm?.ollama,
           },
         });
       } catch (error) {
@@ -212,6 +217,13 @@ export function registerScanRoutes(
             scanId: logScanId(request.params.scanId),
             durationMs: performance.now() - llmStarted,
             errorType: errorType(error),
+            provider:
+              error instanceof LlmUnavailableError ||
+              error instanceof LlmRequestError
+                ? error.provider
+                : undefined,
+            httpStatus:
+              error instanceof LlmRequestError ? error.httpStatus : undefined,
           });
         }
         logger("error", "scan.process.failed", {
@@ -228,10 +240,17 @@ export function registerScanRoutes(
           response.status(503).json({ error: "worker_unavailable" });
         } else if (error instanceof WorkerRequestError) {
           response.status(422).json({ error: "processing_failed" });
-        } else if (error instanceof OllamaUnavailableError) {
-          response.status(503).json({ error: "ollama_unavailable" });
-        } else if (error instanceof OllamaRequestError) {
-          response.status(502).json({ error: "ollama_failed" });
+        } else if (error instanceof LlmUnavailableError) {
+          response.status(503).json({
+            error:
+              error.provider === "ollama"
+                ? "ollama_unavailable"
+                : "llm_unavailable",
+          });
+        } else if (error instanceof LlmRequestError) {
+          response.status(502).json({
+            error: error.provider === "ollama" ? "ollama_failed" : "llm_failed",
+          });
         } else if (error instanceof InvalidLlmResponseError) {
           response.status(502).json({ error: "invalid_llm_response" });
         } else if (error instanceof ZodError) {
