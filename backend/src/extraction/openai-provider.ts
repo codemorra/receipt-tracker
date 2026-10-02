@@ -65,7 +65,7 @@ export class OpenAiProvider implements ReceiptExtractionProvider {
     const signal = AbortSignal.timeout(openaiExtractionProfile.timeoutMs);
     const body = JSON.stringify({
       model: this.model,
-      ...(this.model === "gpt-6-luna" ? { reasoning: { effort: "none" } } : {}),
+      reasoning: { effort: openaiExtractionProfile.reasoningEffort },
       input: createReceiptExtractionPrompt(input),
       store: false,
       stream: false,
