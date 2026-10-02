@@ -36,28 +36,11 @@ const completion = (output: unknown[] = [finalMessage]) => ({
   usage: { input_tokens: 123, output_tokens: 45, total_tokens: 168 },
 });
 
-// Test for the OpenAiProvider using no reasoning for the Luna receipt request
-test("uses no reasoning for the Luna receipt request", async () => {
-  const provider = new OpenAiProvider(
-    "gpt-6-luna",
-    "test-only-key",
-    async (_url, init) => {
-      const body = JSON.parse(String(init?.body));
-      assert.deepEqual(body.reasoning, { effort: "none" });
-      assert.equal(body.input, createReceiptExtractionPrompt(input));
-      assert.equal(body.store, false);
-      assert.equal(body.tools, undefined);
-      return Response.json(completion());
-    },
-  );
-  assert.deepEqual(await provider.extractReceipt(input), extraction);
-});
-
 // Test for the OpenAiProvider extracting a receipt with diagnostics
-test("sends a stateless structured receipt request and returns final JSON with diagnostics", async () => {
+test("sends a stateless Luna request with no reasoning and returns final structured JSON with diagnostics", async () => {
   let calls = 0;
   const provider = new OpenAiProvider(
-    "test-model",
+    "gpt-6-luna",
     "test-only-key",
     async (url, init) => {
       calls++;
@@ -68,7 +51,8 @@ test("sends a stateless structured receipt request and returns final JSON with d
         authorization: "Bearer test-only-key",
       });
       assert.deepEqual(JSON.parse(String(init?.body)), {
-        model: "test-model",
+        model: "gpt-6-luna",
+        reasoning: { effort: "none" },
         input: createReceiptExtractionPrompt(input),
         store: false,
         stream: false,
@@ -95,7 +79,7 @@ test("sends a stateless structured receipt request and returns final JSON with d
   );
   assert.deepEqual(diagnostics, {
     provider: "openai",
-    model: "test-model",
+    model: "gpt-6-luna",
     inputTokens: 123,
     outputTokens: 45,
     totalTokens: 168,
@@ -106,7 +90,7 @@ test("sends a stateless structured receipt request and returns final JSON with d
 // Test for the OpenAiProvider ignoring reasoning and commentary messages
 test("ignores reasoning and commentary when selecting the final receipt output", async () => {
   const decoy = JSON.stringify({ ...extraction, totalCents: 999 });
-  const provider = new OpenAiProvider("test-model", "test-only-key", async () =>
+  const provider = new OpenAiProvider("gpt-6-luna", "test-only-key", async () =>
     Response.json(
       completion([
         {
@@ -128,7 +112,7 @@ test("ignores reasoning and commentary when selecting the final receipt output",
 
 // Test for the OpenAiProvider rejecting a refusal message even if valid JSON is present
 test("rejects an OpenAI refusal even alongside valid JSON without exposing its contents", async () => {
-  const provider = new OpenAiProvider("test-model", "test-only-key", async () =>
+  const provider = new OpenAiProvider("gpt-6-luna", "test-only-key", async () =>
     Response.json(
       completion([
         {

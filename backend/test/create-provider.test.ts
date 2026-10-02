@@ -13,7 +13,7 @@ import { OpenAiProvider } from "../src/extraction/openai-provider.js";
 const input = { plainText: "", lines: [], rows: [], categoryNames: ["food"] };
 const mistralEnv = {
   LLM_PROVIDER: "mistral",
-  MISTRAL_MODEL: "test-mistral-model",
+  MISTRAL_MODEL: "mistral-medium-latest",
   MISTRAL_API_KEY: "test-only-key",
 };
 
@@ -75,7 +75,10 @@ test("configures Mistral using only Mistral variables and preserves base URL pat
     async (url: unknown, init: RequestInit) => {
       calls++;
       assert.equal(url, expectedEndpoint);
-      assert.equal(JSON.parse(String(init.body)).model, "test-mistral-model");
+      assert.equal(
+        JSON.parse(String(init.body)).model,
+        "configured-mistral-model",
+      );
       assert.deepEqual(init.headers, {
         "content-type": "application/json",
         authorization: "Bearer test-only-key",
@@ -91,7 +94,7 @@ test("configures Mistral using only Mistral variables and preserves base URL pat
     expectedEndpoint = entry.endpoint;
     const provider = createReceiptExtractionProviderFromEnv({
       LLM_PROVIDER: " mistral ",
-      MISTRAL_MODEL: " test-mistral-model ",
+      MISTRAL_MODEL: " configured-mistral-model ",
       MISTRAL_API_KEY: " test-only-key ",
       MISTRAL_BASE_URL: entry.base,
       OLLAMA_BASE_URL: "invalid ignored URL",
@@ -139,17 +142,16 @@ test("rejects unsupported providers, missing models and keys, and invalid URLs w
   }
   const openaiEnv = {
     LLM_PROVIDER: "openai",
-    OPENAI_MODEL: "test-model",
+    OPENAI_MODEL: "gpt-6-luna",
     OPENAI_API_KEY: "test-only-key",
   };
-  assert.throws(
-    () =>
-      createReceiptExtractionProviderFromEnv({
-        ...openaiEnv,
-        OPENAI_MODEL: "",
-      }),
-    { message: "OPENAI_MODEL must name an OpenAI model" },
-  );
+  for (const OPENAI_MODEL of [undefined, "", " "]) {
+    assert.throws(
+      () =>
+        createReceiptExtractionProviderFromEnv({ ...openaiEnv, OPENAI_MODEL }),
+      { message: "OPENAI_MODEL must name an OpenAI model" },
+    );
+  }
   assert.throws(
     () =>
       createReceiptExtractionProviderFromEnv({
@@ -184,11 +186,13 @@ test("rejects unsupported providers, missing models and keys, and invalid URLs w
   }
 });
 
-// Tests for backend startup behavior with invalid Mistral configuration
-test("invalid Mistral configuration stops backend startup before migration without logging secrets", (t) => {
+// Tests for backend startup behavior with invalid cloud configuration
+test("invalid cloud configuration stops backend startup before migration without logging secrets", (t) => {
   const directory = mkdtempSync(join(tmpdir(), "receipt-provider-startup-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   for (const invalid of [
+    { MISTRAL_MODEL: "" },
+    { LLM_PROVIDER: "openai", OPENAI_MODEL: "" },
     { MISTRAL_API_KEY: "" },
     { MISTRAL_BASE_URL: "https://test-only-secret@example.test/v1/" },
   ]) {
@@ -242,13 +246,35 @@ test("invalid Mistral configuration stops backend startup before migration witho
 });
 
 // Test for selecting OpenAI provider with its own configuration
-test("selects OpenAI with its own configuration", () => {
+test("selects OpenAI with its own configurable model", async (t) => {
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (_url: unknown, init: RequestInit) => {
+      assert.equal(
+        JSON.parse(String(init.body)).model,
+        "configured-openai-model",
+      );
+      return Response.json({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "{}" }],
+          },
+        ],
+      });
+    },
+  );
   const provider = createReceiptExtractionProviderFromEnv({
     ...mistralEnv,
     LLM_PROVIDER: " openai ",
-    OPENAI_MODEL: " test-model ",
+    OPENAI_MODEL: " configured-openai-model ",
     OPENAI_API_KEY: " test-only-key ",
     MISTRAL_BASE_URL: "invalid ignored URL",
   });
   assert.ok(provider instanceof OpenAiProvider);
+  assert.deepEqual(await provider.extractReceipt(input), {});
 });

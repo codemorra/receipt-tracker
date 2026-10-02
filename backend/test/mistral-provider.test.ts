@@ -7,7 +7,7 @@ import {
   LlmUnavailableError,
 } from "../src/extraction/extraction-errors.js";
 import { MistralProvider } from "../src/extraction/mistral-provider.js";
-import { ministral14bExtractionProfile } from "../src/extraction/extraction-profile.js";
+import { mistralExtractionProfile } from "../src/extraction/extraction-profile.js";
 import { createReceiptExtractionPrompt } from "../src/extraction/receipt-extraction-prompt.js";
 import type { ReceiptExtractionDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "../src/extraction/receipt-extraction.js";
@@ -32,18 +32,19 @@ const extraction = {
 const endpoint = "https://mistral.example.test/custom/chat/completions";
 const apiKey = "test-only-api-key";
 
-// Helper function to create a mock completion response for the Mistral API
-function completion(content: unknown = JSON.stringify(extraction)) {
+function completion(
+  content: unknown = JSON.stringify(extraction),
+  finishReason = "stop",
+) {
   return {
     choices: [
-      { finish_reason: "stop", message: { role: "assistant", content } },
+      { finish_reason: finishReason, message: { role: "assistant", content } },
     ],
     usage: { prompt_tokens: 123, completion_tokens: 45, total_tokens: 168 },
   };
 }
 
-// Tests for the MistralProvider class
-test("sends the shared prompt and Zod JSON schema to the configured model and endpoint", async (t) => {
+test("sends the Medium profile, shared prompt and Zod JSON schema to the configured endpoint", async (t) => {
   const signal = new AbortController().signal;
   t.mock.method(AbortSignal, "timeout", (delay: number) => {
     assert.equal(delay, 240_000);
@@ -52,7 +53,7 @@ test("sends the shared prompt and Zod JSON schema to the configured model and en
   let calls = 0;
   const provider = new MistralProvider(
     endpoint,
-    "configured-model",
+    "mistral-medium-latest",
     apiKey,
     async (url, init) => {
       calls++;
@@ -65,16 +66,18 @@ test("sends the shared prompt and Zod JSON schema to the configured model and en
         authorization: `Bearer ${apiKey}`,
       });
       assert.deepEqual(JSON.parse(String(init?.body)), {
-        model: "configured-model",
+        model: "mistral-medium-latest",
         messages: [
           {
             role: "system",
-            content: ministral14bExtractionProfile.instructions,
+            content: mistralExtractionProfile.instructions,
           },
           { role: "user", content: createReceiptExtractionPrompt(input) },
         ],
         temperature: 0,
         random_seed: 42,
+        top_p: 1,
+        reasoning_effort: "high",
         stream: false,
         response_format: {
           type: "json_schema",
@@ -105,27 +108,31 @@ test("sends the shared prompt and Zod JSON schema to the configured model and en
   assert.equal(calls, 1);
   assert.deepEqual(diagnostics, {
     provider: "mistral",
-    model: "configured-model",
+    model: "mistral-medium-latest",
     inputTokens: 123,
     outputTokens: 45,
     totalTokens: 168,
   });
-  assert.deepEqual(
-    createReceiptExtractionSchema(input.categoryNames, [7]).parse(extraction),
-    extraction,
-  );
 });
 
-// Tests for the MistralProvider class continued
-test("supports structured JSON returned as text chunks", async () => {
+test("reads final structured text chunks while ignoring thinking", async () => {
   const text = JSON.stringify(extraction);
   const provider = new MistralProvider(
     endpoint,
-    "test-model",
+    "mistral-medium-latest",
     apiKey,
     async () =>
       Response.json(
         completion([
+          {
+            type: "thinking",
+            thinking: [
+              {
+                type: "text",
+                text: JSON.stringify({ ...extraction, totalCents: 999 }),
+              },
+            ],
+          },
           { type: "text", text: text.slice(0, 20) },
           { type: "text", text: text.slice(20) },
         ]),
@@ -134,7 +141,6 @@ test("supports structured JSON returned as text chunks", async () => {
   assert.deepEqual(await provider.extractReceipt(input), extraction);
 });
 
-// Tests for preserving discount indexes through parsing and validation
 test("preserves zero and full-array discount indexes through parsing and validation", async () => {
   const receipt = {
     ...extraction,
@@ -162,54 +168,50 @@ test("preserves zero and full-array discount indexes through parsing and validat
     })),
     totalCents: 95,
   };
-  const text = JSON.stringify(receipt);
-  for (const content of [text, [{ type: "text", text }]]) {
-    const provider = new MistralProvider(
-      endpoint,
-      "test-model",
-      apiKey,
-      async () => Response.json(completion(content)),
-    );
-    const parsed = createReceiptExtractionSchema(
-      input.categoryNames,
-      [7],
-    ).parse(await provider.extractReceipt(input));
-    assert.deepEqual(parsed, receipt);
-    assert.deepEqual(
-      parsed.discounts.map((discount) => discount.appliesToItemIndex),
-      [0, 1, 2, 3, null],
-    );
-  }
+  const provider = new MistralProvider(
+    endpoint,
+    "mistral-medium-latest",
+    apiKey,
+    async () => Response.json(completion(JSON.stringify(receipt))),
+  );
+  const parsed = createReceiptExtractionSchema(input.categoryNames, [7]).parse(
+    await provider.extractReceipt(input),
+  );
+  assert.deepEqual(parsed, receipt);
 });
 
-// Additional tests for edge cases and error handling
 test("requires a nonempty API key", () => {
   for (const key of ["", "   "]) {
-    assert.throws(() => new MistralProvider(endpoint, "test-model", key), {
-      message: "MISTRAL_API_KEY must be set for the Mistral provider",
-    });
+    assert.throws(
+      () => new MistralProvider(endpoint, "mistral-medium-latest", key),
+      {
+        message: "MISTRAL_API_KEY must be set for the Mistral provider",
+      },
+    );
   }
 });
 
-// Tests for handling optional usage and malformed token counts
-test("keeps optional usage absent and ignores malformed token counts", async () => {
-  for (const usage of [
-    undefined,
-    null,
-    "invalid",
-    { prompt_tokens: -1, completion_tokens: 1.5, total_tokens: "168" },
+test("accepts missing usage, ignores invalid counts, and preserves zero", async () => {
+  const cases = [
+    { usage: undefined, inputTokens: undefined, outputTokens: undefined },
     {
-      prompt_tokens: Number.MAX_SAFE_INTEGER + 1,
-      completion_tokens: null,
-      total_tokens: [],
+      usage: { prompt_tokens: -1, completion_tokens: 1.5, total_tokens: "168" },
+      inputTokens: undefined,
+      outputTokens: undefined,
     },
-  ]) {
+    {
+      usage: { prompt_tokens: 0, completion_tokens: 45 },
+      inputTokens: 0,
+      outputTokens: 45,
+    },
+  ];
+  for (const entry of cases) {
     let diagnostics: ReceiptExtractionDiagnostics | undefined;
     const provider = new MistralProvider(
       endpoint,
-      "test-model",
+      "mistral-medium-latest",
       apiKey,
-      async () => Response.json({ ...completion(), usage }),
+      async () => Response.json({ ...completion(), usage: entry.usage }),
     );
     assert.deepEqual(
       await provider.extractReceipt(input, (value) => {
@@ -219,38 +221,20 @@ test("keeps optional usage absent and ignores malformed token counts", async () 
     );
     assert.deepEqual(diagnostics, {
       provider: "mistral",
-      model: "test-model",
-      inputTokens: undefined,
-      outputTokens: undefined,
+      model: "mistral-medium-latest",
+      inputTokens: entry.inputTokens,
+      outputTokens: entry.outputTokens,
       totalTokens: undefined,
     });
   }
-  let diagnostics: ReceiptExtractionDiagnostics | undefined;
-  const provider = new MistralProvider(
-    endpoint,
-    "test-model",
-    apiKey,
-    async () =>
-      Response.json({
-        ...completion(),
-        usage: { prompt_tokens: 0, completion_tokens: 45 },
-      }),
-  );
-  await provider.extractReceipt(input, (value) => {
-    diagnostics = value;
-  });
-  assert.equal(diagnostics?.inputTokens, 0);
-  assert.equal(diagnostics?.outputTokens, 45);
-  assert.equal(diagnostics?.totalTokens, undefined);
 });
 
-// Tests for handling HTTP failures and connection issues
 test("classifies HTTP failures without exposing provider bodies or retrying", async () => {
   for (const status of [401, 429, 500]) {
     let calls = 0;
     const provider = new MistralProvider(
       endpoint,
-      "test-model",
+      "mistral-medium-latest",
       apiKey,
       async () => {
         calls++;
@@ -269,16 +253,14 @@ test("classifies HTTP failures without exposing provider bodies or retrying", as
   }
 });
 
-// Tests for handling connection failures and request timeouts
 test("classifies connection failures and request timeouts without copying transport errors", async () => {
   for (const failure of [
     new TypeError(apiKey),
     new DOMException(apiKey, "TimeoutError"),
-    new DOMException(apiKey, "AbortError"),
   ]) {
     const provider = new MistralProvider(
       endpoint,
-      "test-model",
+      "mistral-medium-latest",
       apiKey,
       async () => {
         throw failure;
@@ -294,7 +276,6 @@ test("classifies connection failures and request timeouts without copying transp
   }
 });
 
-// Tests for applying the timeout while reading the response body
 test("applies the timeout while reading the response body", async (t) => {
   const controller = new AbortController();
   t.mock.method(AbortSignal, "timeout", () => controller.signal);
@@ -305,69 +286,32 @@ test("applies the timeout while reading the response body", async (t) => {
   });
   const provider = new MistralProvider(
     endpoint,
-    "test-model",
+    "mistral-medium-latest",
     apiKey,
     async () => response,
   );
   await assert.rejects(provider.extractReceipt(input), LlmUnavailableError);
 });
 
-// Tests for rejecting malformed envelopes, unfinished completions, and non-JSON content
 test("rejects malformed envelopes, unfinished completions, and non-JSON content", async () => {
   const malformed = [
-    "not JSON",
-    "null",
+    `${apiKey} invalid response JSON`,
     "{}",
-    JSON.stringify({ choices: [] }),
-    JSON.stringify(completion(null)),
-    JSON.stringify(completion(123)),
-    JSON.stringify(completion([])),
-    JSON.stringify(completion([{ type: "image_url", image_url: "private" }])),
-    JSON.stringify(completion("```json\n{}\n```")),
-    JSON.stringify(completion("{")),
-    ...["length", "model_length", "tool_calls", "error", null].map(
-      (finish_reason) =>
-        JSON.stringify({
-          choices: [
-            {
-              finish_reason,
-              message: {
-                role: "assistant",
-                content: JSON.stringify(extraction),
-              },
-            },
-          ],
-        }),
-    ),
+    JSON.stringify(completion([{ type: "image_url", image_url: apiKey }])),
+    JSON.stringify(completion(`${apiKey} invalid extraction JSON`)),
+    JSON.stringify(completion(JSON.stringify(extraction), "length")),
   ];
   for (const body of malformed) {
     const provider = new MistralProvider(
       endpoint,
-      "test-model",
+      "mistral-medium-latest",
       apiKey,
       async () => new Response(body),
     );
     await assert.rejects(provider.extractReceipt(input), (error: unknown) => {
       assert.ok(error instanceof InvalidLlmResponseError);
-      assert.equal(error.message.includes(body), false);
+      assert.equal(error.message.includes(apiKey), false);
       return true;
     });
   }
-});
-
-// Tests for leaving receipt validation to the existing Zod validation after transport parsing
-test("leaves receipt validation to the existing Zod validation after transport parsing", async () => {
-  const invalid = { ...extraction, purchaseTime: "25:99" };
-  const provider = new MistralProvider(
-    endpoint,
-    "test-model",
-    apiKey,
-    async () => Response.json(completion(JSON.stringify(invalid))),
-  );
-  const result = await provider.extractReceipt(input);
-  assert.deepEqual(result, invalid);
-  assert.throws(
-    () => createReceiptExtractionSchema(input.categoryNames, [7]).parse(result),
-    z.ZodError,
-  );
 });

@@ -377,7 +377,7 @@ test("process endpoint returns a review DTO using current categories and databas
   nextExtraction = validExtraction;
   nextDiagnostics = {
     provider: "mistral",
-    model: "external-test-model",
+    model: "mistral-medium-latest",
     inputTokens: 123,
     outputTokens: 45,
     totalTokens: 168,
@@ -407,7 +407,7 @@ test("process endpoint returns a review DTO using current categories and databas
       return (
         entry.operation === "scan.llm.complete" &&
         entry.fields.provider === "mistral" &&
-        entry.fields.model === "external-test-model" &&
+        entry.fields.model === "mistral-medium-latest" &&
         entry.fields.inputTokens === 123 &&
         entry.fields.outputTokens === 45 &&
         entry.fields.totalTokens === 168
@@ -446,7 +446,7 @@ test("process endpoint returns a review DTO using current categories and databas
   mistralBody = completion(validExtraction);
   mistral = new MistralProvider(
     "https://mistral.example.test/v1/chat/completions",
-    "external-test-model",
+    "mistral-medium-latest",
     "test-only-mistral-key",
     async () => {
       mistralCalls++;
