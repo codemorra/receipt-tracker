@@ -7,7 +7,7 @@ import {
   LlmUnavailableError,
 } from "../src/extraction/extraction-errors.js";
 import { MistralProvider } from "../src/extraction/mistral-provider.js";
-import { mistralExtractionProfile } from "../src/extraction/extraction-profile.js";
+import { ministral14bExtractionProfile } from "../src/extraction/extraction-profile.js";
 import { createReceiptExtractionPrompt } from "../src/extraction/receipt-extraction-prompt.js";
 import type { ReceiptExtractionDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "../src/extraction/receipt-extraction.js";
@@ -67,7 +67,10 @@ test("sends the shared prompt and Zod JSON schema to the configured model and en
       assert.deepEqual(JSON.parse(String(init?.body)), {
         model: "configured-model",
         messages: [
-          { role: "system", content: mistralExtractionProfile.instructions },
+          {
+            role: "system",
+            content: ministral14bExtractionProfile.instructions,
+          },
           { role: "user", content: createReceiptExtractionPrompt(input) },
         ],
         temperature: 0,
