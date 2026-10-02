@@ -5,6 +5,11 @@ export const ollamaExtractionProfile = {
   timeoutMs: 240_000,
 } as const;
 
+// Extraction profile for the OpenAI LLM provider
+export const openaiExtractionProfile = {
+  timeoutMs: 240_000,
+} as const;
+
 // Common extraction settings for Mistral models
 const mistralExtractionSettings = {
   temperature: 0,
