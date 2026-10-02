@@ -175,6 +175,8 @@ function ReceiptImport({ active, onSaved }: Props) {
           processing_failed: "errors.processingFailed",
           ollama_unavailable: "errors.ollamaUnavailable",
           ollama_failed: "errors.ollamaFailed",
+          llm_unavailable: "errors.ollamaUnavailable",
+          llm_failed: "errors.ollamaFailed",
           invalid_llm_response: "errors.invalidExtraction",
           invalid_extraction: "errors.invalidExtraction",
         };

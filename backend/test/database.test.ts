@@ -184,6 +184,7 @@ test("migration failure prevents backend startup", () => {
         env: {
           ...process.env,
           DATABASE_FILE: filename,
+          LLM_PROVIDER: "ollama",
           OLLAMA_MODEL: "test-model",
           LOG_FILE: join(directory, "backend.log"),
         },
