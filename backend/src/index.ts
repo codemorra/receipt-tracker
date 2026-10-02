@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { createBackendLifecycle } from "./startup.js";
 import { createApp } from "./app.js";
 import { createDatabase } from "./db/database.js";
-import { createOllamaProviderFromEnv } from "./extraction/ollama-provider.js";
+import { createReceiptExtractionProviderFromEnv } from "./extraction/create-provider.js";
 import {
   createFileLogger,
   errorType,
@@ -39,7 +39,7 @@ try {
   logger = createFileLogger(logFile);
   logger("info", "backend.starting");
   startupPhase = "configuration";
-  const provider = createOllamaProviderFromEnv();
+  const provider = createReceiptExtractionProviderFromEnv();
   startupPhase = "database migration";
   const { db, sqlite } = createDatabase();
   logger("info", "database.ready");
