@@ -14,7 +14,10 @@ export class ProviderSettingsError extends Error {
     public readonly code:
       | "invalid_provider_settings"
       | "provider_configuration_incomplete"
-      | "provider_not_selectable",
+      | "provider_not_selectable"
+      | "invalid_provider"
+      | "provider_disabled"
+      | "default_provider_missing",
   ) {
     super(code);
     this.name = "ProviderSettingsError";

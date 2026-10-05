@@ -56,14 +56,13 @@ export class MistralProvider implements ReceiptExtractionProvider {
   private readonly apiKey: string;
 
   constructor(
-    private readonly endpoint: string,
     private readonly model: string,
     apiKey: string,
     private readonly request: typeof fetch = fetch,
   ) {
     this.apiKey = apiKey.trim();
     if (!this.apiKey) {
-      throw new Error("MISTRAL_API_KEY must be set for the Mistral provider");
+      throw new Error("An API key is required for the Mistral provider");
     }
   }
 
@@ -101,16 +100,19 @@ export class MistralProvider implements ReceiptExtractionProvider {
 
     // Send the request to the Mistral API and handle potential errors
     try {
-      response = await this.request(this.endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.apiKey}`,
+      response = await this.request(
+        "https://api.mistral.ai/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${this.apiKey}`,
+          },
+          body,
+          redirect: "error",
+          signal,
         },
-        body,
-        redirect: "error",
-        signal,
-      });
+      );
     } catch {
       throw new LlmUnavailableError(
         "mistral",

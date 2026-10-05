@@ -131,29 +131,3 @@ export class OllamaProvider implements ReceiptExtractionProvider {
     }
   }
 }
-
-/**
- * Creates an OllamaProvider instance using environment variables.
- * @param env The environment variables object (defaults to process.env).
- * @returns An OllamaProvider instance configured with the specified environment variables.
- */
-export function createOllamaProviderFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): OllamaProvider {
-  const model = env.OLLAMA_MODEL?.trim();
-  if (!model) {
-    throw new Error("OLLAMA_MODEL must name an installed Ollama model");
-  }
-
-  let baseUrl: URL;
-  try {
-    baseUrl = new URL(env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434");
-  } catch {
-    throw new Error("OLLAMA_BASE_URL must be a valid HTTP URL");
-  }
-  if (baseUrl.protocol !== "http:" && baseUrl.protocol !== "https:") {
-    throw new Error("OLLAMA_BASE_URL must be a valid HTTP URL");
-  }
-
-  return new OllamaProvider(new URL("/api/chat", baseUrl).toString(), model);
-}

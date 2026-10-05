@@ -29,9 +29,10 @@ const extraction = {
   items: [],
   discounts: [],
 };
-const endpoint = "https://mistral.example.test/custom/chat/completions";
+const endpoint = "https://api.mistral.ai/v1/chat/completions";
 const apiKey = "test-only-api-key";
 
+// Simulates the Mistral provider's API responses for testing purposes.
 function completion(
   content: unknown = JSON.stringify(extraction),
   finishReason = "stop",
@@ -44,6 +45,7 @@ function completion(
   };
 }
 
+// Tests for the Mistral provider's request construction and response handling.
 test("sends the Medium profile, shared prompt and Zod JSON schema to the configured endpoint", async (t) => {
   const signal = new AbortController().signal;
   t.mock.method(AbortSignal, "timeout", (delay: number) => {
@@ -52,7 +54,6 @@ test("sends the Medium profile, shared prompt and Zod JSON schema to the configu
   });
   let calls = 0;
   const provider = new MistralProvider(
-    endpoint,
     "mistral-medium-latest",
     apiKey,
     async (url, init) => {
@@ -115,10 +116,10 @@ test("sends the Medium profile, shared prompt and Zod JSON schema to the configu
   });
 });
 
+// Tests for the Mistral provider's handling of streaming responses and structured text chunks.
 test("reads final structured text chunks while ignoring thinking", async () => {
   const text = JSON.stringify(extraction);
   const provider = new MistralProvider(
-    endpoint,
     "mistral-medium-latest",
     apiKey,
     async () =>
@@ -141,6 +142,7 @@ test("reads final structured text chunks while ignoring thinking", async () => {
   assert.deepEqual(await provider.extractReceipt(input), extraction);
 });
 
+// Tests for the Mistral provider's handling of discount indexes in receipt items.
 test("preserves zero and full-array discount indexes through parsing and validation", async () => {
   const receipt = {
     ...extraction,
@@ -169,7 +171,6 @@ test("preserves zero and full-array discount indexes through parsing and validat
     totalCents: 95,
   };
   const provider = new MistralProvider(
-    endpoint,
     "mistral-medium-latest",
     apiKey,
     async () => Response.json(completion(JSON.stringify(receipt))),
@@ -180,17 +181,16 @@ test("preserves zero and full-array discount indexes through parsing and validat
   assert.deepEqual(parsed, receipt);
 });
 
+// Tests for the Mistral provider's API key validation.
 test("requires a nonempty API key", () => {
   for (const key of ["", "   "]) {
-    assert.throws(
-      () => new MistralProvider(endpoint, "mistral-medium-latest", key),
-      {
-        message: "MISTRAL_API_KEY must be set for the Mistral provider",
-      },
-    );
+    assert.throws(() => new MistralProvider("mistral-medium-latest", key), {
+      message: "An API key is required for the Mistral provider",
+    });
   }
 });
 
+// Tests for the Mistral provider's handling of usage diagnostics, including missing, invalid, and zero values.
 test("accepts missing usage, ignores invalid counts, and preserves zero", async () => {
   const cases = [
     { usage: undefined, inputTokens: undefined, outputTokens: undefined },
@@ -208,7 +208,6 @@ test("accepts missing usage, ignores invalid counts, and preserves zero", async 
   for (const entry of cases) {
     let diagnostics: ReceiptExtractionDiagnostics | undefined;
     const provider = new MistralProvider(
-      endpoint,
       "mistral-medium-latest",
       apiKey,
       async () => Response.json({ ...completion(), usage: entry.usage }),
@@ -229,11 +228,11 @@ test("accepts missing usage, ignores invalid counts, and preserves zero", async 
   }
 });
 
+// Tests for the Mistral provider's handling of HTTP failures, ensuring that provider response bodies are not exposed and requests are not retried.
 test("classifies HTTP failures without exposing provider bodies or retrying", async () => {
   for (const status of [401, 429, 500]) {
     let calls = 0;
     const provider = new MistralProvider(
-      endpoint,
       "mistral-medium-latest",
       apiKey,
       async () => {
@@ -253,13 +252,13 @@ test("classifies HTTP failures without exposing provider bodies or retrying", as
   }
 });
 
+// Tests for the Mistral provider's handling of connection failures and request timeouts, ensuring transport errors are not copied.
 test("classifies connection failures and request timeouts without copying transport errors", async () => {
   for (const failure of [
     new TypeError(apiKey),
     new DOMException(apiKey, "TimeoutError"),
   ]) {
     const provider = new MistralProvider(
-      endpoint,
       "mistral-medium-latest",
       apiKey,
       async () => {
@@ -276,6 +275,7 @@ test("classifies connection failures and request timeouts without copying transp
   }
 });
 
+// Tests for the Mistral provider's handling of response body read timeouts.
 test("applies the timeout while reading the response body", async (t) => {
   const controller = new AbortController();
   t.mock.method(AbortSignal, "timeout", () => controller.signal);
@@ -285,7 +285,6 @@ test("applies the timeout while reading the response body", async (t) => {
     throw new Error(apiKey);
   });
   const provider = new MistralProvider(
-    endpoint,
     "mistral-medium-latest",
     apiKey,
     async () => response,
@@ -293,6 +292,7 @@ test("applies the timeout while reading the response body", async (t) => {
   await assert.rejects(provider.extractReceipt(input), LlmUnavailableError);
 });
 
+// Tests for the Mistral provider's handling of malformed envelopes, unfinished completions, and non-JSON content.
 test("rejects malformed envelopes, unfinished completions, and non-JSON content", async () => {
   const malformed = [
     `${apiKey} invalid response JSON`,
@@ -303,7 +303,6 @@ test("rejects malformed envelopes, unfinished completions, and non-JSON content"
   ];
   for (const body of malformed) {
     const provider = new MistralProvider(
-      endpoint,
       "mistral-medium-latest",
       apiKey,
       async () => new Response(body),

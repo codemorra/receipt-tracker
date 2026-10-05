@@ -162,7 +162,7 @@ test("scan API creates a session and serves its preview", async (t) => {
   const app = createApp(
     new ScanSessionService(directory, previewWorker(90)),
     db,
-    {
+    () => ({
       async extractReceipt() {
         return {
           merchant: { rawName: null, normalizedName: null },
@@ -174,7 +174,7 @@ test("scan API creates a session and serves its preview", async (t) => {
           discounts: [],
         };
       },
-    },
+    }),
   );
   const server = app.listen(0);
   t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));

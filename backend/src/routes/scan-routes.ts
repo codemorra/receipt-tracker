@@ -2,18 +2,14 @@ import express, { type Express } from "express";
 import { ZodError } from "zod";
 import type { Database } from "../db/database.js";
 import { errorType, type Logger } from "../logger.js";
-import { loadExtractionReferenceData } from "../extraction/extraction-reference-data.js";
 import {
   InvalidLlmResponseError,
   LlmRequestError,
   LlmUnavailableError,
 } from "../extraction/extraction-errors.js";
-import type {
-  ReceiptExtractionDiagnostics,
-  ReceiptExtractionProvider,
-} from "../extraction/receipt-extraction-provider.js";
-import { createReceiptExtractionSchema } from "../extraction/receipt-extraction.js";
-import { createReviewDto } from "../review/review-dto.js";
+import type { ReceiptProcessingService } from "../scans/receipt-processing-service.js";
+import { ProviderSettingsError } from "../settings/provider-settings.js";
+import { SecretStorageError } from "../settings/secret-storage.js";
 import {
   ConfirmedEntityNotFoundError,
   DuplicateConfirmationRequiredError,
@@ -47,7 +43,7 @@ function logScanId(value: string): string | undefined {
  * @param app The Express application instance.
  * @param scans The scan session service instance.
  * @param db The database instance.
- * @param provider The receipt extraction provider.
+ * @param processing The receipt processing service.
  * @param dataRoot The root directory for scan data.
  * @param logger The logger instance.
  */
@@ -55,7 +51,7 @@ export function registerScanRoutes(
   app: Express,
   scans: ScanSessionService,
   db: Database,
-  provider: ReceiptExtractionProvider,
+  processing: ReceiptProcessingService,
   dataRoot: string,
   logger: Logger,
 ) {
@@ -119,120 +115,25 @@ export function registerScanRoutes(
     "/api/scans/:scanId/process",
     express.json({ limit: "16kb" }),
     async (request, response) => {
-      const processingStarted = performance.now();
-      let stage = "worker";
-      let llmStarted: number | undefined;
-      logger("info", "scan.process.start", {
-        scanId: logScanId(request.params.scanId),
-      });
-      logger("info", "scan.worker.start", {
-        scanId: logScanId(request.params.scanId),
-      });
-      const workerStarted = performance.now();
       try {
-        const result = await scans.process(
-          request.params.scanId,
-          request.body?.corners,
-          request.body?.rotation,
-        );
+        const result = await processing.process(request.params.scanId, {
+          corners: request.body?.corners,
+          rotation: request.body?.rotation,
+          provider: request.body?.provider,
+        });
         if (!result) {
           response.status(404).json({ error: "scan_not_found" });
           return;
         }
-        const workerDurationMs = performance.now() - workerStarted;
-        logger("info", "scan.ocr.complete", {
-          scanId: result.scanId,
-          ocrDurationMs: result.ocrDurationMs,
-          workerDurationMs,
-        });
-        stage = "reference_data";
-        const { categoryNames } = loadExtractionReferenceData(db);
-        stage = "llm";
-        let llm: ReceiptExtractionDiagnostics | undefined;
-        logger("info", "scan.llm.start", { scanId: result.scanId });
-        llmStarted = performance.now();
-        const extracted = await provider.extractReceipt(
-          {
-            plainText: result.plainText,
-            lines: result.lines,
-            rows: result.rows,
-            categoryNames,
-          },
-          (diagnostics) => {
-            llm = diagnostics;
-          },
-        );
-        const llmDurationMs = performance.now() - llmStarted;
-        logger("info", "scan.llm.complete", {
-          scanId: result.scanId,
-          durationMs: llmDurationMs,
-          provider: llm?.provider,
-          model: llm?.model,
-          inputTokens: llm?.inputTokens,
-          outputTokens: llm?.outputTokens,
-          totalTokens: llm?.totalTokens,
-          ollamaTotalDurationMs: llm?.ollama?.totalDurationMs,
-          loadDurationMs: llm?.ollama?.loadDurationMs,
-          promptEvalCount: llm?.ollama?.promptEvalCount,
-          promptEvalDurationMs: llm?.ollama?.promptEvalDurationMs,
-          evalCount: llm?.ollama?.evalCount,
-          evalDurationMs: llm?.ollama?.evalDurationMs,
-        });
-        stage = "review";
-        const extraction = createReceiptExtractionSchema(
-          categoryNames,
-          result.lines.map((line) => line.index),
-        ).parse(extracted);
-        const review = createReviewDto(db, result, extraction);
-        const totalDurationMs = performance.now() - processingStarted;
-        logger("info", "scan.process.complete", {
-          scanId: result.scanId,
-          durationMs: totalDurationMs,
-          ocrDurationMs: result.ocrDurationMs,
-          llmDurationMs,
-          workerDurationMs,
-        });
-        response.json({
-          ...result,
-          review,
-          timings: {
-            ocrDurationMs: result.ocrDurationMs,
-            workerDurationMs,
-            llmDurationMs,
-            totalDurationMs,
-            llm,
-            ollama: llm?.ollama,
-          },
-        });
+        response.json(result);
       } catch (error) {
-        if (stage === "worker") {
-          logger("error", "scan.worker.failed", {
-            scanId: logScanId(request.params.scanId),
-            durationMs: performance.now() - workerStarted,
-            errorType: errorType(error),
-          });
-        }
-        if (stage === "llm" && llmStarted !== undefined) {
-          logger("error", "scan.llm.failed", {
-            scanId: logScanId(request.params.scanId),
-            durationMs: performance.now() - llmStarted,
-            errorType: errorType(error),
-            provider:
-              error instanceof LlmUnavailableError ||
-              error instanceof LlmRequestError
-                ? error.provider
-                : undefined,
-            httpStatus:
-              error instanceof LlmRequestError ? error.httpStatus : undefined,
-          });
-        }
-        logger("error", "scan.process.failed", {
-          scanId: logScanId(request.params.scanId),
-          stage,
-          durationMs: performance.now() - processingStarted,
-          errorType: errorType(error),
-        });
-        if (error instanceof InvalidCornersError) {
+        if (error instanceof ProviderSettingsError) {
+          response
+            .status(error.code === "invalid_provider" ? 400 : 409)
+            .json({ error: error.code });
+        } else if (error instanceof SecretStorageError) {
+          response.status(503).json({ error: error.code });
+        } else if (error instanceof InvalidCornersError) {
           response.status(400).json({ error: "invalid_corners" });
         } else if (error instanceof InvalidRotationError) {
           response.status(400).json({ error: "invalid_rotation" });
@@ -247,6 +148,13 @@ export function registerScanRoutes(
                 ? "ollama_unavailable"
                 : "llm_unavailable",
           });
+        } else if (
+          error instanceof LlmRequestError &&
+          [401, 403].includes(error.httpStatus ?? 0)
+        ) {
+          response
+            .status(502)
+            .json({ error: "provider_authentication_failed" });
         } else if (error instanceof LlmRequestError) {
           response.status(502).json({
             error: error.provider === "ollama" ? "ollama_failed" : "llm_failed",
