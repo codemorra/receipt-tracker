@@ -1,7 +1,5 @@
 import type { Corners } from "../worker/worker-protocol.js";
 
-export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
-
 export class InvalidCornersError extends Error {}
 export class InvalidRotationError extends Error {}
 
@@ -40,7 +38,7 @@ export const imageTypes = {
   },
 };
 
-// Validates an uploaded image, ensuring it matches a supported type and size.
+// Validates an uploaded image, ensuring it is nonempty and matches a supported type.
 export function validateUpload(
   contentType: string | undefined,
   data: unknown,
@@ -51,9 +49,6 @@ export function validateUpload(
   }
   if (!Buffer.isBuffer(data) || data.length === 0) {
     throw new InvalidUploadError("Image is empty", 400);
-  }
-  if (data.length > MAX_UPLOAD_BYTES) {
-    throw new InvalidUploadError("Image is too large", 413);
   }
   const imageType = type as keyof typeof imageTypes;
   if (!imageTypes[imageType].matches(data)) {
