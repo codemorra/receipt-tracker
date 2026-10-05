@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { copyFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
-import type { createDatabase } from "../db/database.js";
+import type { Database, Transaction } from "../db/database.js";
 import { errorType, silentLogger, type Logger } from "../logger.js";
 import {
   brands,
@@ -25,9 +25,6 @@ import {
   type DuplicateCandidate,
 } from "./duplicate-detection.js";
 import { finalSaveSchema, type FinalSaveDto } from "./final-save.js";
-
-type Database = ReturnType<typeof createDatabase>["db"];
-type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export class ConfirmedEntityNotFoundError extends Error {}
 export class ScanArchiveNotFoundError extends Error {}

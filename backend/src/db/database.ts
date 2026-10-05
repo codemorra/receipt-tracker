@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import SqliteDatabase from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { fileURLToPath } from "node:url";
@@ -13,7 +13,7 @@ import * as schema from "./schema.js";
 export function createDatabase(
   filename = process.env.DATABASE_FILE ?? "./receipt-tracker.sqlite",
 ) {
-  const sqlite = new Database(filename);
+  const sqlite = new SqliteDatabase(filename);
   try {
     sqlite.pragma("foreign_keys = ON");
     const db = drizzle(sqlite, { schema });
@@ -28,3 +28,6 @@ export function createDatabase(
     throw error;
   }
 }
+
+export type Database = ReturnType<typeof createDatabase>["db"];
+export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];

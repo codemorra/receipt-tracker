@@ -1,6 +1,6 @@
 import express, { type ErrorRequestHandler } from "express";
 import { resolve } from "node:path";
-import type { createDatabase } from "./db/database.js";
+import type { Database } from "./db/database.js";
 import { errorType, silentLogger, type Logger } from "./logger.js";
 import type { ReceiptExtractionProvider } from "./extraction/receipt-extraction-provider.js";
 import type { ScanSessionService } from "./scans/scan-session-service.js";
@@ -20,7 +20,7 @@ import { registerScanRoutes } from "./routes/scan-routes.js";
  */
 export function createApp(
   scans: ScanSessionService,
-  db: ReturnType<typeof createDatabase>["db"],
+  db: Database,
   provider: ReceiptExtractionProvider,
   dataRoot = resolve(process.cwd(), "../data"),
   logger: Logger = silentLogger,

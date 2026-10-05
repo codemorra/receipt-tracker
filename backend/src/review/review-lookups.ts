@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import {
   brands,
   categories,
@@ -7,8 +7,6 @@ import {
   productGroups,
   products,
 } from "../db/schema.js";
-
-type Database = ReturnType<typeof createDatabase>["db"];
 
 const MAX_RESULTS = 50;
 

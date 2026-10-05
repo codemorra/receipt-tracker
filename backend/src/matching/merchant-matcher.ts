@@ -1,9 +1,7 @@
 import { eq } from "drizzle-orm";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import { merchantAliases, merchants } from "../db/schema.js";
 import { normalizeAlias } from "./alias-normalizer.js";
-
-type Database = ReturnType<typeof createDatabase>["db"];
 
 // Interface and function for matching merchants based on normalized aliases.
 export interface MerchantMatch {

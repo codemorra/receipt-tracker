@@ -1,9 +1,8 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import { merchants, receiptItems, receipts } from "../db/schema.js";
 
 // Module for detecting potential duplicate receipts based on merchant, date, time, and total amount.
-type Database = ReturnType<typeof createDatabase>["db"];
 
 // Input structure for searching potential duplicate receipts.
 export interface DuplicateSearchInput {

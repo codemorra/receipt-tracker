@@ -20,16 +20,18 @@ import { createApp } from "../src/app.js";
 import {
   WorkerRequestError,
   WorkerUnavailableError,
-  type Rotation,
 } from "../src/worker/python-worker-client.js";
 import {
   InvalidRotationError,
   isScanId,
   MAX_UPLOAD_BYTES,
+  validateUpload,
+} from "../src/scans/scan-validation.js";
+import {
   STALE_SCAN_AGE_MS,
   ScanSessionService,
-  validateUpload,
 } from "../src/scans/scan-session-service.js";
+import type { Rotation } from "../src/worker/worker-protocol.js";
 
 // Sample PNG image buffer for testing.
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);

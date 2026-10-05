@@ -1,5 +1,5 @@
 import { asc, eq, inArray } from "drizzle-orm";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import {
   brands,
   categories,
@@ -11,8 +11,6 @@ import {
   receipts,
   warranties,
 } from "../db/schema.js";
-
-type Database = ReturnType<typeof createDatabase>["db"];
 
 /**
  * Service for loading detailed information about a receipt, including its items, associated products, discounts, and warranties.

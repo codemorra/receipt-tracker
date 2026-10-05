@@ -13,7 +13,7 @@ import {
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
-import type { ProviderId } from "./provider-settings.js";
+import type { ProviderId } from "../extraction/receipt-extraction-provider.js";
 
 // Error class for secret storage-related issues.
 export class SecretStorageError extends Error {

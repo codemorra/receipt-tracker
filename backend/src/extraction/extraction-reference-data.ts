@@ -1,8 +1,6 @@
 import { asc } from "drizzle-orm";
 import { categories } from "../db/schema.js";
-import type { createDatabase } from "../db/database.js";
-
-type Database = ReturnType<typeof createDatabase>["db"];
+import type { Database } from "../db/database.js";
 
 /**
  * Loads reference data for extraction, such as category names.

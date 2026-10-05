@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { eq } from "drizzle-orm";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import { receipts } from "../db/schema.js";
 import { errorType, type Logger } from "../logger.js";
 import { loadReceiptDetail } from "../review/receipt-detail.js";
@@ -15,7 +15,7 @@ import { loadReceiptDetail } from "../review/receipt-detail.js";
  */
 export function registerReceiptRoutes(
   app: Express,
-  db: ReturnType<typeof createDatabase>["db"],
+  db: Database,
   dataRoot: string,
   logger: Logger,
 ) {

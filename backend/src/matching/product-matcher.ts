@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import {
   brands,
   productAliases,
@@ -9,7 +9,6 @@ import {
 import type { ReceiptExtraction } from "../extraction/receipt-extraction.js";
 import { normalizeAlias } from "./alias-normalizer.js";
 
-type Database = ReturnType<typeof createDatabase>["db"];
 type Item = ReceiptExtraction["items"][number];
 
 // Interface representing a row in the products table along with related brand and product group information.

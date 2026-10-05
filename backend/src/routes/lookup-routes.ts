@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import {
   listBrands,
   listCategories,
@@ -13,10 +13,7 @@ import {
  * @param app The Express application instance.
  * @param db The database instance.
  */
-export function registerLookupRoutes(
-  app: Express,
-  db: ReturnType<typeof createDatabase>["db"],
-) {
+export function registerLookupRoutes(app: Express, db: Database) {
   // Categories endpoint
   app.get("/api/categories", (_request, response) => {
     response.json(listCategories(db));

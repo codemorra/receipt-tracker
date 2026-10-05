@@ -10,18 +10,6 @@ import {
   type Rotation,
 } from "./worker-protocol.js";
 
-// Exports and types related to the Python worker protocol.
-export { isRotation } from "./worker-protocol.js";
-export type {
-  Corner,
-  Corners,
-  OcrLine,
-  OcrRow,
-  PreviewResult,
-  ProcessResult,
-  Rotation,
-} from "./worker-protocol.js";
-
 export class WorkerUnavailableError extends Error {}
 export class WorkerRequestError extends Error {}
 
