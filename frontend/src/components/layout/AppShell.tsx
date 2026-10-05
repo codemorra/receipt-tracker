@@ -6,7 +6,7 @@ import Topbar from "./Topbar";
 
 // Props for the AppShell component.
 interface Props {
-  route: Exclude<Route, "legacy">;
+  route: Route;
   navigate: (section: Section) => void;
   children: ReactNode;
 }

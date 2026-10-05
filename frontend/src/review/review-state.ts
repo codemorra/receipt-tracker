@@ -108,7 +108,7 @@ export interface ItemDraft {
   normalizedName: string;
   productId: number | null;
   selectedProductName: string | null;
-  selectedProductDetails?: Omit<ProductSelection, "id" | "name"> | null;
+  selectedProductDetails: Omit<ProductSelection, "id" | "name"> | null;
   matchStatus: MatchStatus | null;
   matchCandidates: ReviewDto["items"][number]["match"];
   brand: string;
@@ -266,6 +266,7 @@ export function createEmptyItem(): ItemDraft {
     normalizedName: "",
     productId: null,
     selectedProductName: null,
+    selectedProductDetails: null,
     matchStatus: null,
     matchCandidates: null,
     brand: "",

@@ -5,7 +5,7 @@ import Navigation from "./Navigation";
 
 // Props for the Sidebar component.
 interface Props {
-  route: Exclude<Route, "legacy">;
+  route: Route;
   navigate: (section: Section) => void;
   drawer: RefObject<HTMLDialogElement | null>;
 }

@@ -40,7 +40,6 @@
     "import": {
       "title": "Import",
       "description": "Digitalisiere deine Belege und prüfe ihre Angaben.",
-      "legacyLink": "Bestehende Import-Oberfläche öffnen (veraltet, ohne Übersetzung)",
       "scan": {
         "title": "Scan",
         "chooseFile": "Belegbild auswählen",

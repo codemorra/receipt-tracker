@@ -30,7 +30,7 @@ export interface ImportState {
   rotation: Rotation;
   processed: ProcessedScan | null;
   generation: number;
-  busy: "upload" | "process" | "delete" | null;
+  busy: "upload" | "process" | null;
 }
 
 // Initial state for the receipt import workflow.
