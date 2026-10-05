@@ -39,7 +39,7 @@ test("shell DE/EN have matching keys and interpolation parameters", () => {
   }
   assert.deepEqual(
     Object.keys(en).sort(),
-    ["appearance", "common", "navigation", "pages"].sort(),
+    ["appearance", "common", "navigation", "pages", "providerSettings"].sort(),
   );
 });
 

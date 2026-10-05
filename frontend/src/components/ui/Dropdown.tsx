@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 
 // Props for the Dropdown component.
 interface Props {
@@ -8,6 +8,8 @@ interface Props {
   trigger: ReactNode;
   triggerClassName?: string;
   panelClassName?: string;
+  disabled?: boolean;
+  floatingPanel?: boolean;
   children: ReactNode;
 }
 
@@ -28,10 +30,36 @@ export default function Dropdown({
   trigger,
   triggerClassName = "",
   panelClassName = "",
+  disabled = false,
+  floatingPanel = false,
   children,
 }: Props) {
   const dropdown = useRef<HTMLDetailsElement>(null);
   const summary = useRef<HTMLElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const positionPanel = useCallback(() => {
+    if (!dropdown.current?.open || !summary.current || !panel.current) return;
+    const bounds = summary.current.getBoundingClientRect();
+    Object.assign(panel.current.style, {
+      left: `${bounds.left}px`,
+      top: `${bounds.bottom + 8}px`,
+      width: `${bounds.width}px`,
+      maxHeight: `${Math.max(80, window.innerHeight - bounds.bottom - 24)}px`,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!floatingPanel) return;
+    window.addEventListener("resize", positionPanel);
+    document.addEventListener("scroll", positionPanel, true);
+    return () => {
+      window.removeEventListener("resize", positionPanel);
+      document.removeEventListener("scroll", positionPanel, true);
+    };
+  }, [floatingPanel, positionPanel]);
+  useEffect(() => {
+    if (disabled) dropdown.current?.removeAttribute("open");
+  }, [disabled]);
 
   // Close the dropdown when clicking outside or pressing Escape.
   function close() {
@@ -67,16 +95,28 @@ export default function Dropdown({
   }, []);
 
   return (
-    <details ref={dropdown} className="group/dropdown relative">
+    <details
+      ref={dropdown}
+      className="group/dropdown relative"
+      onToggle={() => {
+        if (floatingPanel) positionPanel();
+      }}
+    >
       <summary
         ref={summary}
         aria-label={label}
+        aria-disabled={disabled || undefined}
+        tabIndex={disabled ? -1 : 0}
+        onClick={(event) => {
+          if (disabled) event.preventDefault();
+        }}
         title={title}
-        className={`cursor-pointer list-none rounded-xl border border-shell bg-(image:--surface-gradient) shadow-soft hover:border-accent/45 group-open/dropdown:border-accent/45 [&::-webkit-details-marker]:hidden ${triggerClassName}`}
+        className={`cursor-pointer list-none rounded-xl border border-shell bg-(image:--surface-gradient) shadow-soft hover:border-accent/45 group-open/dropdown:border-accent/45 aria-disabled:cursor-default aria-disabled:opacity-60 [&::-webkit-details-marker]:hidden ${triggerClassName}`}
       >
         {trigger}
       </summary>
       <div
+        ref={panel}
         role="group"
         aria-label={groupLabel}
         onClick={(event) => {
@@ -88,7 +128,7 @@ export default function Dropdown({
           )
             close();
         }}
-        className={`absolute top-[calc(100%+0.6rem)] right-0 origin-top-right rounded-2xl border border-shell bg-(image:--surface-gradient) shadow-raised group-open/dropdown:animate-dropdown-in motion-reduce:animate-none ${panelClassName}`}
+        className={`${floatingPanel ? "fixed overflow-y-auto" : "absolute top-[calc(100%+0.6rem)] right-0"} z-30 origin-top-right rounded-2xl border border-shell bg-(image:--surface-gradient) shadow-raised group-open/dropdown:animate-dropdown-in motion-reduce:animate-none ${panelClassName}`}
       >
         {children}
       </div>

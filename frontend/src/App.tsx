@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import LegacyImportApp from "./LegacyImportApp";
 import AppShell from "./components/layout/AppShell";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import SettingsPage from "./pages/SettingsPage";
 import { resolveRoute } from "./routes/routing";
 import "./App.css";
 
@@ -30,7 +31,11 @@ function App() {
     </div>
   ) : (
     <AppShell route={route} navigate={navigate}>
-      <PlaceholderPage route={route} />
+      {route === "settings" ? (
+        <SettingsPage />
+      ) : (
+        <PlaceholderPage route={route} />
+      )}
     </AppShell>
   );
 }
