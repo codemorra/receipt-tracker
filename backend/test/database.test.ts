@@ -26,6 +26,7 @@ test("database initialization applies migrations to a fresh database", () => {
         .filter((name) => name !== "__drizzle_migrations")
         .sort(),
       [
+        "ai_provider_settings",
         "brand",
         "category",
         "discount",
@@ -36,6 +37,7 @@ test("database initialization applies migrations to a fresh database", () => {
         "product_group",
         "receipt",
         "receipt_item",
+        "receipt_processing_settings",
         "warranty",
       ],
     );
@@ -142,7 +144,7 @@ test("database initialization skips migrations already applied", () => {
       const categoryCount = second.sqlite
         .prepare("SELECT COUNT(*) AS count FROM category")
         .get() as { count: number };
-      assert.equal(migrationCount.count, 2);
+      assert.equal(migrationCount.count, 3);
       assert.equal(categoryCount.count, 13);
     } finally {
       second.sqlite.close();

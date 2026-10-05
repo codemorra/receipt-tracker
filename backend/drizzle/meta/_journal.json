@@ -15,6 +15,13 @@
       "when": 1790586307560,
       "tag": "0001_seed-default-categories",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791200545753,
+      "tag": "0002_ai_provider_settings",
+      "breakpoints": true
     }
   ]
 }
