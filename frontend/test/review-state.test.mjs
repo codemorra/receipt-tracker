@@ -11,7 +11,14 @@ import {
   reviewIssues,
   reviewSumStatus,
   warrantyDateIssue,
+  createEmptyItem,
+  removeReviewItem,
 } from "../src/review/review-state.ts";
+import {
+  getReviewLookup,
+  isReviewDto,
+  ReviewApiError,
+} from "../src/api/review-api.ts";
 
 // Sample review object used for testing the review state functions.
 const review = {
@@ -167,13 +174,27 @@ test("matched products show canonical names while clearing restores the new-prod
   const manuallySelected = chooseProduct(matched, {
     id: 9,
     name: "Other saved product",
+    brandName: "Canonical brand",
+    productGroupName: "Canonical group",
+    categoryName: "food",
+    packageAmount: 500,
+    packageUnit: "g",
   });
   assert.equal(manuallySelected.selectedProductName, "Other saved product");
   assert.equal(manuallySelected.matchStatus, null);
   assert.equal(manuallySelected.normalizedName, "Pommes");
+  assert.deepEqual(manuallySelected.selectedProductDetails, {
+    brandName: "Canonical brand",
+    productGroupName: "Canonical group",
+    categoryName: "food",
+    packageAmount: 500,
+    packageUnit: "g",
+  });
+  assert.equal(manuallySelected.productGroup, matched.productGroup);
   const cleared = chooseProduct(manuallySelected, null);
   assert.equal(cleared.productId, null);
   assert.equal(cleared.selectedProductName, null);
+  assert.equal(cleared.selectedProductDetails, null);
   assert.equal(cleared.normalizedName, "Pommes");
   assert.equal(cleared.brand, matched.brand);
 
@@ -239,6 +260,7 @@ test("changing a product line to another type removes warranties and its selecti
     assert.equal(changed.lineType, lineType);
     assert.equal(changed.productId, null);
     assert.equal(changed.selectedProductName, null);
+    assert.equal(changed.selectedProductDetails, null);
     assert.equal(changed.matchStatus, null);
     assert.deepEqual(changed.warranties, []);
     assert.equal(changed.rawName, product.rawName);
@@ -271,4 +293,192 @@ test("review validation still rejects warranties on non-product lines", () => {
     assert.ok(reviewIssues(draft).some((issue) => issue.code === "warranty"));
     assert.equal(buildFinalSaveDto(draft), null);
   }
+});
+
+// Test for verifying that removing an item correctly updates discount references.
+test("removing an item detaches its discounts and shifts later references without changing the extraction", () => {
+  const draft = createReviewDraft(review);
+  draft.items.push(createEmptyItem(), createEmptyItem());
+  draft.discounts = [null, 0, 1, 2].map((appliesToItemIndex, index) => ({
+    ...draft.discounts[0],
+    id: `discount-${index}`,
+    appliesToItemIndex,
+  }));
+  const original = structuredClone(draft);
+  const updated = removeReviewItem(draft, draft.items[1].id);
+  assert.deepEqual(
+    updated.discounts.map((discount) => discount.appliesToItemIndex),
+    [null, 0, null, 1],
+  );
+  assert.equal(updated.items[1].id, draft.items[2].id);
+  assert.deepEqual(draft, original);
+  assert.equal(removeReviewItem(draft, "missing"), draft);
+  const firstRemoved = removeReviewItem(draft, draft.items[0].id);
+  assert.deepEqual(
+    firstRemoved.discounts.map((discount) => discount.appliesToItemIndex),
+    [null, null, 0, 1],
+  );
+});
+
+// Test for verifying that a fresh extraction of the same scan rebuilds all edit and association state with new item identities.
+test("a fresh extraction of the same scan rebuilds all edit and association state with new item identities", () => {
+  const previous = createReviewDraft(review);
+  previous.merchantName = "edited merchant";
+  previous.items[0] = chooseProduct(previous.items[0], {
+    id: 99,
+    name: "manual choice",
+  });
+  previous.items[0].sourceLineIndexes.push(99);
+  previous.items[0].warranties.push({
+    id: "old-warranty",
+    type: "manufacturer",
+    startDate: "2026-01-01",
+    endDate: "2028-01-01",
+    notes: "old notes",
+  });
+  previous.discounts[0].sourceLineIndexes.push(99);
+  previous.discounts[0].amount = "99.00";
+  const next = createReviewDraft({
+    ...review,
+    items: [
+      { ...review.items[0], normalizedName: "New extraction", match: null },
+    ],
+    discounts: [],
+  });
+  assert.equal(next.merchantName, "Edeka");
+  assert.equal(next.items[0].normalizedName, "New extraction");
+  assert.equal(next.items[0].productId, null);
+  assert.equal(next.items[0].selectedProductName, null);
+  assert.equal(next.items[0].brandId, null);
+  assert.equal(next.items[0].productGroupId, null);
+  assert.deepEqual(next.items[0].warranties, []);
+  assert.deepEqual(next.discounts, []);
+  assert.notEqual(next.items[0].id, previous.items[0].id);
+  assert.deepEqual(review.items[0].sourceLineIndexes, [0]);
+  assert.deepEqual(review.discounts[0].sourceLineIndexes, [1]);
+});
+
+// Test for verifying that review lookups use encoded search terms and retain selectable product metadata.
+test("review lookups use encoded search terms and keep selectable product metadata", async (t) => {
+  const products = [
+    {
+      id: 7,
+      name: "Milk",
+      brandName: "Brand",
+      productGroupName: "Milk",
+      categoryName: "food",
+      packageAmount: 1,
+      packageUnit: "l",
+    },
+  ];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    assert.equal(url, "/api/products?query=Milk%20%26%20Brand");
+    assert.equal(init.cache, "no-store");
+    return Response.json(products);
+  });
+  assert.deepEqual(
+    await getReviewLookup("products", "  Milk & Brand "),
+    products,
+  );
+});
+
+// Test for verifying that review responses accept incomplete extraction and refunds but reject structures that cannot be edited safely.
+test("review responses accept incomplete extraction and refunds but reject structures that cannot be edited safely", () => {
+  const valid = { ...review, duplicateCandidates: [] };
+  assert.equal(isReviewDto(valid), true);
+  assert.equal(
+    isReviewDto({
+      ...valid,
+      totalCents: null,
+      purchaseDate: null,
+      currency: null,
+      items: [],
+      discounts: [],
+    }),
+    true,
+  );
+  assert.equal(
+    isReviewDto({
+      ...valid,
+      items: [
+        {
+          ...review.items[0],
+          lineType: "deposit",
+          totalPriceCents: -25,
+          match: null,
+        },
+      ],
+      discounts: [],
+    }),
+    true,
+  );
+  for (const change of [
+    {
+      merchant: {
+        ...valid.merchant,
+        match: { status: "unknown", candidates: [] },
+      },
+    },
+    { items: [{ ...valid.items[0], sourceLineIndexes: null }] },
+    { items: [{ ...valid.items[0], quantity: 0 }] },
+    { items: [{ ...valid.items[0], totalPriceCents: "1.49" }] },
+    {
+      items: [
+        {
+          ...valid.items[0],
+          match: {
+            status: "SUGGESTED",
+            productId: null,
+            candidates: [{ productId: 1 }],
+          },
+        },
+      ],
+    },
+    { discounts: [{ ...valid.discounts[0], appliesToItemIndex: -1 }] },
+    { discounts: [{ ...valid.discounts[0], appliesToItemIndex: 1 }] },
+    { discounts: [{ ...valid.discounts[0], amountCents: "invalid" }] },
+  ])
+    assert.equal(isReviewDto({ ...valid, ...change }), false);
+});
+
+// Test for verifying that lookup failures reject malformed entities and sanitize server and transport details.
+test("lookup failures reject malformed entities and sanitize server and transport details", async (t) => {
+  let response = () => Response.json([]);
+  t.mock.method(globalThis, "fetch", async () => response());
+  for (const payload of [
+    null,
+    {},
+    [{ id: -1, name: "invalid" }],
+    [{ id: 1, name: null }],
+    [{ id: 1, name: "Milk", packageAmount: -1 }],
+    [{ id: 1, name: "Milk", brandName: {} }],
+  ]) {
+    response = () => Response.json(payload);
+    await assert.rejects(getReviewLookup("products"), {
+      code: "unexpected_response",
+    });
+  }
+  response = () => new Response("private backend details", { status: 500 });
+  await assert.rejects(getReviewLookup("categories"), {
+    code: "categories_failed",
+  });
+  await assert.rejects(getReviewLookup("merchants"), (error) => {
+    assert.ok(error instanceof ReviewApiError);
+    assert.equal(error.code, "lookup_failed");
+    assert.equal(String(error).includes("private"), false);
+    return true;
+  });
+  response = () => new Response("invalid JSON");
+  await assert.rejects(getReviewLookup("products"), {
+    code: "unexpected_response",
+  });
+  response = () => {
+    throw new Error("private transport details");
+  };
+  await assert.rejects(getReviewLookup("products"), { code: "network_error" });
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(getReviewLookup("products", "", controller.signal), {
+    name: "AbortError",
+  });
 });

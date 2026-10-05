@@ -31,7 +31,23 @@ const scan = {
 const file = new File(["image"], "receipt.png", { type: "image/png" });
 const result = {
   archiveUrl: `/api/scans/${id}/archive`,
-  review: { scanId: id, merchant: {}, items: [], discounts: [], warnings: [] },
+  review: {
+    scanId: id,
+    archiveUrl: `/api/scans/${id}/archive`,
+    merchant: {
+      rawName: null,
+      normalizedName: null,
+      match: { status: "NEW", merchantId: null, candidates: [] },
+    },
+    purchaseDate: null,
+    purchaseTime: null,
+    currency: null,
+    totalCents: null,
+    items: [],
+    discounts: [],
+    duplicateCandidates: [],
+    warnings: [],
+  },
 };
 
 // Tests for the scan API, including upload, processing, and validation.
@@ -139,6 +155,16 @@ test("scan responses reject malformed frames, dimensions, rotation, IDs, and for
     { archiveUrl: "https://foreign.example/image" },
     { review: { ...result.review, scanId: "other" } },
     { review: { ...result.review, items: null } },
+    {
+      review: {
+        ...result.review,
+        merchant: { ...result.review.merchant, match: null },
+      },
+    },
+    { review: { ...result.review, totalCents: "invalid" } },
+    {
+      review: { ...result.review, archiveUrl: "https://foreign.example/image" },
+    },
   ]) {
     payload = { ...result, ...change };
     await assert.rejects(processScan(id, corners, 0, "ollama"), {

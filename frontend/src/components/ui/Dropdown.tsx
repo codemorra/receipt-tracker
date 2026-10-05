@@ -10,6 +10,7 @@ interface Props {
   panelClassName?: string;
   disabled?: boolean;
   floatingPanel?: boolean;
+  onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }
 
@@ -32,6 +33,7 @@ export default function Dropdown({
   panelClassName = "",
   disabled = false,
   floatingPanel = false,
+  onOpenChange,
   children,
 }: Props) {
   const dropdown = useRef<HTMLDetailsElement>(null);
@@ -100,6 +102,7 @@ export default function Dropdown({
       className="group/dropdown relative"
       onToggle={() => {
         if (floatingPanel) positionPanel();
+        onOpenChange?.(dropdown.current?.open ?? false);
       }}
     >
       <summary

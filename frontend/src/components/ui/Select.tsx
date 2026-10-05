@@ -14,6 +14,7 @@ interface Props {
   options: Option[];
   disabled?: boolean;
   floatingPanel?: boolean;
+  compact?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -23,6 +24,8 @@ interface Props {
  * @param value The currently selected value.
  * @param options The list of available options.
  * @param disabled Whether the select dropdown should be disabled.
+ * @param floatingPanel Whether the dropdown panel should float.
+ * @param compact Whether the select should use compact styling.
  * @param onChange Callback function to handle when the selected value changes.
  */
 export default function Select({
@@ -31,6 +34,7 @@ export default function Select({
   options,
   disabled,
   floatingPanel,
+  compact = false,
   onChange,
 }: Props) {
   const selected = options.find((option) => option.value === value);
@@ -40,7 +44,7 @@ export default function Select({
       groupLabel={label}
       disabled={disabled}
       floatingPanel={floatingPanel}
-      triggerClassName="flex w-full items-center gap-3 px-3.5 py-3 text-sm text-foreground"
+      triggerClassName={`flex w-full items-center gap-3 text-sm text-foreground ${compact ? "px-3 py-2.5" : "px-3.5 py-3"}`}
       panelClassName="w-full min-w-40 p-2"
       trigger={
         <>
