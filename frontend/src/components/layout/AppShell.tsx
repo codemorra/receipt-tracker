@@ -34,7 +34,7 @@ export default function AppShell({ route, navigate, children }: Props) {
         <main
           id="page-content"
           tabIndex={-1}
-          className="mx-auto max-w-304 px-5 py-10 lg:px-10 lg:py-12"
+          className="mx-auto max-w-384 px-5 py-10 lg:px-10 lg:py-12"
         >
           {children}
         </main>

@@ -1,4 +1,5 @@
-import type { Corners } from "./ReceiptImagePreview";
+export type CornerName = "topLeft" | "topRight" | "bottomRight" | "bottomLeft";
+export type Corners = Record<CornerName, [number, number]>;
 
 // Utilities for handling scan orientation and rotating receipt corners.
 export type Rotation = 0 | 90 | 180 | 270;
