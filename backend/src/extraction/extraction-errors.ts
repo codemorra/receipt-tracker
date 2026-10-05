@@ -1,9 +1,9 @@
-import type { ReceiptExtractionProviderName } from "./receipt-extraction-provider.js";
+import type { ProviderId } from "./receipt-extraction-provider.js";
 
 // General LLM errors
 export class LlmUnavailableError extends Error {
   constructor(
-    readonly provider: ReceiptExtractionProviderName,
+    readonly provider: ProviderId,
     message: string,
   ) {
     super(message);
@@ -13,7 +13,7 @@ export class LlmUnavailableError extends Error {
 // Errors related to LLM requests
 export class LlmRequestError extends Error {
   constructor(
-    readonly provider: ReceiptExtractionProviderName,
+    readonly provider: ProviderId,
     message: string,
     readonly httpStatus?: number,
   ) {

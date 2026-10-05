@@ -1,18 +1,19 @@
+import {
+  providerIds,
+  type ProviderId,
+} from "../extraction/receipt-extraction-provider.js";
 import { eq, isNotNull } from "drizzle-orm";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import { aiProviderSettings, receiptProcessingSettings } from "../db/schema.js";
 import {
   DEFAULT_OLLAMA_BASE_URL,
   parseProviderUpdate,
   providerIdSchema,
-  providerIds,
   ProviderSettingsError,
-  type ProviderId,
   type PublicProviderSettings,
 } from "./provider-settings.js";
 import { SecretStorage, SecretStorageError } from "./secret-storage.js";
 
-type SettingsDatabase = ReturnType<typeof createDatabase>["db"];
 type ProviderRow = typeof aiProviderSettings.$inferSelect;
 
 /**
@@ -34,7 +35,7 @@ function parseProvider(input: unknown): ProviderId {
  */
 export class ProviderSettingsService {
   constructor(
-    private readonly db: SettingsDatabase,
+    private readonly db: Database,
     private readonly secrets = new SecretStorage(),
   ) {
     db.transaction((tx) => {

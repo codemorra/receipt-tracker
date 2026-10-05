@@ -1,4 +1,4 @@
-import type { OcrLine, OcrRow } from "../worker/python-worker-client.js";
+import type { OcrLine, OcrRow } from "../worker/worker-protocol.js";
 
 // Defines the interfaces for receipt extraction input and provider.
 export interface ReceiptExtractionInput {
@@ -20,11 +20,12 @@ export interface OllamaDiagnostics {
 }
 
 // Defines the names of the supported receipt extraction providers.
-export type ReceiptExtractionProviderName = "ollama" | "mistral" | "openai";
+export const providerIds = ["ollama", "mistral", "openai"] as const;
+export type ProviderId = (typeof providerIds)[number];
 
 // Defines the structure of diagnostic information for receipt extraction.
 export interface ReceiptExtractionDiagnostics {
-  provider: ReceiptExtractionProviderName;
+  provider: ProviderId;
   model: string;
   inputTokens?: number;
   outputTokens?: number;

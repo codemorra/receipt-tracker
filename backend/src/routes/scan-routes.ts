@@ -1,6 +1,6 @@
 import express, { type Express } from "express";
 import { ZodError } from "zod";
-import type { createDatabase } from "../db/database.js";
+import type { Database } from "../db/database.js";
 import { errorType, type Logger } from "../logger.js";
 import { loadExtractionReferenceData } from "../extraction/extraction-reference-data.js";
 import {
@@ -30,8 +30,8 @@ import {
   InvalidUploadError,
   isScanId,
   MAX_UPLOAD_BYTES,
-  type ScanSessionService,
-} from "../scans/scan-session-service.js";
+} from "../scans/scan-validation.js";
+import type { ScanSessionService } from "../scans/scan-session-service.js";
 
 /**
  * Logs the scan ID if it is valid.
@@ -54,7 +54,7 @@ function logScanId(value: string): string | undefined {
 export function registerScanRoutes(
   app: Express,
   scans: ScanSessionService,
-  db: ReturnType<typeof createDatabase>["db"],
+  db: Database,
   provider: ReceiptExtractionProvider,
   dataRoot: string,
   logger: Logger,

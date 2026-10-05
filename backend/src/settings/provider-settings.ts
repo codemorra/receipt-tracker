@@ -1,7 +1,10 @@
 import { z } from "zod";
 
-export const providerIds = ["ollama", "mistral", "openai"] as const;
-export type ProviderId = (typeof providerIds)[number];
+import {
+  providerIds,
+  type ProviderId,
+} from "../extraction/receipt-extraction-provider.js";
+
 export const providerIdSchema = z.enum(providerIds);
 export const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
