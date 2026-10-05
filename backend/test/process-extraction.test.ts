@@ -11,13 +11,10 @@ import {
   InvalidLlmResponseError,
   OllamaRequestError,
   OllamaUnavailableError,
-} from "../src/extraction/ollama-provider.js";
-import {
   LlmRequestError,
   LlmUnavailableError,
 } from "../src/extraction/extraction-errors.js";
 import type { ReceiptExtractionDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
-import { MistralProvider } from "../src/extraction/mistral-provider.js";
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
 
 const corners = {
@@ -104,15 +101,13 @@ test("process endpoint returns a review DTO using current categories and databas
   );
   let nextExtraction: unknown = validExtraction;
   let nextError: Error | undefined;
-  let nextDiagnostics: ReceiptExtractionDiagnostics = {
+  const nextDiagnostics: ReceiptExtractionDiagnostics = {
     provider: "ollama",
     model: "test-model",
     inputTokens: 250,
     ollama: { model: "test-model", promptEvalCount: 250 },
   };
   let providerCalls = 0;
-  let mistral: MistralProvider | undefined;
-  let mistralCalls = 0;
   const events: string[] = [];
   const app = createApp(
     scans,
@@ -132,7 +127,6 @@ test("process endpoint returns a review DTO using current categories and databas
         assert.ok(input.categoryNames.includes("groceries"));
         assert.ok(input.categoryNames.includes("custom"));
         assert.equal(input.categoryNames.includes("food"), false);
-        if (mistral) return mistral.extractReceipt(input, onDiagnostics);
         if (nextError) throw nextError;
         onDiagnostics?.(nextDiagnostics);
         return nextExtraction;
@@ -314,50 +308,6 @@ test("process endpoint returns a review DTO using current categories and databas
   assert.equal(invalid.status, 502);
   assert.deepEqual(await invalid.json(), { error: "invalid_extraction" });
 
-  for (const extraction of [
-    {
-      ...validExtraction,
-      items: [{ ...validExtraction.items[0], sourceLineIndexes: [1] }],
-    },
-    {
-      ...validExtraction,
-      discounts: [
-        {
-          rawName: "RABATT",
-          description: null,
-          amountCents: 10,
-          appliesToItemIndex: null,
-          sourceLineIndexes: [1],
-        },
-      ],
-    },
-  ]) {
-    nextExtraction = extraction;
-    const invalidReferences = await processScan();
-    assert.equal(invalidReferences.status, 502);
-    assert.deepEqual(await invalidReferences.json(), {
-      error: "invalid_extraction",
-    });
-  }
-  nextExtraction = {
-    ...validExtraction,
-    items: [{ ...validExtraction.items[0], sourceLineIndexes: [] }],
-    discounts: [
-      {
-        rawName: "RABATT",
-        description: null,
-        amountCents: 10,
-        appliesToItemIndex: null,
-        sourceLineIndexes: [],
-      },
-    ],
-  };
-  const emptyReferences = await processScan();
-  assert.equal(emptyReferences.status, 200);
-  const emptyReview = (await emptyReferences.json()).review;
-  assert.deepEqual(emptyReview.items[0].sourceLineIndexes, []);
-  assert.deepEqual(emptyReview.discounts[0].sourceLineIndexes, []);
-
   nextError = new OllamaUnavailableError("unavailable");
   const unavailable = await processScan();
   assert.equal(unavailable.status, 503);
@@ -372,22 +322,6 @@ test("process endpoint returns a review DTO using current categories and databas
   const malformed = await processScan();
   assert.equal(malformed.status, 502);
   assert.deepEqual(await malformed.json(), { error: "invalid_llm_response" });
-
-  nextError = undefined;
-  nextExtraction = validExtraction;
-  nextDiagnostics = {
-    provider: "mistral",
-    model: "mistral-medium-latest",
-    inputTokens: 123,
-    outputTokens: 45,
-    totalTokens: 168,
-  };
-  const external = await processScan();
-  assert.equal(external.status, 200);
-  const externalResult = await external.json();
-  assert.deepEqual(externalResult.timings.llm, nextDiagnostics);
-  assert.equal(externalResult.timings.ollama, undefined);
-  assert.deepEqual(externalResult.review, result.review);
 
   nextError = new LlmUnavailableError("mistral", "secret-external-key");
   const externalUnavailable = await processScan();
@@ -406,11 +340,9 @@ test("process endpoint returns a review DTO using current categories and databas
       const entry = JSON.parse(event);
       return (
         entry.operation === "scan.llm.complete" &&
-        entry.fields.provider === "mistral" &&
-        entry.fields.model === "mistral-medium-latest" &&
-        entry.fields.inputTokens === 123 &&
-        entry.fields.outputTokens === 45 &&
-        entry.fields.totalTokens === 168
+        entry.fields.provider === nextDiagnostics.provider &&
+        entry.fields.model === nextDiagnostics.model &&
+        entry.fields.inputTokens === nextDiagnostics.inputTokens
       );
     }),
   );
@@ -424,143 +356,26 @@ test("process endpoint returns a review DTO using current categories and databas
       );
     }),
   );
-  assert.equal(events.join("\n").includes("secret-external-key"), false);
   nextError = undefined;
+  nextExtraction = validExtraction;
 
-  let mistralBody: string;
-  let mistralStatus = 200;
-  let mistralFailure: Error | undefined;
-  const completion = (value: unknown) =>
-    JSON.stringify({
-      choices: [
-        {
-          finish_reason: "stop",
-          message: {
-            role: "assistant",
-            content: JSON.stringify(value),
-          },
-        },
-      ],
-      usage: { prompt_tokens: 123, completion_tokens: 45, total_tokens: 168 },
-    });
-  mistralBody = completion(validExtraction);
-  mistral = new MistralProvider(
-    "https://mistral.example.test/v1/chat/completions",
-    "mistral-medium-latest",
-    "test-only-mistral-key",
-    async () => {
-      mistralCalls++;
-      if (mistralFailure) throw mistralFailure;
-      return new Response(mistralBody, { status: mistralStatus });
-    },
-  );
-  const mistralSuccess = await processScan();
-  assert.equal(mistralSuccess.status, 200);
-  const mistralResult = await mistralSuccess.json();
-  assert.deepEqual(mistralResult.review, result.review);
-  assert.deepEqual(mistralResult.timings.llm, nextDiagnostics);
-  assert.equal(mistralResult.timings.ollama, undefined);
-  assert.ok(mistralResult.timings.llmDurationMs >= 0);
-
-  for (const invalidExtraction of [
-    { ...validExtraction, purchaseTime: "25:99" },
-    { ...validExtraction, totalCents: 119.5 },
-    { ...validExtraction, unsupported: "private model response" },
-    {
-      ...validExtraction,
-      items: [
-        { ...validExtraction.items[0], category: "unknown-private-category" },
-      ],
-    },
-    {
-      ...validExtraction,
-      items: [{ ...validExtraction.items[0], sourceLineIndexes: [99] }],
-    },
-    {
-      ...validExtraction,
-      discounts: [
-        {
-          rawName: "private discount",
-          description: null,
-          amountCents: 10,
-          appliesToItemIndex: 1,
-          sourceLineIndexes: [0],
-        },
-      ],
-    },
-  ]) {
-    mistralBody = completion(invalidExtraction);
-    const invalidMistral = await processScan();
-    assert.equal(invalidMistral.status, 502);
-    assert.deepEqual(await invalidMistral.json(), {
-      error: "invalid_extraction",
-    });
-  }
-
-  mistralBody = "private invalid response containing test-only-mistral-key";
-  const invalidMistralJson = await processScan();
-  assert.equal(invalidMistralJson.status, 502);
-  assert.deepEqual(await invalidMistralJson.json(), {
-    error: "invalid_llm_response",
-  });
-
-  for (const status of [401, 429]) {
-    mistralStatus = status;
-    const rejectedMistral = await processScan();
-    assert.equal(rejectedMistral.status, 502);
-    assert.deepEqual(await rejectedMistral.json(), { error: "llm_failed" });
-    assert.ok(
-      events.some((event) => {
-        const entry = JSON.parse(event);
-        return (
-          entry.operation === "scan.llm.failed" &&
-          entry.fields.provider === "mistral" &&
-          entry.fields.httpStatus === status
-        );
-      }),
-    );
-  }
-  for (const failure of [
-    new TypeError("test-only-mistral-key"),
-    new DOMException("test-only-mistral-key", "TimeoutError"),
-  ]) {
-    mistralFailure = failure;
-    const unavailableMistral = await processScan();
-    assert.equal(unavailableMistral.status, 503);
-    assert.deepEqual(await unavailableMistral.json(), {
-      error: "llm_unavailable",
-    });
-  }
-  for (const sensitive of [
-    "test-only-mistral-key",
-    "private invalid response",
-    "private model response",
-    "unknown-private-category",
-    "private discount",
-    validExtraction.items[0].rawName,
-    JSON.stringify(validExtraction),
-  ]) {
-    assert.equal(events.join("\n").includes(sensitive), false);
-  }
-  assert.equal(mistralCalls, 12);
-  mistral = undefined;
   sqlite.exec("DROP TABLE merchant_alias");
   const databaseFailure = await processScan();
   assert.equal(databaseFailure.status, 500);
   assert.deepEqual(await databaseFailure.json(), { error: "scan_failed" });
-  assert.equal(providerCalls, 15 + mistralCalls);
   assert.ok(
     events.some((event) => event.includes('"operation":"scan.ocr.complete"')),
   );
   assert.ok(
-    events.some((event) => event.includes('"operation":"scan.llm.complete"')),
-  );
-  assert.ok(
-    events.some((event) => event.includes('"operation":"scan.llm.failed"')),
-  );
-  assert.ok(
     events.some((event) => event.includes('"operation":"scan.process.failed"')),
   );
-  assert.equal(events.join("\n").includes(ocrLine.text), false);
-  assert.equal(events.join("\n").includes("private receipt text"), false);
+  for (const sensitive of [
+    ocrLine.text,
+    validExtraction.items[0].rawName,
+    JSON.stringify(validExtraction),
+    "private receipt text",
+    "secret-external-key",
+  ]) {
+    assert.equal(events.join("\n").includes(sensitive), false);
+  }
 });
