@@ -15,14 +15,14 @@ import { eq } from "drizzle-orm";
 import { createDatabase } from "../src/db/database.js";
 import { createApp } from "../src/app.js";
 import { receipts } from "../src/db/schema.js";
-import { finalSaveSchema } from "../src/review/final-save.js";
-import { loadReceiptDetail } from "../src/review/receipt-detail.js";
+import { saveReceipt } from "../src/receipts/receipt-save-service.js";
+import { finalSaveSchema } from "../src/receipts/final-save.js";
+import { loadReceiptDetail } from "../src/receipts/receipt-detail.js";
 import {
   ConfirmedEntityNotFoundError,
   DuplicateConfirmationRequiredError,
-  saveReceipt,
   ScanArchiveNotFoundError,
-} from "../src/review/receipt-persistence.js";
+} from "../src/receipts/receipt-errors.js";
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
 
 const validReceipt = {

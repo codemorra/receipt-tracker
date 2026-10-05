@@ -11,7 +11,7 @@ import {
 import {
   findDuplicateCandidates,
   type DuplicateCandidate,
-} from "./duplicate-detection.js";
+} from "../receipts/duplicate-detection.js";
 import { checkReceiptSum, type SumCheck } from "./sum-check.js";
 
 // Data transfer object and helper function for creating a review of a receipt, including merchant match, item matches, duplicate detection, and sum check.

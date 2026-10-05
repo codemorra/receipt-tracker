@@ -6,7 +6,7 @@ import {
   listMerchants,
   listProductGroups,
   listProducts,
-} from "../review/review-lookups.js";
+} from "../lookups/entity-lookups.js";
 
 /**
  * Registers the lookup routes for categories, merchants, brands, product groups, and products.

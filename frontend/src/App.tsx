@@ -4,26 +4,36 @@ import AppShell from "./components/layout/AppShell";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
 import ImportPage from "./pages/ImportPage";
-import { resolveRoute } from "./routes/routing";
+import SavedReceiptPage from "./pages/SavedReceiptPage";
+import { receiptIdFromSearch, resolveRoute } from "./routes/routing";
 import "./App.css";
 
 // Main application component.
 function App() {
-  const [route, setRoute] = useState(() =>
-    resolveRoute(window.location.pathname, window.location.search),
-  );
-  // Effect for handling browser navigation events (back/forward buttons).
+  const [location, setLocation] = useState(() => ({
+    pathname: window.location.pathname,
+    search: window.location.search,
+  }));
+  const route = resolveRoute(location.pathname, location.search);
+  const receiptId = receiptIdFromSearch(location.search);
   useEffect(() => {
     const onPopState = () =>
-      setRoute(resolveRoute(window.location.pathname, window.location.search));
+      setLocation({
+        pathname: window.location.pathname,
+        search: window.location.search,
+      });
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
-
-  // Function for navigating to a different section of the application.
+  function navigateTo(url: string) {
+    window.history.pushState(null, "", url);
+    setLocation({
+      pathname: window.location.pathname,
+      search: window.location.search,
+    });
+  }
   function navigate(section: string) {
-    window.history.pushState(null, "", `/${section}`);
-    setRoute(resolveRoute(window.location.pathname, window.location.search));
+    navigateTo(`/${section}`);
   }
 
   return route === "legacy" ? (
@@ -35,7 +45,15 @@ function App() {
       {route === "settings" ? (
         <SettingsPage />
       ) : route === "import" ? (
-        <ImportPage />
+        receiptId !== null ? (
+          <SavedReceiptPage
+            key={receiptId}
+            receiptId={receiptId}
+            onNewImport={() => navigateTo("/import")}
+          />
+        ) : (
+          <ImportPage onSaved={(id) => navigateTo(`/import?receiptId=${id}`)} />
+        )
       ) : (
         <PlaceholderPage route={route} />
       )}

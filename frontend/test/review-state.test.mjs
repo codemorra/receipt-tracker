@@ -20,6 +20,13 @@ import {
   ReviewApiError,
 } from "../src/api/review-api.ts";
 
+import {
+  confirmReceipt,
+  getSavedReceipt,
+  isSavedReceipt,
+  ReceiptApiError,
+} from "../src/api/receipt-api.ts";
+
 // Sample review object used for testing the review state functions.
 const review = {
   scanId: "scan",
@@ -481,4 +488,255 @@ test("lookup failures reject malformed entities and sanitize server and transpor
   await assert.rejects(getReviewLookup("products", "", controller.signal), {
     name: "AbortError",
   });
+});
+
+// Sample data for testing duplicate and saved receipts.
+const scanId = "5aa1a222-b333-4ccc-8ddd-555566667777";
+const duplicate = {
+  receiptId: 7,
+  merchantId: 4,
+  merchantName: "Edeka",
+  purchaseDate: "2026-09-29",
+  purchaseTime: "14:05",
+  totalCents: 119,
+  currency: "EUR",
+  imagePath: "receipts/archive.webp",
+  items: [
+    {
+      position: 0,
+      rawName: "MILCH",
+      quantity: 1,
+      unit: "pcs",
+      unitPriceCents: 149,
+      totalPriceCents: 149,
+      lineType: "product",
+      productId: 8,
+    },
+  ],
+};
+const savedReceipt = {
+  id: 7,
+  merchantId: 4,
+  merchantName: "Edeka",
+  merchantRawName: "EDEKA",
+  purchaseDate: "2026-09-29",
+  purchaseTime: "14:05",
+  totalCents: 119,
+  currency: "EUR",
+  imageUrl: "/api/receipts/7/image",
+  items: [
+    {
+      id: 11,
+      position: 0,
+      rawName: "MILCH",
+      quantity: 1,
+      unit: "pcs",
+      unitPriceCents: 149,
+      totalPriceCents: 149,
+      lineType: "product",
+      product: {
+        id: 8,
+        name: "Milk",
+        brandName: null,
+        productGroupName: "milk",
+        categoryName: "food",
+        packageAmount: 1,
+        packageUnit: "l",
+      },
+      warranties: [
+        {
+          id: 12,
+          receiptItemId: 11,
+          type: "statutory",
+          startDate: "2026-09-29",
+          endDate: "2028-09-29",
+          notes: null,
+        },
+      ],
+    },
+  ],
+  discounts: [
+    { id: 13, receiptItemId: 11, description: "Coupon", amountCents: 30 },
+  ],
+};
+
+// Tests for the confirmation process of reviewed receipts, including handling of duplicate overrides and save errors.
+test("confirmation sends the reviewed associations, discounts and warranties, and requires an explicit duplicate override", async (t) => {
+  const draft = createReviewDraft(review);
+  draft.items[0].warranties = [
+    {
+      id: "draft-warranty",
+      type: "statutory",
+      startDate: "2026-09-29",
+      endDate: "2028-09-29",
+      notes: "receipt required",
+    },
+  ];
+  const payload = buildFinalSaveDto(draft);
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    assert.equal(url, `/api/scans/${scanId}/confirm`);
+    assert.equal(init.method, "POST");
+    assert.equal(init.cache, "no-store");
+    assert.equal(init.headers["Content-Type"], "application/json");
+    const body = JSON.parse(init.body);
+    assert.deepEqual(body, { ...payload, duplicateOverride: calls === 1 });
+    calls++;
+    return calls === 1
+      ? Response.json(
+          { error: "duplicate_confirmation_required", candidates: [duplicate] },
+          { status: 409 },
+        )
+      : Response.json({ receiptId: 7 }, { status: 201 });
+  });
+  assert.deepEqual(await confirmReceipt(scanId, payload), {
+    kind: "duplicates",
+    candidates: [duplicate],
+  });
+  assert.deepEqual(await confirmReceipt(scanId, payload, true), {
+    kind: "saved",
+    receiptId: 7,
+  });
+  assert.equal(calls, 2);
+  assert.equal(
+    isReviewDto({ ...review, duplicateCandidates: [duplicate] }),
+    true,
+  );
+  assert.equal(
+    isReviewDto({
+      ...review,
+      duplicateCandidates: [{ ...duplicate, items: null }],
+    }),
+    false,
+  );
+});
+
+// Tests for classification of save errors and handling of broken duplicate payloads.
+test("confirmation classifies save errors and rejects broken duplicate payloads without leaking server details", async (t) => {
+  let response = () => Response.json({ receiptId: 7 }, { status: 201 });
+  t.mock.method(globalThis, "fetch", async () => response());
+  const payload = buildFinalSaveDto(createReviewDraft(review));
+  for (const code of [
+    "invalid_final_save",
+    "scan_archive_not_found",
+    "confirmed_entity_not_found",
+    "receipt_save_failed",
+  ]) {
+    response = () =>
+      Response.json(
+        { error: code, message: "private details" },
+        { status: 400 },
+      );
+    await assert.rejects(
+      confirmReceipt(scanId, payload),
+      (error) =>
+        error instanceof ReceiptApiError &&
+        error.code === code &&
+        !String(error).includes("private"),
+    );
+  }
+  for (const candidates of [[], null, [{ ...duplicate, items: [{}] }]]) {
+    response = () =>
+      Response.json(
+        { error: "duplicate_confirmation_required", candidates },
+        { status: 409 },
+      );
+    await assert.rejects(confirmReceipt(scanId, payload), {
+      code: "unexpected_response",
+    });
+  }
+  for (const value of [
+    { receiptId: -1 },
+    { receiptId: "7" },
+    null,
+    { error: "private error" },
+  ]) {
+    response = () => Response.json(value);
+    await assert.rejects(confirmReceipt(scanId, payload), {
+      code: "unexpected_response",
+    });
+  }
+  response = () => new Response("private server details", { status: 500 });
+  await assert.rejects(confirmReceipt(scanId, payload), {
+    code: "unexpected_response",
+  });
+  response = () => {
+    throw new Error("private transport details");
+  };
+  await assert.rejects(confirmReceipt(scanId, payload), {
+    code: "network_error",
+  });
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    confirmReceipt(scanId, payload, false, controller.signal),
+    { name: "AbortError" },
+  );
+});
+
+// Tests for fetching saved receipts, including handling of associations, foreign images, broken references, and malformed nested data.
+test("saved receipts reload with associations and reject foreign images, broken references and malformed nested data", async (t) => {
+  let response = () => Response.json(savedReceipt);
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    assert.equal(url, "/api/receipts/7");
+    assert.equal(init.cache, "no-store");
+    return response();
+  });
+  assert.deepEqual(await getSavedReceipt(7), savedReceipt);
+  assert.equal(isSavedReceipt(savedReceipt), true);
+  for (const change of [
+    { imageUrl: "https://foreign.test/image" },
+    { purchaseDate: "2026-02-30" },
+    { purchaseTime: "24:00" },
+    { discounts: [{ ...savedReceipt.discounts[0], receiptItemId: 99 }] },
+    {
+      items: [
+        {
+          ...savedReceipt.items[0],
+          product: { ...savedReceipt.items[0].product, name: null },
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          ...savedReceipt.items[0],
+          warranties: [
+            { ...savedReceipt.items[0].warranties[0], receiptItemId: 99 },
+          ],
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          ...savedReceipt.items[0],
+          warranties: [
+            { ...savedReceipt.items[0].warranties[0], endDate: "2025-01-01" },
+          ],
+        },
+      ],
+    },
+    { items: [{ ...savedReceipt.items[0], quantity: 0 }] },
+  ]) {
+    const value = { ...savedReceipt, ...change };
+    assert.equal(isSavedReceipt(value), false);
+    response = () => Response.json(value);
+    await assert.rejects(getSavedReceipt(7), { code: "unexpected_response" });
+  }
+  response = () =>
+    Response.json({
+      ...savedReceipt,
+      id: 8,
+      imageUrl: "/api/receipts/8/image",
+    });
+  await assert.rejects(getSavedReceipt(7), { code: "unexpected_response" });
+  response = () => new Response("private details", { status: 404 });
+  await assert.rejects(getSavedReceipt(7), { code: "receipt_not_found" });
+  response = () => new Response("private details", { status: 500 });
+  await assert.rejects(getSavedReceipt(7), { code: "receipt_detail_failed" });
+  response = () => {
+    throw new Error("private details");
+  };
+  await assert.rejects(getSavedReceipt(7), { code: "network_error" });
 });

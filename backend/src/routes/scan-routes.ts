@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import { ZodError } from "zod";
+import { saveReceipt } from "../receipts/receipt-save-service.js";
 import type { Database } from "../db/database.js";
 import { errorType, type Logger } from "../logger.js";
 import {
@@ -13,9 +14,8 @@ import { SecretStorageError } from "../settings/secret-storage.js";
 import {
   ConfirmedEntityNotFoundError,
   DuplicateConfirmationRequiredError,
-  saveReceipt,
   ScanArchiveNotFoundError,
-} from "../review/receipt-persistence.js";
+} from "../receipts/receipt-errors.js";
 import {
   WorkerRequestError,
   WorkerUnavailableError,

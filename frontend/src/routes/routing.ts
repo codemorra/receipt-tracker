@@ -27,10 +27,9 @@ export function receiptIdFromSearch(search: string): number | null {
  * @returns The resolved route.
  */
 export function resolveRoute(pathname: string, search: string): Route {
-  // Existing shared receipt URLs always retain access to the reference workflow.
-  if (receiptIdFromSearch(search) !== null) return "legacy";
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/legacy-import") return "legacy";
+  if (receiptIdFromSearch(search) !== null) return "import";
   if (path === "/") return "import";
   return sections.find((section) => path === `/${section}`) ?? "notFound";
 }

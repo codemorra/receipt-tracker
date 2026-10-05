@@ -1,4 +1,4 @@
-import type { ReviewDto } from "../review/review-state";
+import type { DuplicateCandidate, ReviewDto } from "../review/review-state";
 
 export type LookupKind =
   "categories" | "merchants" | "products" | "brands" | "product-groups";
@@ -92,6 +92,46 @@ function match(value: unknown, kind: "merchant" | "product"): boolean {
 }
 
 /**
+ * Type guard for checking if a value is a DuplicateCandidate.
+ * @param value - The value to check.
+ * @returns True if the value is a DuplicateCandidate, false otherwise.
+ */
+export function isDuplicateCandidate(
+  value: unknown,
+): value is DuplicateCandidate {
+  return (
+    record(value) &&
+    identifier(value.receiptId) &&
+    identifier(value.merchantId) &&
+    typeof value.merchantName === "string" &&
+    typeof value.purchaseDate === "string" &&
+    nullableText(value.purchaseTime) &&
+    Number.isSafeInteger(value.totalCents) &&
+    typeof value.currency === "string" &&
+    /^[A-Z]{3}$/.test(value.currency) &&
+    typeof value.imagePath === "string" &&
+    Array.isArray(value.items) &&
+    value.items.every(
+      (item: unknown) =>
+        record(item) &&
+        Number.isSafeInteger(item.position) &&
+        (item.position as number) >= 0 &&
+        typeof item.rawName === "string" &&
+        typeof item.quantity === "number" &&
+        Number.isFinite(item.quantity) &&
+        item.quantity > 0 &&
+        unit(item.unit) &&
+        nullableMoney(item.unitPriceCents) &&
+        Number.isSafeInteger(item.totalPriceCents) &&
+        ["product", "deposit", "fee", "other"].includes(
+          item.lineType as string,
+        ) &&
+        (item.productId === null || identifier(item.productId)),
+    )
+  );
+}
+
+/**
  * Type guard for checking if a value is a ReviewDto.
  * @param value - The value to check.
  * @returns True if the value is a ReviewDto, false otherwise.
@@ -112,6 +152,7 @@ export function isReviewDto(value: unknown): value is ReviewDto {
     !Array.isArray(value.items) ||
     !Array.isArray(value.discounts) ||
     !Array.isArray(value.duplicateCandidates) ||
+    !value.duplicateCandidates.every(isDuplicateCandidate) ||
     !Array.isArray(value.warnings) ||
     !value.warnings.every((warning) =>
       ["possible_duplicate", "sum_mismatch", "sum_incomplete"].includes(

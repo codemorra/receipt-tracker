@@ -11,6 +11,7 @@ import ScanFrame from "./ScanFrame";
 // Props for the ScanPanel component.
 interface Props {
   state: ImportState;
+  locked?: boolean;
   settings: AiSettings | null;
   provider: ProviderId | null;
   loadingProviders: boolean;
@@ -25,6 +26,7 @@ interface Props {
 /**
  * ScanPanel component for managing the scan process, including uploading, previewing, and processing scans.
  * @param state - The current import state.
+ * @param locked - Whether the scan panel is locked.
  * @param settings - The AI settings.
  * @param provider - The selected provider.
  * @param loadingProviders - Whether the providers are currently loading.
@@ -37,6 +39,7 @@ interface Props {
  */
 export default function ScanPanel({
   state,
+  locked = false,
   settings,
   provider,
   loadingProviders,
@@ -66,7 +69,8 @@ export default function ScanPanel({
     <Card
       aria-labelledby={`${id}-heading`}
       className="min-w-0 p-5 sm:p-6"
-      aria-busy={busy !== null}
+      aria-busy={busy !== null || locked}
+      inert={locked}
     >
       <h2 id={`${id}-heading`} className="mb-5 text-lg font-semibold">
         {t("pages.import.scan.title")}
