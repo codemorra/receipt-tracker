@@ -196,12 +196,8 @@
           "name": "discount_receipt_id_receipt_id_fk",
           "tableFrom": "discount",
           "tableTo": "receipt",
-          "columnsFrom": [
-            "receipt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["receipt_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -209,12 +205,8 @@
           "name": "discount_receipt_item_id_receipt_item_id_fk",
           "tableFrom": "discount",
           "tableTo": "receipt_item",
-          "columnsFrom": [
-            "receipt_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["receipt_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -265,9 +257,7 @@
       "indexes": {
         "merchant_alias_normalized_alias_idx": {
           "name": "merchant_alias_normalized_alias_idx",
-          "columns": [
-            "normalized_alias"
-          ],
+          "columns": ["normalized_alias"],
           "isUnique": false
         }
       },
@@ -276,12 +266,8 @@
           "name": "merchant_alias_merchant_id_merchant_id_fk",
           "tableFrom": "merchant_alias",
           "tableTo": "merchant",
-          "columnsFrom": [
-            "merchant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["merchant_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -370,9 +356,7 @@
       "indexes": {
         "product_alias_normalized_alias_idx": {
           "name": "product_alias_normalized_alias_idx",
-          "columns": [
-            "normalized_alias"
-          ],
+          "columns": ["normalized_alias"],
           "isUnique": false
         }
       },
@@ -381,12 +365,8 @@
           "name": "product_alias_product_id_product_id_fk",
           "tableFrom": "product_alias",
           "tableTo": "product",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -440,12 +420,8 @@
           "name": "product_group_category_id_category_id_fk",
           "tableFrom": "product_group",
           "tableTo": "category",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -520,12 +496,8 @@
           "name": "product_product_group_id_product_group_id_fk",
           "tableFrom": "product",
           "tableTo": "product_group",
-          "columnsFrom": [
-            "product_group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_group_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -533,12 +505,8 @@
           "name": "product_brand_id_brand_id_fk",
           "tableFrom": "product",
           "tableTo": "brand",
-          "columnsFrom": [
-            "brand_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["brand_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -641,12 +609,8 @@
           "name": "receipt_item_receipt_id_receipt_id_fk",
           "tableFrom": "receipt_item",
           "tableTo": "receipt",
-          "columnsFrom": [
-            "receipt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["receipt_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -654,12 +618,8 @@
           "name": "receipt_item_product_id_product_id_fk",
           "tableFrom": "receipt_item",
           "tableTo": "product",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -692,12 +652,8 @@
           "name": "receipt_processing_settings_default_provider_ai_provider_settings_provider_fk",
           "tableFrom": "receipt_processing_settings",
           "tableTo": "ai_provider_settings",
-          "columnsFrom": [
-            "default_provider"
-          ],
-          "columnsTo": [
-            "provider"
-          ],
+          "columnsFrom": ["default_provider"],
+          "columnsTo": ["provider"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -795,11 +751,7 @@
       "indexes": {
         "receipt_duplicate_candidate_idx": {
           "name": "receipt_duplicate_candidate_idx",
-          "columns": [
-            "merchant_id",
-            "purchase_date",
-            "total_cents"
-          ],
+          "columns": ["merchant_id", "purchase_date", "total_cents"],
           "isUnique": false
         }
       },
@@ -808,12 +760,8 @@
           "name": "receipt_merchant_id_merchant_id_fk",
           "tableFrom": "receipt",
           "tableTo": "merchant",
-          "columnsFrom": [
-            "merchant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["merchant_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -888,12 +836,8 @@
           "name": "warranty_receipt_item_id_receipt_item_id_fk",
           "tableFrom": "warranty",
           "tableTo": "receipt_item",
-          "columnsFrom": [
-            "receipt_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["receipt_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
