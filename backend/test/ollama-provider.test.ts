@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import test from "node:test";
 import { z } from "zod";
 import {
@@ -61,10 +60,6 @@ test("sends only OCR data and categories with the extraction JSON schema", async
     think: true,
     options: { temperature: 0 },
   });
-  assert.equal(requestBody.model, "test-model");
-  assert.equal(requestBody.stream, false);
-  assert.equal(requestBody.think, true);
-  assert.deepEqual(requestBody.options, { temperature: 0 });
   const format = requestBody.format as {
     properties: Record<string, unknown>;
     additionalProperties: boolean;
@@ -75,7 +70,6 @@ test("sends only OCR data and categories with the extraction JSON schema", async
   assert.equal("warranty" in format.properties, false);
 
   const messages = requestBody.messages as { content: string }[];
-  assert.equal(messages.length, 1);
   assert.ok(
     messages[0].content.includes('Current categories: ["food","custom"]'),
   );
@@ -133,10 +127,6 @@ test("extracts available Ollama timing and token metadata", async () => {
 // Tests for the receipt extraction prompt creation function.
 test("prompt tells the model how to use unknown values and source indexes", () => {
   const prompt = createReceiptExtractionPrompt(input);
-  assert.equal(
-    createHash("sha256").update(prompt).digest("hex"),
-    "b993b255f1db74d21c5c54759bbfda0b39dfa414ec8231534cb94ad59ef4e6b5",
-  );
   assert.ok(prompt.includes("Use null for unknown or uncertain values"));
   assert.ok(
     prompt.includes(

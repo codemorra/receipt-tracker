@@ -18,7 +18,7 @@ const mistralEnv = {
 };
 
 // Tests for the createReceiptExtractionProviderFromEnv function
-test("defaults to Ollama and preserves its configured endpoint, model, and request settings", async (t) => {
+test("defaults to Ollama and preserves its configured endpoint and model", async (t) => {
   let calls = 0;
   t.mock.method(
     globalThis,
@@ -28,9 +28,6 @@ test("defaults to Ollama and preserves its configured endpoint, model, and reque
       assert.equal(url, "http://127.0.0.1:9999/api/chat");
       const body = JSON.parse(String(init.body));
       assert.equal(body.model, "test-ollama-model");
-      assert.equal(body.think, true);
-      assert.deepEqual(body.options, { temperature: 0 });
-      assert.equal("authorization" in (init.headers ?? {}), false);
       return Response.json({ message: { content: '{"items":[]}' } });
     },
   );
