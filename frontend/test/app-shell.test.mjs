@@ -89,20 +89,20 @@ test("direct shell routes, root, and trailing slashes resolve consistently", () 
   assert.equal(resolveRoute("/legacy-import", ""), "legacy");
 });
 
-// Tests for handling existing receipt-ID URLs and ensuring the correct workflow is retained.
-test("existing receipt-ID URLs and reload/back flows retain the reference workflow", () => {
-  for (const path of ["/", "/import", "/receipts", "/legacy-import"]) {
-    assert.equal(resolveRoute(path, "?receiptId=123"), "legacy");
+// Tests for handling of existing receipt-ID URLs and the legacy import route.
+test("existing receipt-ID URLs load in the new shell while the explicit legacy route stays available", () => {
+  for (const path of ["/", "/import", "/receipts"]) {
+    assert.equal(resolveRoute(path, "?receiptId=123"), "import");
     assert.equal(receiptIdFromSearch("?receiptId=123"), 123);
   }
-  // A new import from an old root receipt link moves to the dedicated legacy path.
+  assert.equal(resolveRoute("/legacy-import", "?receiptId=123"), "legacy");
   const urls = [
     new URL("http://localhost/?receiptId=123"),
-    new URL("http://localhost/legacy-import"),
-    new URL("http://localhost/legacy-import?receiptId=456"),
+    new URL("http://localhost/import"),
+    new URL("http://localhost/import?receiptId=456"),
   ];
   for (const url of [...urls, ...urls.toReversed()]) {
-    assert.equal(resolveRoute(url.pathname, url.search), "legacy");
+    assert.equal(resolveRoute(url.pathname, url.search), "import");
   }
   for (const value of ["", "0", "-1", "1.5", "NaN", "9007199254740992"]) {
     assert.equal(receiptIdFromSearch(`?receiptId=${value}`), null);

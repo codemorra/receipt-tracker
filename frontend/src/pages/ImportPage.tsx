@@ -14,10 +14,15 @@ import { resolveImportProvider } from "../scans/import-state";
  * Page component for importing receipts.
  * @returns The import page JSX element.
  */
-export default function ImportPage() {
+export default function ImportPage({
+  onSaved,
+}: {
+  onSaved: (id: number) => void;
+}) {
   const { t } = useTranslation();
   const heading = useRef<HTMLHeadingElement>(null);
   const workflow = useReceiptImport();
+  const [confirming, setConfirming] = useState(false);
   const providers = useProviderSettings();
   const [selection, setSelection] = useState<ProviderId | null | undefined>(
     undefined,
@@ -61,6 +66,7 @@ export default function ImportPage() {
         <ScanPanel
           key={workflow.state.scan?.scanId ?? "upload"}
           state={workflow.state}
+          locked={confirming}
           settings={providers.settings}
           provider={provider}
           loadingProviders={providers.loading}
@@ -79,6 +85,9 @@ export default function ImportPage() {
           <ReceiptReviewPanel
             key={`${workflow.state.scan?.scanId}-${workflow.state.generation}`}
             review={workflow.state.processed.review}
+            onSaved={onSaved}
+            onCancelled={() => workflow.dispatch({ type: "reset" })}
+            onBusyChange={setConfirming}
           />
         ) : (
           <Card aria-labelledby="import-review-heading" className="min-w-0">

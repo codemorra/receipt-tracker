@@ -215,7 +215,6 @@
         "discountNumber": "Rabatt {{number}}",
         "issuesHeading": "Angaben prüfen: {{count}}",
         "possibleDuplicate": "Es wurden mögliche doppelte Belege gefunden.",
-        "saveTransition": "Das Speichern und der Dublettenvergleich werden im nächsten Schritt ergänzt.",
         "retryCategories": "Kategorien erneut laden",
         "match": {
           "MATCHED": "Automatisch zugeordnet",
@@ -244,6 +243,44 @@
         "editWarranty": "Bearbeiten",
         "saveWarranty": "Änderungen übernehmen",
         "removeDiscountConfirmation": "„{{name}}“ wirklich aus dem Beleg entfernen?"
+      },
+      "duplicates": {
+        "title": "Mögliche doppelte Belege",
+        "hint": "Vergleiche die Belege. Du kannst den Import abbrechen oder diesen Beleg trotzdem speichern.",
+        "current": "Aktueller Beleg",
+        "existing": "Gespeicherter Beleg #{{id}}"
+      },
+      "save": {
+        "save": "Beleg speichern",
+        "saving": "Wird gespeichert…",
+        "override": "Trotzdem speichern",
+        "cancelImport": "Import abbrechen",
+        "cancelling": "Wird abgebrochen…",
+        "errors": {
+          "invalid_final_save": "Die Angaben konnten nicht gespeichert werden. Prüfe die Belegdaten.",
+          "scan_archive_not_found": "Das Archivbild fehlt. Verarbeite den Beleg erneut.",
+          "confirmed_entity_not_found": "Ein ausgewählter Eintrag ist nicht mehr vorhanden. Prüfe die Zuordnungen.",
+          "receipt_save_failed": "Der Beleg konnte nicht gespeichert werden. Versuche es erneut.",
+          "receipt_not_found": "Der gespeicherte Beleg wurde nicht gefunden.",
+          "receipt_detail_failed": "Der gespeicherte Beleg konnte nicht geladen werden. Versuche es erneut.",
+          "scan_cancel_failed": "Der Import konnte nicht abgebrochen werden. Versuche es erneut.",
+          "network_error": "Das Backend ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
+          "unexpected_response": "Das Backend hat eine unerwartete Antwort geliefert. Versuche es erneut."
+        }
+      },
+      "saved": {
+        "title": "Beleg #{{id}}",
+        "description": "Dein gespeicherter Beleg mit allen Angaben und dem Archivbild.",
+        "status": "Gespeichert",
+        "newImport": "Neuen Beleg importieren",
+        "archive": "Archivbild",
+        "imageAlt": "Archivbild des gespeicherten Belegs",
+        "imageMissing": "Das Archivbild ist nicht verfügbar.",
+        "loading": "Beleg wird geladen…",
+        "unavailable": "Der Beleg ist derzeit nicht verfügbar.",
+        "retry": "Erneut laden",
+        "itemDetails": "Produktdetails",
+        "discount": "Rabatt"
       }
     },
     "receipts": {

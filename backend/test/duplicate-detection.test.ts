@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createDatabase } from "../src/db/database.js";
-import { findDuplicateCandidates } from "../src/review/duplicate-detection.js";
+import { findDuplicateCandidates } from "../src/receipts/duplicate-detection.js";
 
 const now = "2026-09-29T00:00:00.000Z";
 

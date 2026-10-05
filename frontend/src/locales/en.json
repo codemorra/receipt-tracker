@@ -215,7 +215,6 @@
         "discountNumber": "Discount {{number}}",
         "issuesHeading": "Fields to review: {{count}}",
         "possibleDuplicate": "Possible duplicate receipts were found.",
-        "saveTransition": "Saving and duplicate comparison will be added in the next step.",
         "retryCategories": "Reload categories",
         "match": {
           "MATCHED": "Automatically matched",
@@ -244,6 +243,44 @@
         "editWarranty": "Edit",
         "saveWarranty": "Apply changes",
         "removeDiscountConfirmation": "Remove “{{name}}” from the receipt?"
+      },
+      "duplicates": {
+        "title": "Possible duplicate receipts",
+        "hint": "Compare the receipts. You can cancel the import or save this receipt anyway.",
+        "current": "Current receipt",
+        "existing": "Saved receipt #{{id}}"
+      },
+      "save": {
+        "save": "Save receipt",
+        "saving": "Saving…",
+        "override": "Save anyway",
+        "cancelImport": "Cancel import",
+        "cancelling": "Cancelling…",
+        "errors": {
+          "invalid_final_save": "The data could not be saved. Check the receipt details.",
+          "scan_archive_not_found": "The archive image is missing. Process the receipt again.",
+          "confirmed_entity_not_found": "A selected entry no longer exists. Check the associations.",
+          "receipt_save_failed": "The receipt could not be saved. Try again.",
+          "receipt_not_found": "The saved receipt was not found.",
+          "receipt_detail_failed": "The saved receipt could not be loaded. Try again.",
+          "scan_cancel_failed": "The import could not be cancelled. Try again.",
+          "network_error": "The backend is unreachable. Check your connection and try again.",
+          "unexpected_response": "The backend returned an unexpected response. Try again."
+        }
+      },
+      "saved": {
+        "title": "Receipt #{{id}}",
+        "description": "Your saved receipt with all details and its archive image.",
+        "status": "Saved",
+        "newImport": "Import another receipt",
+        "archive": "Archive image",
+        "imageAlt": "Archive image of the saved receipt",
+        "imageMissing": "The archive image is unavailable.",
+        "loading": "Loading receipt…",
+        "unavailable": "The receipt is currently unavailable.",
+        "retry": "Reload",
+        "itemDetails": "Product details",
+        "discount": "Discount"
       }
     },
     "receipts": {
