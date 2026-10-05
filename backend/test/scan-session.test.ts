@@ -24,7 +24,6 @@ import {
 import {
   InvalidRotationError,
   isScanId,
-  MAX_UPLOAD_BYTES,
   validateUpload,
 } from "../src/scans/scan-validation.js";
 import {
@@ -126,10 +125,6 @@ test("invalid uploads are rejected before a scan is created", async () => {
     status: 400,
   });
   assert.throws(() => validateUpload("image/jpeg", png), { status: 400 });
-  assert.throws(
-    () => validateUpload("image/png", Buffer.alloc(MAX_UPLOAD_BYTES + 1)),
-    { status: 413 },
-  );
 });
 
 // Test for ensuring that failed preview processing removes the temporary session directory.
@@ -247,6 +242,27 @@ test("scan API creates a session and serves its preview", async (t) => {
   });
   assert.equal(invalid.status, 400);
   assert.equal((await invalid.json()).error, "invalid_upload");
+
+  await t.test(
+    "uploads larger than the former 20 MiB limit reach the preview worker",
+    async () => {
+      const largeImage = Buffer.alloc(20 * 1024 * 1024 + 1);
+      png.copy(largeImage);
+      assert.equal(validateUpload("image/png", largeImage), "image/png");
+      const upload = await fetch(base + "/api/scans", {
+        method: "POST",
+        headers: { "content-type": "image/png" },
+        body: largeImage,
+      });
+      assert.equal(upload.status, 201);
+      const scan = await upload.json();
+      assert.deepEqual(scan.suggestedCorners, suggestedCorners);
+      assert.deepEqual(
+        await readFile(join(directory, scan.scanId, "original.png")),
+        largeImage,
+      );
+    },
+  );
 });
 
 // Test for failed reprocessing scenario

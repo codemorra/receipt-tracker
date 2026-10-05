@@ -25,7 +25,6 @@ import {
   InvalidRotationError,
   InvalidUploadError,
   isScanId,
-  MAX_UPLOAD_BYTES,
 } from "../scans/scan-validation.js";
 import type { ScanSessionService } from "../scans/scan-session-service.js";
 
@@ -58,7 +57,7 @@ export function registerScanRoutes(
   // Scan creation endpoint
   app.post(
     "/api/scans",
-    express.raw({ type: () => true, limit: MAX_UPLOAD_BYTES }),
+    express.raw({ type: () => true, limit: Number.POSITIVE_INFINITY }),
     async (request, response) => {
       const started = performance.now();
       logger("info", "scan.create.start");
