@@ -1,6 +1,7 @@
 import type { Corners, Rotation } from "../scans/scan-orientation";
 import type { ReviewDto } from "../review/review-state";
 import type { ProviderId } from "./provider-settings-api";
+import { isReviewDto } from "./review-api.ts";
 
 // Interfaces and types for scan API.
 export interface Scan {
@@ -12,6 +13,7 @@ export interface Scan {
   rotation: Rotation;
 }
 
+// Interface representing a processed scan returned by the scan API.
 export interface ProcessedScan {
   archiveUrl: string;
   review: ReviewDto;
@@ -213,12 +215,9 @@ export async function processScan(
   if (
     !record(value) ||
     value.archiveUrl !== `${scanPath(scanId)}/archive` ||
-    !record(value.review) ||
+    !isReviewDto(value.review) ||
     value.review.scanId !== scanId ||
-    !record(value.review.merchant) ||
-    !Array.isArray(value.review.items) ||
-    !Array.isArray(value.review.discounts) ||
-    !Array.isArray(value.review.warnings)
+    value.review.archiveUrl !== value.archiveUrl
   )
     throw new ScanApiError("unexpected_response");
   return {

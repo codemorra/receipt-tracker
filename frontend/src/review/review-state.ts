@@ -90,6 +90,17 @@ export interface WarrantyDraft {
   notes: string;
 }
 
+// Draft representation of a product selection within the review process.
+export interface ProductSelection {
+  id: number;
+  name: string;
+  brandName?: string | null;
+  productGroupName?: string;
+  categoryName?: string;
+  packageAmount?: number | null;
+  packageUnit?: string | null;
+}
+
 // Draft representation of an item within the review process.
 export interface ItemDraft {
   id: string;
@@ -97,6 +108,7 @@ export interface ItemDraft {
   normalizedName: string;
   productId: number | null;
   selectedProductName: string | null;
+  selectedProductDetails?: Omit<ProductSelection, "id" | "name"> | null;
   matchStatus: MatchStatus | null;
   matchCandidates: ReviewDto["items"][number]["match"];
   brand: string;
@@ -192,42 +204,108 @@ export function createReviewDraft(review: ReviewDto): ReviewDraft {
     purchaseTime: review.purchaseTime ?? "",
     currency: review.currency ?? "",
     total: formatCents(review.totalCents),
-    items: review.items.map((item) => ({
-      id: crypto.randomUUID(),
-      rawName: item.rawName,
-      normalizedName: item.normalizedName ?? item.rawName,
-      productId: item.match?.productId ?? null,
-      selectedProductName:
+    items: review.items.map((item) => {
+      const matched =
         item.match?.status === "MATCHED"
-          ? (item.match.candidates.find(
+          ? item.match.candidates.find(
               (candidate) => candidate.productId === item.match?.productId,
-            )?.name ?? null)
+            )
+          : undefined;
+      return {
+        id: crypto.randomUUID(),
+        rawName: item.rawName,
+        normalizedName: item.normalizedName ?? item.rawName,
+        productId: item.match?.productId ?? null,
+        selectedProductName: matched?.name ?? null,
+        selectedProductDetails: matched
+          ? {
+              brandName: matched.brand,
+              productGroupName: matched.productGroup,
+              packageAmount: matched.packageAmount,
+              packageUnit: matched.packageUnit,
+            }
           : null,
-      matchStatus: item.match?.status ?? null,
-      matchCandidates: item.match,
-      brand: item.brand ?? "",
-      brandId: null,
-      productGroup: item.productGroup ?? "",
-      productGroupId: null,
-      category: item.category ?? "",
-      packageAmount:
-        item.packageAmount === null ? "" : String(item.packageAmount),
-      packageUnit: item.packageUnit ?? "",
-      quantity: String(item.quantity),
-      unit: item.unit ?? "",
-      unitPrice: formatCents(item.unitPriceCents),
-      totalPrice: formatCents(item.totalPriceCents),
-      lineType: item.lineType,
-      sourceLineIndexes: item.sourceLineIndexes,
-      warranties: [],
-    })),
+        matchStatus: item.match?.status ?? null,
+        matchCandidates: item.match,
+        brand: item.brand ?? "",
+        brandId: null,
+        productGroup: item.productGroup ?? "",
+        productGroupId: null,
+        category: item.category ?? "",
+        packageAmount:
+          item.packageAmount === null ? "" : String(item.packageAmount),
+        packageUnit: item.packageUnit ?? "",
+        quantity: String(item.quantity),
+        unit: item.unit ?? "",
+        unitPrice: formatCents(item.unitPriceCents),
+        totalPrice: formatCents(item.totalPriceCents),
+        lineType: item.lineType,
+        sourceLineIndexes: [...item.sourceLineIndexes],
+        warranties: [],
+      };
+    }),
     discounts: review.discounts.map((discount) => ({
       id: crypto.randomUUID(),
       rawName: discount.rawName,
       description: discount.description ?? "",
       amount: formatCents(discount.amountCents),
       appliesToItemIndex: discount.appliesToItemIndex,
-      sourceLineIndexes: discount.sourceLineIndexes,
+      sourceLineIndexes: [...discount.sourceLineIndexes],
+    })),
+  };
+}
+
+/**
+ * Creates an empty item draft with default values.
+ * @returns A new item draft object.
+ */
+export function createEmptyItem(): ItemDraft {
+  return {
+    id: crypto.randomUUID(),
+    rawName: "",
+    normalizedName: "",
+    productId: null,
+    selectedProductName: null,
+    matchStatus: null,
+    matchCandidates: null,
+    brand: "",
+    brandId: null,
+    productGroup: "",
+    productGroupId: null,
+    category: "",
+    packageAmount: "",
+    packageUnit: "",
+    quantity: "1",
+    unit: "",
+    unitPrice: "",
+    totalPrice: "",
+    lineType: "product",
+    sourceLineIndexes: [],
+    warranties: [],
+  };
+}
+
+/**
+ * Removes an item from the review draft by its ID and updates the discount references accordingly.
+ * @param draft - The current review draft.
+ * @param id - The ID of the item to remove.
+ * @returns The updated review draft with the item removed and discount references adjusted.
+ */
+export function removeReviewItem(draft: ReviewDraft, id: string): ReviewDraft {
+  const index = draft.items.findIndex((item) => item.id === id);
+  if (index === -1) return draft;
+  return {
+    ...draft,
+    items: draft.items.filter((item) => item.id !== id),
+    discounts: draft.discounts.map((discount) => ({
+      ...discount,
+      appliesToItemIndex:
+        discount.appliesToItemIndex === index
+          ? null
+          : discount.appliesToItemIndex !== null &&
+              discount.appliesToItemIndex > index
+            ? discount.appliesToItemIndex - 1
+            : discount.appliesToItemIndex,
     })),
   };
 }
@@ -240,12 +318,21 @@ export function createReviewDraft(review: ReviewDto): ReviewDraft {
  */
 export function chooseProduct(
   item: ItemDraft,
-  product: { id: number; name: string } | null,
+  product: ProductSelection | null,
 ): ItemDraft {
   return {
     ...item,
     productId: product?.id ?? null,
     selectedProductName: product?.name ?? null,
+    selectedProductDetails: product
+      ? {
+          brandName: product.brandName,
+          productGroupName: product.productGroupName,
+          categoryName: product.categoryName,
+          packageAmount: product.packageAmount,
+          packageUnit: product.packageUnit,
+        }
+      : null,
     matchStatus: null,
   };
 }
@@ -263,6 +350,8 @@ export function changeLineType(item: ItemDraft, lineType: LineType): ItemDraft {
     productId: lineType === "product" ? item.productId : null,
     selectedProductName:
       lineType === "product" ? item.selectedProductName : null,
+    selectedProductDetails:
+      lineType === "product" ? item.selectedProductDetails : null,
     matchStatus: lineType === "product" ? item.matchStatus : null,
     warranties: lineType === "product" ? item.warranties : [],
   };
@@ -311,7 +400,7 @@ export function isValidDate(value: string): boolean {
  * @returns "missing" if either date is missing, "invalid" if either date is invalid, "range" if the end date is before the start date, or null if there are no issues.
  */
 export function warrantyDateIssue(
-  warranty: WarrantyDraft,
+  warranty: Pick<WarrantyDraft, "startDate" | "endDate">,
 ): "missing" | "invalid" | "range" | null {
   if (!warranty.startDate || !warranty.endDate) return "missing";
   if (!isValidDate(warranty.startDate) || !isValidDate(warranty.endDate))
