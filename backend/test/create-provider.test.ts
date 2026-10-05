@@ -5,254 +5,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { createReceiptExtractionProviderFromEnv } from "../src/extraction/create-provider.js";
-import { MistralProvider } from "../src/extraction/mistral-provider.js";
-import { OllamaProvider } from "../src/extraction/ollama-provider.js";
-import { OpenAiProvider } from "../src/extraction/openai-provider.js";
+import { createDatabase } from "../src/db/database.js";
+import { createReceiptExtractionProvider } from "../src/extraction/create-provider.js";
+import { createProviderResolver } from "../src/extraction/provider-resolver.js";
+import { ProviderSettingsService } from "../src/settings/provider-settings-service.js";
+import { SecretStorage } from "../src/settings/secret-storage.js";
 
 const input = { plainText: "", lines: [], rows: [], categoryNames: ["food"] };
-const mistralEnv = {
-  LLM_PROVIDER: "mistral",
-  MISTRAL_MODEL: "mistral-medium-latest",
-  MISTRAL_API_KEY: "test-only-key",
-};
 
-// Tests for the createReceiptExtractionProviderFromEnv function
-test("defaults to Ollama and preserves its configured endpoint and model", async (t) => {
-  let calls = 0;
-  t.mock.method(
-    globalThis,
-    "fetch",
-    async (url: unknown, init: RequestInit) => {
-      calls++;
-      assert.equal(url, "http://127.0.0.1:9999/api/chat");
-      const body = JSON.parse(String(init.body));
-      assert.equal(body.model, "test-ollama-model");
-      return Response.json({ message: { content: '{"items":[]}' } });
-    },
-  );
-  for (const LLM_PROVIDER of [undefined, "ollama", " ollama "]) {
-    const provider = createReceiptExtractionProviderFromEnv({
-      LLM_PROVIDER,
-      OLLAMA_MODEL: " test-ollama-model ",
-      OLLAMA_BASE_URL: "http://127.0.0.1:9999",
-      MISTRAL_BASE_URL: "invalid ignored URL",
-    });
-    assert.ok(provider instanceof OllamaProvider);
-    assert.deepEqual(await provider.extractReceipt(input), { items: [] });
-  }
-  assert.equal(calls, 3);
-  assert.throws(() => createReceiptExtractionProviderFromEnv({}), {
-    message: "OLLAMA_MODEL must name an installed Ollama model",
-  });
-});
-
-// Additional tests for edge cases and error handling can be added below.
-test("configures Mistral using only Mistral variables and preserves base URL paths", async (t) => {
-  const cases = [
-    { base: undefined, endpoint: "https://api.mistral.ai/v1/chat/completions" },
-    {
-      base: "https://mistral.example.test/v1",
-      endpoint: "https://mistral.example.test/v1/chat/completions",
-    },
-    {
-      base: "https://mistral.example.test/proxy/v1/",
-      endpoint: "https://mistral.example.test/proxy/v1/chat/completions",
-    },
-    {
-      base: "http://127.0.0.1:9999/v1/",
-      endpoint: "http://127.0.0.1:9999/v1/chat/completions",
-    },
-  ];
-  let expectedEndpoint: string;
-  let calls = 0;
-  t.mock.method(
-    globalThis,
-    "fetch",
-    async (url: unknown, init: RequestInit) => {
-      calls++;
-      assert.equal(url, expectedEndpoint);
-      assert.equal(
-        JSON.parse(String(init.body)).model,
-        "configured-mistral-model",
-      );
-      assert.deepEqual(init.headers, {
-        "content-type": "application/json",
-        authorization: "Bearer test-only-key",
-      });
-      return Response.json({
-        choices: [
-          { finish_reason: "stop", message: { content: '{"items":[]}' } },
-        ],
-      });
-    },
-  );
-  for (const entry of cases) {
-    expectedEndpoint = entry.endpoint;
-    const provider = createReceiptExtractionProviderFromEnv({
-      LLM_PROVIDER: " mistral ",
-      MISTRAL_MODEL: " configured-mistral-model ",
-      MISTRAL_API_KEY: " test-only-key ",
-      MISTRAL_BASE_URL: entry.base,
-      OLLAMA_BASE_URL: "invalid ignored URL",
-    });
-    assert.ok(provider instanceof MistralProvider);
-    assert.deepEqual(await provider.extractReceipt(input), { items: [] });
-  }
-  assert.equal(calls, cases.length);
-});
-
-// Tests for error handling when environment variables are missing or invalid
-test("rejects unsupported providers, missing models and keys, and invalid URLs without exposing values", () => {
-  for (const LLM_PROVIDER of ["", "anthropic", "test-only-secret"]) {
-    assert.throws(
-      () =>
-        createReceiptExtractionProviderFromEnv({ ...mistralEnv, LLM_PROVIDER }),
-      {
-        message: "LLM_PROVIDER must be ollama, mistral or openai",
-      },
-    );
-  }
-  for (const MISTRAL_MODEL of [undefined, "", " "]) {
-    assert.throws(
-      () =>
-        createReceiptExtractionProviderFromEnv({
-          ...mistralEnv,
-          MISTRAL_MODEL,
-        }),
-      {
-        message: "MISTRAL_MODEL must name a Mistral model",
-      },
-    );
-  }
-  for (const MISTRAL_API_KEY of [undefined, "", " "]) {
-    assert.throws(
-      () =>
-        createReceiptExtractionProviderFromEnv({
-          ...mistralEnv,
-          MISTRAL_API_KEY,
-        }),
-      {
-        message: "MISTRAL_API_KEY must be set for the Mistral provider",
-      },
-    );
-  }
-  const openaiEnv = {
-    LLM_PROVIDER: "openai",
-    OPENAI_MODEL: "gpt-6-luna",
-    OPENAI_API_KEY: "test-only-key",
-  };
-  for (const OPENAI_MODEL of [undefined, "", " "]) {
-    assert.throws(
-      () =>
-        createReceiptExtractionProviderFromEnv({ ...openaiEnv, OPENAI_MODEL }),
-      { message: "OPENAI_MODEL must name an OpenAI model" },
-    );
-  }
-  assert.throws(
-    () =>
-      createReceiptExtractionProviderFromEnv({
-        ...openaiEnv,
-        OPENAI_API_KEY: "",
-      }),
-    { message: "OPENAI_API_KEY must be set for the OpenAI provider" },
-  );
-  for (const MISTRAL_BASE_URL of [
-    "",
-    "test-only-secret",
-    "file:///tmp/test-only-secret",
-    "ftp://example.test",
-    "https://test-only-secret@example.test/v1/",
-    "https://example.test/v1/?key=test-only-secret",
-    "https://example.test/v1/#test-only-secret",
-  ]) {
-    assert.throws(
-      () =>
-        createReceiptExtractionProviderFromEnv({
-          ...mistralEnv,
-          MISTRAL_BASE_URL,
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof Error);
-        assert.ok(error.message.startsWith("MISTRAL_BASE_URL must be"));
-        assert.equal(error.message.includes("test-only-secret"), false);
-        assert.equal(error.cause, undefined);
-        return true;
-      },
-    );
-  }
-});
-
-// Tests for backend startup behavior with invalid cloud configuration
-test("invalid cloud configuration stops backend startup before migration without logging secrets", (t) => {
-  const directory = mkdtempSync(join(tmpdir(), "receipt-provider-startup-"));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  for (const invalid of [
-    { MISTRAL_MODEL: "" },
-    { LLM_PROVIDER: "openai", OPENAI_MODEL: "" },
-    { MISTRAL_API_KEY: "" },
-    { MISTRAL_BASE_URL: "https://test-only-secret@example.test/v1/" },
-  ]) {
-    const logFile = join(directory, `backend-${Object.keys(invalid)[0]}.log`);
-    const databaseFile = join(directory, "unused.sqlite");
-    const result = spawnSync(
-      process.execPath,
-      [
-        "--import",
-        "tsx",
-        fileURLToPath(new URL("../src/index.ts", import.meta.url)),
-      ],
-      {
-        cwd: fileURLToPath(new URL("..", import.meta.url)),
-        env: {
-          ...process.env,
-          ...mistralEnv,
-          MISTRAL_BASE_URL: "https://mistral.example.test/v1/",
-          ...invalid,
-          DATABASE_FILE: databaseFile,
-          LOG_FILE: logFile,
-        },
-        encoding: "utf8",
-        timeout: 10000,
-      },
-    );
-    assert.equal(result.status, 1, result.stderr);
-    assert.ok(
-      result.stderr.includes("Backend startup failed during configuration"),
-    );
-    assert.equal(existsSync(databaseFile), false);
-    const log = readFileSync(logFile, "utf8");
-    const events = log
-      .trimEnd()
-      .split("\n")
-      .map((line) => JSON.parse(line));
-    assert.ok(
-      events.some(
-        (event) =>
-          event.operation === "backend.start.failed" &&
-          event.phase === "configuration",
-      ),
-    );
-    for (const secret of ["test-only-secret", "test-only-key"]) {
-      assert.equal(
-        (log + result.stderr + result.stdout).includes(secret),
-        false,
-      );
-    }
-  }
-});
-
-// Test for selecting OpenAI provider with its own configuration
-test("selects OpenAI with its own configurable model", async (t) => {
-  t.mock.method(
-    globalThis,
-    "fetch",
-    async (_url: unknown, init: RequestInit) => {
-      assert.equal(
-        JSON.parse(String(init.body)).model,
-        "configured-openai-model",
-      );
-      return Response.json({
+// Simulates the cloud provider responses for testing purposes.
+function cloudResponse(provider: "mistral" | "openai") {
+  return provider === "mistral"
+    ? Response.json({
+        choices: [{ finish_reason: "stop", message: { content: "{}" } }],
+      })
+    : Response.json({
         status: "completed",
         output: [
           {
@@ -263,15 +30,214 @@ test("selects OpenAI with its own configurable model", async (t) => {
           },
         ],
       });
+}
+
+// Tests for the receipt extraction provider factory functions.
+test("Ollama preserves configured hosts, ports, and base URL paths", async () => {
+  for (const baseUrl of [
+    "http://127.0.0.1:9999",
+    "http://localhost:11434/proxy/ollama/",
+  ]) {
+    const expected = `${baseUrl.replace(/\/$/, "")}/api/chat`;
+    const provider = createReceiptExtractionProvider(
+      { provider: "ollama", model: " configured-model ", baseUrl },
+      async (url, init) => {
+        assert.equal(url, expected);
+        assert.equal(JSON.parse(String(init?.body)).model, "configured-model");
+        return Response.json({ message: { content: "{}" } });
+      },
+    );
+    assert.deepEqual(await provider.extractReceipt(input), {});
+  }
+});
+
+// Tests for the Ollama provider's handling of base URLs, ports, and paths.
+test("cloud providers use fixed official endpoints and the configured model and key", async () => {
+  for (const providerId of ["mistral", "openai"] as const) {
+    const endpoint =
+      providerId === "mistral"
+        ? "https://api.mistral.ai/v1/chat/completions"
+        : "https://api.openai.com/v1/responses";
+    const provider = createReceiptExtractionProvider(
+      {
+        provider: providerId,
+        model: "configured-model",
+        apiKey: " test-only-key ",
+      },
+      async (url, init) => {
+        assert.equal(url, endpoint);
+        assert.equal(
+          new Headers(init?.headers).get("authorization"),
+          "Bearer test-only-key",
+        );
+        assert.equal(JSON.parse(String(init?.body)).model, "configured-model");
+        assert.equal(init?.redirect, "error");
+        return cloudResponse(providerId);
+      },
+    );
+    assert.deepEqual(await provider.extractReceipt(input), {});
+  }
+});
+
+// Tests for the factory's handling of incomplete configurations and unsafe Ollama URLs.
+test("factory rejects incomplete configuration and unsafe Ollama URLs without exposing values", () => {
+  assert.throws(
+    () =>
+      createReceiptExtractionProvider({
+        provider: "ollama",
+        model: "",
+        baseUrl: "http://localhost:11434",
+      }),
+    { code: "provider_configuration_incomplete" },
+  );
+  for (const provider of ["mistral", "openai"] as const) {
+    assert.throws(
+      () =>
+        createReceiptExtractionProvider({
+          provider,
+          model: "model",
+          apiKey: " ",
+        }),
+      { code: "provider_configuration_incomplete" },
+    );
+  }
+  for (const baseUrl of [
+    "file:///tmp/test-only-secret",
+    "https://user:test-only-secret@example.com",
+    "http://localhost/?key=test-only-secret",
+  ]) {
+    assert.throws(
+      () =>
+        createReceiptExtractionProvider({
+          provider: "ollama",
+          model: "model",
+          baseUrl,
+        }),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.equal(String(error).includes("test-only-secret"), false);
+        return true;
+      },
+    );
+  }
+});
+
+// Tests for the provider resolver's handling of default selections, invalid selections, and configuration snapshots.
+test("resolver uses the persisted default, rejects explicit invalid selections, and snapshots configuration", async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "receipt-resolver-"));
+  const { db, sqlite } = createDatabase(":memory:");
+  t.after(() => {
+    sqlite.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const settings = new ProviderSettingsService(
+    db,
+    new SecretStorage(join(directory, "keys")),
+  );
+  const requests: {
+    url: string;
+    model: string;
+    authorization: string | null;
+  }[] = [];
+  const resolver = createProviderResolver(settings, (configuration) =>
+    createReceiptExtractionProvider(configuration, async (url, init) => {
+      requests.push({
+        url: String(url),
+        model: JSON.parse(String(init?.body)).model,
+        authorization: new Headers(init?.headers).get("authorization"),
+      });
+      return configuration.provider === "ollama"
+        ? Response.json({ message: { content: "{}" } })
+        : cloudResponse(configuration.provider);
+    }),
+  );
+  assert.throws(() => resolver(undefined), {
+    code: "default_provider_missing",
+  });
+  settings.updateProvider("ollama", { enabled: true, model: "local-model" });
+  settings.updateProvider("mistral", {
+    enabled: true,
+    model: "old-model",
+    apiKey: { action: "set", value: "old-key" },
+  });
+  settings.setDefaultProvider("ollama");
+  const pending = resolver("mistral");
+  settings.updateProvider("mistral", {
+    model: "new-model",
+    apiKey: { action: "set", value: "new-key" },
+  });
+  await pending.extractReceipt(input);
+  await resolver("mistral").extractReceipt(input);
+  await resolver(undefined).extractReceipt(input);
+  assert.deepEqual(
+    requests.map(({ model, authorization }) => ({ model, authorization })),
+    [
+      { model: "old-model", authorization: "Bearer old-key" },
+      { model: "new-model", authorization: "Bearer new-key" },
+      { model: "local-model", authorization: null },
+    ],
+  );
+  for (const selection of ["unknown", null, "", 123])
+    assert.throws(() => resolver(selection), { code: "invalid_provider" });
+  assert.throws(() => resolver("openai"), { code: "provider_disabled" });
+  assert.equal(requests.length, 3);
+});
+
+// Tests for the application's startup behavior, particularly ignoring obsolete provider environment variables and initializing settings without importing secrets.
+test("startup ignores obsolete provider ENV and initializes settings without importing secrets", (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "receipt-provider-startup-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const databaseFile = join(directory, "settings.sqlite");
+  const logFile = join(directory, "backend.log");
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      fileURLToPath(new URL("../src/index.ts", import.meta.url)),
+    ],
+    {
+      cwd: fileURLToPath(new URL("..", import.meta.url)),
+      env: {
+        ...process.env,
+        LLM_PROVIDER: "unsupported",
+        OLLAMA_MODEL: "",
+        MISTRAL_API_KEY: "test-only-secret",
+        MISTRAL_BASE_URL: "https://test-only-secret@example.com",
+        OPENAI_API_KEY: "test-only-secret",
+        DATABASE_FILE: databaseFile,
+        LOG_FILE: logFile,
+        SCANS_DIR: join(directory, "scans"),
+        PYTHON_EXECUTABLE: join(directory, "missing-python"),
+        SECRETS_KEY_DIR: join(directory, "keys"),
+      },
+      encoding: "utf8",
+      timeout: 10000,
     },
   );
-  const provider = createReceiptExtractionProviderFromEnv({
-    ...mistralEnv,
-    LLM_PROVIDER: " openai ",
-    OPENAI_MODEL: " configured-openai-model ",
-    OPENAI_API_KEY: " test-only-key ",
-    MISTRAL_BASE_URL: "invalid ignored URL",
-  });
-  assert.ok(provider instanceof OpenAiProvider);
-  assert.deepEqual(await provider.extractReceipt(input), {});
+  assert.equal(result.status, 1, result.stderr);
+  assert.ok(existsSync(databaseFile));
+  assert.ok(result.stderr.includes("worker readiness and HTTP startup"));
+  const { db, sqlite } = createDatabase(databaseFile);
+  try {
+    const settings = new ProviderSettingsService(
+      db,
+      new SecretStorage(join(directory, "keys")),
+    ).getSettings();
+    assert.equal(settings.defaultProvider, null);
+    assert.ok(
+      settings.providers.every(
+        (provider) => !provider.enabled && !provider.hasApiKey,
+      ),
+    );
+    assert.equal(existsSync(join(directory, "keys")), false);
+  } finally {
+    sqlite.close();
+  }
+  assert.equal(
+    (readFileSync(logFile, "utf8") + result.stdout + result.stderr).includes(
+      "test-only-secret",
+    ),
+    false,
+  );
 });

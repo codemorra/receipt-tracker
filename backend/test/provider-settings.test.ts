@@ -11,6 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { request as httpRequest } from "node:http";
 import { join } from "node:path";
 import test from "node:test";
 import { eq } from "drizzle-orm";
@@ -430,4 +431,227 @@ test("master key defaults live outside the repository and creation enforces priv
   } finally {
     f.close();
   }
+});
+
+// HTTP integration: the service must never be serialized wholesale, including on errors.
+test("settings API persists edits and defaults without exposing keys or encrypted envelopes", async (t) => {
+  const f = fixture();
+  t.after(() => f.close());
+  const { createApp } = await import("../src/app.js");
+  const { ScanSessionService } =
+    await import("../src/scans/scan-session-service.js");
+  const events: string[] = [];
+  const scans = new ScanSessionService(join(f.directory, "scans"), {
+    async requestPreview() {
+      throw new Error("Unexpected worker request");
+    },
+    async requestProcess() {
+      throw new Error("Unexpected worker request");
+    },
+  });
+  const app = createApp(
+    scans,
+    f.db,
+    () => {
+      throw new Error("Unexpected provider request");
+    },
+    f.directory,
+    (level, operation, fields) =>
+      events.push(JSON.stringify({ level, operation, fields })),
+    f.service,
+  );
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}/api/settings/ai`;
+  const headers = {
+    "content-type": "application/json",
+    "x-receipt-tracker-settings": "1",
+    origin: "http://localhost:5173",
+  };
+  const responses: string[] = [];
+  const patch = async (path: string, body: unknown) => {
+    const response = await fetch(`${base}${path}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    responses.push(text);
+    return { status: response.status, body: JSON.parse(text) };
+  };
+  const initial = await fetch(base, { headers });
+  assert.equal(initial.status, 200);
+  assert.equal(initial.headers.get("cache-control"), "no-store");
+  assert.equal((await initial.json()).defaultProvider, null);
+  const key = "api-integration-private-key";
+  const configured = await patch("/providers/mistral", {
+    enabled: true,
+    model: "model",
+    apiKey: { action: "set", value: key },
+  });
+  assert.equal(configured.status, 200);
+  assert.equal(configured.body.hasApiKey, true);
+  assert.equal(configured.body.selectable, true);
+  assert.deepEqual(await patch("/default-provider", { provider: "mistral" }), {
+    status: 200,
+    body: { defaultProvider: "mistral" },
+  });
+  assert.equal(
+    (
+      await patch("/providers/mistral", {
+        apiKey: { action: "set", value: "api-replacement-private-key" },
+      })
+    ).status,
+    200,
+  );
+  assert.deepEqual(
+    await patch("/providers/mistral", { baseUrl: "https://foreign.example" }),
+    { status: 400, body: { error: "invalid_provider_settings" } },
+  );
+  assert.deepEqual(await patch("/default-provider", { provider: "openai" }), {
+    status: 409,
+    body: { error: "provider_not_selectable" },
+  });
+  rmSync(f.keyPath);
+  const unreadable = await fetch(base, { headers });
+  const unreadableText = await unreadable.text();
+  responses.push(unreadableText);
+  assert.equal(JSON.parse(unreadableText).providers[1].hasApiKey, true);
+  assert.equal(JSON.parse(unreadableText).providers[1].selectable, false);
+  assert.deepEqual(await patch("/providers/mistral", { enabled: true }), {
+    status: 503,
+    body: { error: "secret_key_unavailable" },
+  });
+  assert.equal(
+    (await patch("/providers/mistral", { apiKey: { action: "remove" } })).body
+      .hasApiKey,
+    false,
+  );
+  assert.equal(f.service.getSettings().defaultProvider, null);
+  for (const sensitive of [
+    key,
+    "api-replacement-private-key",
+    "ciphertext",
+    "apiKeyEncrypted",
+  ]) {
+    assert.equal(
+      (responses.join("\n") + events.join("\n")).includes(sensitive),
+      false,
+    );
+  }
+});
+
+// Tests for the settings API's handling of foreign browser requests, host rebinding attempts, and unsafe payloads.
+test("settings API rejects foreign browser requests, rebinding hosts and unsafe payloads", async (t) => {
+  const f = fixture();
+  t.after(() => f.close());
+  const { createApp } = await import("../src/app.js");
+  const { ScanSessionService } =
+    await import("../src/scans/scan-session-service.js");
+  const scans = new ScanSessionService(join(f.directory, "scans"), {
+    async requestPreview() {
+      throw new Error("Unexpected worker request");
+    },
+    async requestProcess() {
+      throw new Error("Unexpected worker request");
+    },
+  });
+  const server = createApp(
+    scans,
+    f.db,
+    () => {
+      throw new Error("Unexpected provider request");
+    },
+    f.directory,
+    undefined,
+    f.service,
+  ).listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}/api/settings/ai`;
+  const required = { "x-receipt-tracker-settings": "1" };
+  const original = f.service.getSettings();
+  for (const headers of [
+    {},
+    { ...required, origin: "https://foreign.example" },
+    { ...required, origin: "null" },
+  ]) {
+    const response = await fetch(`${base}/providers/ollama`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({ enabled: true, model: "model" }),
+    });
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), {
+      error: "settings_request_forbidden",
+    });
+  }
+  // Fetch manages Host itself; send an actual forged Host through the HTTP client.
+  const rebinding = await new Promise<{ status: number; body: string }>(
+    (resolve, reject) => {
+      const request = httpRequest(
+        `${base}/providers/ollama`,
+        {
+          method: "PATCH",
+          headers: {
+            ...required,
+            "content-type": "application/json",
+            host: "rebind.example",
+          },
+        },
+        (response) => {
+          let body = "";
+          response.on("data", (chunk) => {
+            body += chunk.toString();
+          });
+          response.on("end", () =>
+            resolve({ status: response.statusCode!, body }),
+          );
+        },
+      );
+      request.on("error", reject);
+      request.end(JSON.stringify({ enabled: true, model: "model" }));
+    },
+  );
+  assert.equal(rebinding.status, 403);
+  assert.deepEqual(JSON.parse(rebinding.body), {
+    error: "settings_request_forbidden",
+  });
+  const preflight = await fetch(`${base}/providers/ollama`, {
+    method: "OPTIONS",
+    headers: {
+      origin: "https://foreign.example",
+      "access-control-request-method": "PATCH",
+      "access-control-request-headers": "x-receipt-tracker-settings",
+    },
+  });
+  assert.equal(preflight.headers.get("access-control-allow-origin"), null);
+  const nonJson = await fetch(`${base}/providers/ollama`, {
+    method: "PATCH",
+    headers: { ...required, "content-type": "text/plain" },
+    body: "private-submitted-key",
+  });
+  assert.equal(nonJson.status, 415);
+  const invalidJson = await fetch(`${base}/providers/ollama`, {
+    method: "PATCH",
+    headers: { ...required, "content-type": "application/json" },
+    body: '{"apiKey":"private-submitted-key"',
+  });
+  assert.equal(invalidJson.status, 400);
+  assert.deepEqual(await invalidJson.json(), { error: "invalid_request" });
+  const oversized = await fetch(`${base}/providers/ollama`, {
+    method: "PATCH",
+    headers: { ...required, "content-type": "application/json" },
+    body: JSON.stringify({ apiKey: "private-submitted-key".repeat(4000) }),
+  });
+  assert.equal(oversized.status, 413);
+  assert.deepEqual(await oversized.json(), {
+    error: "settings_payload_too_large",
+  });
+  assert.deepEqual(f.service.getSettings(), original);
 });

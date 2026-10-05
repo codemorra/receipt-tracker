@@ -1,6 +1,7 @@
 import {
   providerIds,
   type ProviderId,
+  type ProviderRuntimeConfiguration,
 } from "../extraction/receipt-extraction-provider.js";
 import { eq, isNotNull } from "drizzle-orm";
 import type { Database } from "../db/database.js";
@@ -124,6 +125,49 @@ export class ProviderSettingsService {
         .from(receiptProcessingSettings)
         .where(eq(receiptProcessingSettings.id, 1))
         .get()!.defaultProvider,
+    };
+  }
+
+  /**
+   * Retrieves the runtime configuration for the selected provider.
+   * @param selection The identifier of the provider to retrieve the configuration for.
+   * @returns The runtime configuration for the provider.
+   * @throws {ProviderSettingsError} If the provider is not properly configured or disabled.
+   */
+  getProcessingConfiguration(selection: unknown): ProviderRuntimeConfiguration {
+    const requested =
+      selection === undefined
+        ? this.db
+            .select()
+            .from(receiptProcessingSettings)
+            .where(eq(receiptProcessingSettings.id, 1))
+            .get()!.defaultProvider
+        : selection;
+    if (selection === undefined && requested === null) {
+      throw new ProviderSettingsError("default_provider_missing");
+    }
+    const parsed = providerIdSchema.safeParse(requested);
+    if (!parsed.success) throw new ProviderSettingsError("invalid_provider");
+    const row = this.row(parsed.data);
+    if (!row.enabled) throw new ProviderSettingsError("provider_disabled");
+    if (
+      !row.model ||
+      (row.provider === "ollama" && !row.ollamaBaseUrl) ||
+      (row.provider !== "ollama" && !row.apiKeyEncrypted)
+    ) {
+      throw new ProviderSettingsError("provider_configuration_incomplete");
+    }
+    if (row.provider === "ollama") {
+      return {
+        provider: row.provider,
+        model: row.model,
+        baseUrl: row.ollamaBaseUrl!,
+      };
+    }
+    return {
+      provider: row.provider,
+      model: row.model,
+      apiKey: this.secrets.decrypt(row.provider, row.apiKeyEncrypted!),
     };
   }
 

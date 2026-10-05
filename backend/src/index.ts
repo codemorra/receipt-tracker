@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 import { createBackendLifecycle } from "./startup.js";
 import { createApp } from "./app.js";
 import { createDatabase } from "./db/database.js";
-import { createReceiptExtractionProviderFromEnv } from "./extraction/create-provider.js";
+import { createProviderResolver } from "./extraction/provider-resolver.js";
+import { ProviderSettingsService } from "./settings/provider-settings-service.js";
 import {
   createFileLogger,
   errorType,
@@ -38,12 +39,11 @@ let startupPhase = "logging";
 try {
   logger = createFileLogger(logFile);
   logger("info", "backend.starting");
-  startupPhase = "configuration";
-  const provider = createReceiptExtractionProviderFromEnv();
   startupPhase = "database migration";
   const { db, sqlite } = createDatabase();
   logger("info", "database.ready");
   startupPhase = "application setup";
+  const settings = new ProviderSettingsService(db);
 
   // Create the Python worker client and scan session service.
   const worker = new PythonWorkerClient(
@@ -56,9 +56,10 @@ try {
   const app = createApp(
     scans,
     db,
-    provider,
+    createProviderResolver(settings),
     resolve(projectRoot, "data"),
     logger,
+    settings,
   );
   const port = Number(process.env.PORT ?? 3000);
 

@@ -377,11 +377,11 @@ test("confirm API validates requests and returns a saved receipt image", async (
   const app = createApp(
     data.scans,
     data.db,
-    {
+    () => ({
       async extractReceipt() {
         throw new Error("unused");
       },
-    },
+    }),
     data.dataRoot,
   );
   const server = app.listen(0);
@@ -559,11 +559,11 @@ test("confirm API returns current duplicate candidates after final edits", async
   const app = createApp(
     data.scans,
     data.db,
-    {
+    () => ({
       async extractReceipt() {
         throw new Error("unused");
       },
-    },
+    }),
     data.dataRoot,
   );
   const server = app.listen(0);
@@ -607,11 +607,11 @@ test("cancel scan removes temporary files without storing a receipt", async (t) 
   const app = createApp(
     data.scans,
     data.db,
-    {
+    () => ({
       async extractReceipt() {
         throw new Error("unused");
       },
-    },
+    }),
     data.dataRoot,
   );
   const server = app.listen(0);

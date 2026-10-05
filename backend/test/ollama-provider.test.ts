@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { z } from "zod";
 import {
-  createOllamaProviderFromEnv,
   InvalidLlmResponseError,
   OllamaProvider,
   OllamaRequestError,
@@ -182,18 +181,4 @@ test("classifies transport, HTTP, envelope, and extraction JSON failures", async
       InvalidLlmResponseError,
     );
   }
-});
-
-// Tests for the creation of an OllamaProvider instance from environment variables.
-test("requires a model and a valid Ollama HTTP URL", () => {
-  assert.throws(() => createOllamaProviderFromEnv({}), /OLLAMA_MODEL/);
-  assert.throws(
-    () =>
-      createOllamaProviderFromEnv({
-        OLLAMA_MODEL: "test",
-        OLLAMA_BASE_URL: "file:///tmp/ollama",
-      }),
-    /OLLAMA_BASE_URL/,
-  );
-  assert.ok(createOllamaProviderFromEnv({ OLLAMA_MODEL: "test" }));
 });

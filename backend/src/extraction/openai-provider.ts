@@ -53,7 +53,7 @@ export class OpenAiProvider implements ReceiptExtractionProvider {
   ) {
     this.apiKey = apiKey.trim();
     if (!this.apiKey) {
-      throw new Error("OPENAI_API_KEY must be set for the OpenAI provider");
+      throw new Error("An API key is required for the OpenAI provider");
     }
   }
 

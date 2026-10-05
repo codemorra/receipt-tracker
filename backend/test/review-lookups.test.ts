@@ -62,11 +62,11 @@ test("review lookups return selectable entities and filter by name", async (t) =
   const app = createApp(
     scans,
     db,
-    {
+    () => ({
       async extractReceipt() {
         throw new Error("Unexpected extraction request");
       },
-    },
+    }),
     directory,
   );
   const server = app.listen(0);
