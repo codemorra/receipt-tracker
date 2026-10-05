@@ -3,6 +3,7 @@ import LegacyImportApp from "./LegacyImportApp";
 import AppShell from "./components/layout/AppShell";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
+import ImportPage from "./pages/ImportPage";
 import { resolveRoute } from "./routes/routing";
 import "./App.css";
 
@@ -33,6 +34,8 @@ function App() {
     <AppShell route={route} navigate={navigate}>
       {route === "settings" ? (
         <SettingsPage />
+      ) : route === "import" ? (
+        <ImportPage />
       ) : (
         <PlaceholderPage route={route} />
       )}
