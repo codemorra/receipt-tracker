@@ -4,7 +4,7 @@ import { sections, type Route, type Section } from "../../routes/routing";
 
 // Props for the Navigation component.
 interface Props {
-  route: Exclude<Route, "legacy">;
+  route: Route;
   navigate: (section: Section) => void;
 }
 

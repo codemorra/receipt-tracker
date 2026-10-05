@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import LegacyImportApp from "./LegacyImportApp";
 import AppShell from "./components/layout/AppShell";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -36,11 +35,7 @@ function App() {
     navigateTo(`/${section}`);
   }
 
-  return route === "legacy" ? (
-    <div className="legacy-import">
-      <LegacyImportApp />
-    </div>
-  ) : (
+  return (
     <AppShell route={route} navigate={navigate}>
       {route === "settings" ? (
         <SettingsPage />

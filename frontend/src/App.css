@@ -113,11 +113,8 @@
 }
 
 @layer base {
-  body:has(.app-shell) {
+  body {
     background: var(--background);
-  }
-  :root:has(.legacy-import) {
-    color-scheme: light;
   }
 }
 

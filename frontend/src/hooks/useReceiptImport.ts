@@ -2,7 +2,6 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   uploadScan,
   processScan,
-  deleteScan,
   validateScanFile,
   ScanApiError,
   type ScanErrorCode,
@@ -121,21 +120,6 @@ export function useReceiptImport() {
     });
   }
 
-  /**
-   * Cancels the current operation or resets the import state if no scan is present.
-   * @returns A promise that resolves when the cancellation or reset is complete.
-   */
-  function cancel() {
-    if (!state.scan) {
-      dispatch({ type: "reset" });
-      return;
-    }
-    const scan = state.scan;
-    return run("delete", async (signal) => {
-      await deleteScan(scan.scanId, signal);
-      if (!signal.aborted) dispatch({ type: "reset" });
-    });
-  }
   return {
     state,
     dispatch,
@@ -145,6 +129,5 @@ export function useReceiptImport() {
     selectFile,
     upload,
     process,
-    cancel,
   };
 }

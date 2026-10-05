@@ -40,7 +40,6 @@
     "import": {
       "title": "Import",
       "description": "Digitize your receipts and review their details.",
-      "legacyLink": "Open existing import interface (outdated, untranslated)",
       "scan": {
         "title": "Scan",
         "chooseFile": "Choose receipt image",

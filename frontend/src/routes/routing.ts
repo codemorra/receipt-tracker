@@ -7,7 +7,7 @@ export const sections = [
   "settings",
 ] as const;
 export type Section = (typeof sections)[number];
-export type Route = Section | "legacy" | "notFound";
+export type Route = Section | "notFound";
 
 /**
  * Extracts the receipt ID from the search string.
@@ -28,7 +28,6 @@ export function receiptIdFromSearch(search: string): number | null {
  */
 export function resolveRoute(pathname: string, search: string): Route {
   const path = pathname.replace(/\/+$/, "") || "/";
-  if (path === "/legacy-import") return "legacy";
   if (receiptIdFromSearch(search) !== null) return "import";
   if (path === "/") return "import";
   return sections.find((section) => path === `/${section}`) ?? "notFound";

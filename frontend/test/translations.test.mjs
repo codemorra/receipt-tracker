@@ -26,8 +26,8 @@ function files(directory) {
   });
 }
 
-// Tests for ensuring that translation keys are consistent and fully utilized across the shell.
-test("shell DE/EN have matching keys and interpolation parameters", () => {
+// Tests for ensuring that translation keys are consistent and fully utilized across the application.
+test("application DE/EN have matching keys and interpolation parameters", () => {
   const english = new Map(flatten(en));
   const german = new Map(flatten(de));
   assert.deepEqual([...english.keys()].sort(), [...german.keys()].sort());
@@ -43,8 +43,8 @@ test("shell DE/EN have matching keys and interpolation parameters", () => {
   );
 });
 
-// Tests for verifying that all shell translation keys are resolvable in both languages and that there are no unused locale entries.
-test("all shell translation keys resolve in both languages without unused locale entries", async () => {
+// Tests for verifying that all application translation keys are resolvable in both languages and that there are no unused locale entries.
+test("all application translation keys resolve in both languages without unused locale entries", async () => {
   const i18n = createInstance();
   await i18n.init({
     resources: { en: { translation: en }, de: { translation: de } },
@@ -53,16 +53,8 @@ test("all shell translation keys resolve in both languages without unused locale
   const leaves = flatten(en).map(([key]) => key);
   const pattern = /\bt\(\s*(["`])([^"`\n]+)\1/g;
   const usedKeys = new Set();
-  // The original workflow is a reference snapshot with its own legacy locales.
-  const shellFiles = [
-    ...files(new URL("hooks/", source)),
-    ...files(new URL("routes/", source)),
-    ...files(new URL("appearance/", source)),
-    ...files(new URL("components/", source)),
-    ...files(new URL("pages/", source)),
-    ...["App.tsx", "main.tsx", "i18n.ts"].map((name) => new URL(name, source)),
-  ];
-  for (const file of shellFiles) {
+  const sourceFiles = files(source);
+  for (const file of sourceFiles) {
     for (const [, , expression] of readFileSync(file, "utf8").matchAll(
       pattern,
     )) {
