@@ -9,7 +9,8 @@
     "actions": {
       "openMenu": "Open menu",
       "closeMenu": "Close menu",
-      "skipToContent": "Skip to content"
+      "skipToContent": "Skip to content",
+      "dismissNotification": "Dismiss notification"
     }
   },
   "navigation": {
@@ -55,7 +56,7 @@
     },
     "settings": {
       "title": "Settings",
-      "description": "A central place for your app settings."
+      "description": "Configure AI providers and choose a default for receipt processing."
     },
     "placeholder": {
       "status": "Coming later",
@@ -65,5 +66,76 @@
       "title": "Page not found",
       "description": "Choose a section in the navigation."
     }
+  },
+  "providerSettings": {
+    "names": {
+      "ollama": "Ollama",
+      "mistral": "Mistral",
+      "openai": "OpenAI"
+    },
+    "cloud": "Cloud provider",
+    "local": "Local or self-hosted provider",
+    "configuration": "{{provider}} configuration",
+    "model": "Model",
+    "baseUrl": "Base URL",
+    "baseUrlHint": "Address of your Ollama server, including a path prefix if needed.",
+    "apiKey": "API key",
+    "keyPlaceholder": "Enter a new API key",
+    "keyReplacementPlaceholder": "Enter a key to replace the existing one",
+    "keyPresent": "An API key is stored. Leave this field empty to keep it.",
+    "keyMissing": "No API key is stored.",
+    "removeKey": "Remove stored key",
+    "cancelKeyRemoval": "Cancel key removal",
+    "keyRemovalPending": "Saving will remove the key, disable this provider and clear its default selection if applicable.",
+    "secretUnavailable": "The stored key cannot be read. Restore the local master key, or remove the stored API keys and configure them again.",
+    "cloudRequirements": "A model and API key are required to enable this provider.",
+    "localRequirements": "A model and server address are required to enable Ollama.",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "loading": "Loading AI settings…",
+    "retry": "Reload settings",
+    "saved": "{{provider}} settings saved.",
+    "secretHint": "API keys are stored encrypted on this device. A stored key is never displayed again. Cloud providers use their official endpoints.",
+    "status": {
+      "disabled": "Disabled",
+      "ready": "Ready",
+      "unavailable": "Unavailable"
+    },
+    "default": {
+      "title": "Default provider",
+      "hint": "Preselected when importing a receipt. You can choose another configured provider for each scan.",
+      "none": "No default provider",
+      "unavailable": "Unavailable — {{provider}}",
+      "noProviders": "Add and enable a provider to choose a default.",
+      "saved": "Default provider saved."
+    },
+    "errors": {
+      "invalid_provider_settings": "Check the model, server address and API key fields.",
+      "provider_configuration_incomplete": "Complete the required configuration before enabling this provider.",
+      "provider_not_selectable": "This provider is not enabled or fully configured.",
+      "secret_key_unavailable": "The local master key is missing or inaccessible. Restore it before using stored API keys.",
+      "secret_decryption_failed": "The stored API keys do not match the local master key. Restore the original key, or remove the stored API keys and configure them again.",
+      "provider_settings_failed": "The AI settings could not be saved. Please try again.",
+      "settings_request_forbidden": "Access to the local settings was denied.",
+      "settings_json_required": "The settings request could not be processed. Reload the page and try again.",
+      "settings_payload_too_large": "The submitted settings are too large. Check the input fields.",
+      "invalid_request": "The settings request is invalid. Reload the page and try again.",
+      "network_error": "The backend could not be reached. Check that it is running and try again.",
+      "unexpected_response": "The backend returned an unexpected response. Reload the settings and try again."
+    },
+    "add": "Add provider",
+    "editTitle": "Edit",
+    "provider": "Provider",
+    "chooseProvider": "Choose a provider",
+    "cancel": "Cancel",
+    "listTitle": "Saved models",
+    "emptyList": "No models configured yet. Add a provider to get started.",
+    "allConfigured": "All available providers are already configured.",
+    "edit": "Edit {{provider}}",
+    "enabledFor": "Enable or disable {{provider}} · {{model}}",
+    "deleteTitle": "Delete",
+    "delete": "Delete {{provider}} · {{model}}",
+    "deleteConfirmation": "Delete {{provider}} · {{model}}? The configuration and stored API key will be removed, along with its default selection, if any.",
+    "removed": "Configuration for {{provider}} deleted."
   }
 }

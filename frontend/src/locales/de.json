@@ -9,7 +9,8 @@
     "actions": {
       "openMenu": "Menü öffnen",
       "closeMenu": "Menü schließen",
-      "skipToContent": "Zum Inhalt springen"
+      "skipToContent": "Zum Inhalt springen",
+      "dismissNotification": "Meldung schließen"
     }
   },
   "navigation": {
@@ -55,7 +56,7 @@
     },
     "settings": {
       "title": "Einstellungen",
-      "description": "Ein zentraler Platz für deine App-Einstellungen."
+      "description": "Konfiguriere AI-Provider und wähle einen Default für die Belegverarbeitung."
     },
     "placeholder": {
       "status": "In Vorbereitung",
@@ -65,5 +66,76 @@
       "title": "Seite nicht gefunden",
       "description": "Wähle einen Bereich in der Navigation."
     }
+  },
+  "providerSettings": {
+    "names": {
+      "ollama": "Ollama",
+      "mistral": "Mistral",
+      "openai": "OpenAI"
+    },
+    "cloud": "Cloud-Provider",
+    "local": "Lokaler oder selbst gehosteter Provider",
+    "configuration": "Konfiguration für {{provider}}",
+    "model": "Modell",
+    "baseUrl": "Base URL",
+    "baseUrlHint": "Adresse deines Ollama-Servers, bei Bedarf einschließlich eines Pfadpräfixes.",
+    "apiKey": "API-Key",
+    "keyPlaceholder": "Neuen API-Key eingeben",
+    "keyReplacementPlaceholder": "Key eingeben, um den vorhandenen zu ersetzen",
+    "keyPresent": "Ein API-Key ist gespeichert. Lass dieses Feld leer, um ihn beizubehalten.",
+    "keyMissing": "Es ist kein API-Key gespeichert.",
+    "removeKey": "Gespeicherten Key entfernen",
+    "cancelKeyRemoval": "Entfernung abbrechen",
+    "keyRemovalPending": "Beim Speichern wird der Key entfernt, dieser Provider deaktiviert und gegebenenfalls seine Auswahl als Default gelöscht.",
+    "secretUnavailable": "Der gespeicherte Key ist nicht lesbar. Stelle den lokalen Hauptschlüssel wieder her oder entferne die gespeicherten API-Keys und richte sie erneut ein.",
+    "cloudRequirements": "Zum Aktivieren sind ein Modell und ein API-Key erforderlich.",
+    "localRequirements": "Zum Aktivieren von Ollama sind ein Modell und eine Server-Adresse erforderlich.",
+    "save": "Änderungen speichern",
+    "saving": "Wird gespeichert…",
+    "loading": "AI-Einstellungen werden geladen…",
+    "retry": "Einstellungen neu laden",
+    "saved": "Einstellungen für {{provider}} gespeichert.",
+    "secretHint": "API-Keys werden verschlüsselt auf diesem Gerät gespeichert. Ein gespeicherter Key wird nicht wieder angezeigt. Cloud-Provider nutzen ihre offiziellen Endpunkte.",
+    "status": {
+      "disabled": "Deaktiviert",
+      "ready": "Bereit",
+      "unavailable": "Nicht verfügbar"
+    },
+    "default": {
+      "title": "Default-Provider",
+      "hint": "Beim Belegimport vorausgewählt. Du kannst für jeden Scan einen anderen konfigurierten Provider wählen.",
+      "none": "Kein Default-Provider",
+      "unavailable": "Nicht verfügbar — {{provider}}",
+      "noProviders": "Füge einen Provider hinzu und aktiviere ihn, um einen Default auszuwählen.",
+      "saved": "Default-Provider gespeichert."
+    },
+    "errors": {
+      "invalid_provider_settings": "Prüfe die Angaben zu Modell, Server-Adresse und API-Key.",
+      "provider_configuration_incomplete": "Vervollständige die erforderlichen Angaben, bevor du diesen Provider aktivierst.",
+      "provider_not_selectable": "Dieser Provider ist nicht aktiviert oder nicht vollständig eingerichtet.",
+      "secret_key_unavailable": "Der lokale Hauptschlüssel fehlt oder ist nicht lesbar. Stelle ihn wieder her, um gespeicherte API-Keys zu verwenden.",
+      "secret_decryption_failed": "Die gespeicherten API-Keys passen nicht zum lokalen Hauptschlüssel. Stelle den ursprünglichen Schlüssel wieder her oder entferne die gespeicherten API-Keys und richte sie erneut ein.",
+      "provider_settings_failed": "Die AI-Einstellungen konnten nicht gespeichert werden. Versuche es erneut.",
+      "settings_request_forbidden": "Der Zugriff auf die lokalen Einstellungen wurde abgelehnt.",
+      "settings_json_required": "Die Einstellungsanfrage konnte nicht verarbeitet werden. Lade die Seite neu und versuche es erneut.",
+      "settings_payload_too_large": "Die übermittelten Einstellungen sind zu groß. Prüfe die Eingabefelder.",
+      "invalid_request": "Die Einstellungsanfrage ist ungültig. Lade die Seite neu und versuche es erneut.",
+      "network_error": "Das Backend ist nicht erreichbar. Prüfe, ob es läuft, und versuche es erneut.",
+      "unexpected_response": "Das Backend hat eine unerwartete Antwort geliefert. Lade die Einstellungen neu und versuche es erneut."
+    },
+    "add": "Provider hinzufügen",
+    "editTitle": "Bearbeiten",
+    "provider": "Provider",
+    "chooseProvider": "Provider auswählen",
+    "cancel": "Abbrechen",
+    "listTitle": "Gespeicherte Modelle",
+    "emptyList": "Noch keine Modelle eingerichtet. Füge einen Provider hinzu.",
+    "allConfigured": "Alle verfügbaren Provider sind bereits eingerichtet.",
+    "edit": "{{provider}} bearbeiten",
+    "enabledFor": "{{provider}} · {{model}} aktivieren oder deaktivieren",
+    "deleteTitle": "Löschen",
+    "delete": "{{provider}} · {{model}} löschen",
+    "deleteConfirmation": "{{provider}} · {{model}} wirklich löschen? Die Konfiguration und der gespeicherte API-Key werden entfernt. Eine zugehörige Default-Auswahl wird ebenfalls gelöscht.",
+    "removed": "Konfiguration für {{provider}} gelöscht."
   }
 }
