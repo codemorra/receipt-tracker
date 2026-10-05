@@ -1,214 +1,69 @@
 {
-  "heading": "Receipt Tracker",
-  "intro": "Belegbild hochladen, den Rahmen prüfen und Text erkennen.",
-  "languageLabel": "Sprache wählen",
-  "german": "Deutsch",
-  "english": "Englisch",
-  "uploadHeading": "Beleg hochladen",
-  "uploadHint": "JPEG, PNG oder WebP, maximal 20 MB.",
-  "fileLabel": "Belegbild",
-  "createPreview": "Vorschau erstellen",
-  "uploading": "Vorschau wird erstellt…",
-  "previewHeading": "Belegrahmen anpassen",
-  "previewInstructions": "Ziehe die vier Punkte an die Belegecken. Mit den Pfeiltasten kannst du sie fein verschieben; mit Umschalt geht es schneller.",
-  "previewAlt": "Vorschau des hochgeladenen Belegs",
-  "corners": {
-    "topLeft": "Obere linke Ecke",
-    "topRight": "Obere rechte Ecke",
-    "bottomRight": "Untere rechte Ecke",
-    "bottomLeft": "Untere linke Ecke"
+  "common": {
+    "appName": "Receipt Tracker",
+    "language": {
+      "label": "Sprache wählen",
+      "de": "Deutsch",
+      "en": "Englisch"
+    },
+    "actions": {
+      "openMenu": "Menü öffnen",
+      "closeMenu": "Menü schließen",
+      "skipToContent": "Zum Inhalt springen"
+    }
   },
-  "cancelImport": "Import abbrechen",
-  "newImport": "Weiteren Beleg importieren",
-  "errors": {
-    "unsupportedType": "Bitte wähle ein JPEG-, PNG- oder WebP-Bild.",
-    "tooLarge": "Das Bild darf höchstens 20 MB groß sein.",
-    "invalidUpload": "Das Bild konnte nicht angenommen werden. Prüfe Dateityp und Inhalt.",
-    "invalidImage": "Das Bild konnte nicht verarbeitet werden. Wähle ein anderes Bild.",
-    "workerUnavailable": "Die Bildverarbeitung ist momentan nicht verfügbar. Versuche es später erneut.",
-    "uploadFailed": "Die Vorschau konnte nicht erstellt werden. Versuche es erneut.",
-    "cancelFailed": "Der Import konnte nicht abgebrochen werden. Versuche es erneut.",
-    "network": "Der Server ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
-    "previewUnavailable": "Das Vorschaubild konnte nicht geladen werden.",
-    "invalidCorners": "Die Ecken bilden keinen gültigen Belegrahmen. Passe sie an und versuche es erneut.",
-    "scanNotFound": "Die Vorschau ist nicht mehr verfügbar. Lade das Bild erneut hoch.",
-    "processingFailed": "Der Beleg konnte nicht verarbeitet werden. Prüfe den Rahmen und versuche es erneut.",
-    "archiveUnavailable": "Das verarbeitete Belegbild konnte nicht geladen werden.",
-    "ollamaUnavailable": "Die Texterkennung ist momentan nicht verfügbar. Versuche es später erneut.",
-    "ollamaFailed": "Die Belegdaten konnten nicht ausgewertet werden. Versuche es erneut.",
-    "invalidExtraction": "Die erkannten Belegdaten konnten nicht verarbeitet werden. Versuche es erneut.",
-    "invalidRotation": "Die Bildausrichtung ist ungültig. Lade das Bild erneut hoch."
+  "navigation": {
+    "label": "Hauptnavigation",
+    "import": "Import",
+    "receipts": "Belege",
+    "analytics": "Auswertungen",
+    "warranties": "Garantie & Gewährleistung",
+    "settings": "Einstellungen"
   },
-  "processReceipt": "Beleg verarbeiten",
-  "processing": "Beleg wird verarbeitet…",
-  "resultHeading": "Verarbeiteter Beleg",
-  "processingDurations": "OCR: {{ocr}} s · KI-Auswertung: {{llm}} s · Gesamt: {{total}} s",
-  "archiveAlt": "Zugeschnittenes Archivbild des Belegs",
-  "ocrHeading": "Erkannter Text",
-  "noOcrText": "Auf dem Beleg wurde kein Text erkannt.",
-  "detail": {
-    "heading": "Gespeicherter Beleg {{id}}",
-    "loading": "Beleg wird geladen …",
-    "loadFailed": "Der gespeicherte Beleg konnte nicht geladen werden.",
-    "imageMissing": "Das Archivbild ist nicht verfügbar.",
-    "imageAlt": "Archivbild des gespeicherten Belegs",
-    "receiptMerchant": "Händlername auf dem Beleg",
-    "currency": "Währung",
-    "items": "Positionen",
-    "quantity": "Menge",
-    "unitPrice": "Einzelpreis",
-    "lineType": "Positionsart",
-    "product": "Produkt",
-    "brand": "Marke",
-    "productGroup": "Produktgruppe",
-    "category": "Kategorie",
-    "package": "Packungsgröße",
-    "warranties": "Garantie und Gewährleistung",
-    "discounts": "Rabatte",
-    "discount": "Rabatt",
-    "wholeReceipt": "Gesamter Beleg"
+  "appearance": {
+    "mode": {
+      "label": "Design",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System"
+    },
+    "accent": {
+      "label": "Akzentfarbe",
+      "blue": "Blau",
+      "green": "Grün",
+      "purple": "Lila",
+      "orange": "Orange"
+    }
   },
-  "review": {
-    "heading": "Beleg prüfen",
-    "hint": "Prüfe und korrigiere die erkannten Angaben.",
-    "search": "Gespeicherte Einträge suchen",
-    "lookupError": "Gespeicherte Einträge konnten nicht geladen werden.",
-    "categoriesError": "Kategorien konnten nicht geladen werden.",
-    "merchantRawName": "Händlername auf dem Beleg",
-    "merchantName": "Händlername",
-    "existingMerchant": "Gespeicherten Händler auswählen",
-    "matchStatus": "Zuordnung",
-    "match": {
-      "MATCHED": "Automatisch zugeordnet",
-      "SUGGESTED": "Vorschlag",
-      "NEW": "Neu"
+  "pages": {
+    "import": {
+      "title": "Import",
+      "description": "Digitalisiere deine Belege und prüfe ihre Angaben.",
+      "legacyLink": "Bestehende Import-Oberfläche öffnen (veraltet, ohne Übersetzung)"
     },
-    "purchaseDate": "Kaufdatum",
-    "purchaseTime": "Uhrzeit",
-    "currency": "Währung",
-    "total": "Gesamtbetrag",
-    "sum": {
-      "MATCH": "Die Positionssumme stimmt mit dem Gesamtbetrag überein.",
-      "MISMATCH": "Die Positionssumme weicht vom Gesamtbetrag ab. Bitte prüfe Preise und Rabatte.",
-      "INCOMPLETE": "Die Summe kann noch nicht geprüft werden. Bitte ergänze fehlende oder ungültige Beträge."
+    "receipts": {
+      "title": "Belege",
+      "description": "Deine gespeicherten Belege an einem Ort."
     },
-    "items": "Positionen",
-    "addItem": "Position hinzufügen",
-    "removeItem": "Position entfernen",
-    "itemNumber": "Position {{number}}",
-    "rawName": "Bezeichnung auf dem Beleg",
-    "lineType": "Positionsart",
-    "lineTypes": {
-      "product": "Produkt",
-      "deposit": "Pfand",
-      "fee": "Gebühr",
-      "other": "Sonstiges"
+    "analytics": {
+      "title": "Auswertungen",
+      "description": "Ein Überblick über deine Ausgaben."
     },
-    "existingProduct": "Gespeichertes Produkt auswählen",
-    "productName": "Produktname",
-    "brandName": "Marke",
-    "productGroupName": "Produktgruppe",
-    "category": "Kategorie",
-    "chooseCategory": "Kategorie auswählen",
-    "packageAmount": "Packungsgröße",
-    "packageUnit": "Packungseinheit",
-    "quantity": "Menge",
-    "unit": "Einheit",
-    "noUnit": "Keine Einheit",
-    "units": {
-      "pcs": "Stück",
-      "g": "g",
-      "kg": "kg",
-      "ml": "ml",
-      "l": "l"
+    "warranties": {
+      "title": "Garantie & Gewährleistung",
+      "description": "Garantie und Gewährleistung deiner Einkäufe im Blick."
     },
-    "unitPrice": "Einzelpreis",
-    "itemTotal": "Positionsbetrag",
-    "warranties": "Garantie und Gewährleistung",
-    "addWarranty": "Zeitraum hinzufügen",
-    "removeWarranty": "Zeitraum entfernen",
-    "warrantyType": "Art",
-    "warrantyTypes": {
-      "statutory": "Gesetzliche Gewährleistung",
-      "manufacturer": "Herstellergarantie",
-      "extended": "Erweiterte Garantie"
+    "settings": {
+      "title": "Einstellungen",
+      "description": "Ein zentraler Platz für deine App-Einstellungen."
     },
-    "startDate": "Beginn",
-    "endDate": "Ende",
-    "notes": "Notizen",
-    "warrantyIssues": {
-      "missing": "Bitte Beginn und Ende angeben.",
-      "invalid": "Bitte gültige Datumswerte angeben.",
-      "range": "Das Ende muss am oder nach dem Beginn liegen."
+    "placeholder": {
+      "status": "In Vorbereitung",
+      "hint": "Dieser Bereich wird später umgesetzt."
     },
-    "discounts": "Rabatte",
-    "addDiscount": "Rabatt hinzufügen",
-    "removeDiscount": "Rabatt entfernen",
-    "discountRawName": "Rabatttext auf dem Beleg",
-    "discountDescription": "Beschreibung",
-    "discountAmount": "Rabattbetrag",
-    "appliesTo": "Gilt für",
-    "wholeReceipt": "Gesamten Beleg",
-    "categories": {
-      "food": "Lebensmittel",
-      "beverages": "Getränke",
-      "drugstore": "Drogerie",
-      "household": "Haushalt",
-      "pet_supplies": "Tierbedarf",
-      "electronics": "Elektronik",
-      "clothing": "Bekleidung",
-      "home_and_garden": "Haus und Garten",
-      "automotive": "Auto",
-      "leisure": "Freizeit",
-      "gastronomy": "Gastronomie",
-      "services": "Dienstleistungen",
-      "other": "Sonstiges"
-    },
-    "issuesHeading": "Bitte diese Angaben prüfen",
-    "issues": {
-      "merchant": "Händlername fehlt.",
-      "purchaseDate": "Kaufdatum fehlt oder ist ungültig.",
-      "purchaseTime": "Die Uhrzeit ist ungültig.",
-      "currency": "Die Währung muss aus drei Großbuchstaben bestehen.",
-      "total": "Der Gesamtbetrag fehlt oder ist ungültig.",
-      "items": "Füge mindestens eine Position hinzu.",
-      "rawName": "Position {{number}}: Bezeichnung fehlt.",
-      "quantity": "Position {{number}}: Menge muss größer als null sein.",
-      "unitPrice": "Position {{number}}: Einzelpreis ist ungültig.",
-      "itemTotal": "Position {{number}}: Positionsbetrag fehlt oder ist ungültig.",
-      "packageAmount": "Position {{number}}: Packungsgröße muss größer als null sein.",
-      "productName": "Position {{number}}: Produktname fehlt.",
-      "productGroup": "Position {{number}}: Produktgruppe fehlt.",
-      "category": "Position {{number}}: Kategorie fehlt.",
-      "packageUnit": "Position {{number}}: Packungsgröße und Einheit müssen zusammen angegeben werden.",
-      "warranty": "Position {{number}}: Garantiezeitraum ist ungültig.",
-      "discountAmount": "Rabatt {{number}}: Betrag muss größer als null sein."
-    },
-    "duplicateHeading": "Möglicher doppelter Beleg",
-    "duplicateHint": "Vergleiche den aktuellen Scan mit den gespeicherten Belegen und entscheide über den Import.",
-    "currentScan": "Aktueller Scan",
-    "currentScanImage": "Archivbild des aktuellen Scans",
-    "existingReceipt": "Gespeicherter Beleg {{id}}",
-    "existingReceiptImage": "Archivbild des gespeicherten Belegs {{id}}",
-    "cancelImport": "Import abbrechen",
-    "importAnyway": "Trotzdem importieren",
-    "cancelFailed": "Der Import konnte nicht abgebrochen werden. Versuche es erneut.",
-    "save": "Beleg speichern",
-    "saving": "Beleg wird gespeichert …",
-    "saved": "Beleg {{id}} wurde gespeichert.",
-    "saveFailed": "Der Beleg konnte nicht gespeichert werden.",
-    "saveInvalid": "Die Angaben zum Beleg sind ungültig. Bitte prüfe sie erneut.",
-    "saveArchiveMissing": "Das verarbeitete Belegbild fehlt. Bitte verarbeite den Scan erneut.",
-    "saveEntityMissing": "Eine ausgewählte Zuordnung existiert nicht mehr. Bitte wähle sie erneut.",
-    "productDetails": "Produktdetails anzeigen",
-    "matchManual": "Manuell zugeordnet",
-    "noProductMatch": "Keine Produktzuordnung",
-    "warrantyCount": "Garantie und Gewährleistung ({{count}})",
-    "hideProductDetails": "Produktdetails verbergen",
-    "selectedProduct": "Zugeordnetes Produkt",
-    "selectedMerchant": "Zugeordneter Händler",
-    "clearSelection": "Zuordnung aufheben"
-  },
-  "rotateLeft": "Links drehen",
-  "rotateRight": "Rechts drehen"
+    "notFound": {
+      "title": "Seite nicht gefunden",
+      "description": "Wähle einen Bereich in der Navigation."
+    }
+  }
 }

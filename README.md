@@ -235,7 +235,7 @@ Aliases allow the application to learn confirmed receipt labels over time and au
 
 The core receipt import, review, duplicate-check, and save workflow is implemented, including direct loading of a saved receipt by its ID.
 
-The current interface is still primarily functional and focused on supporting the import workflow. A broader frontend for navigating, managing, and analyzing saved data has not yet been implemented.
+The new frontend shell provides responsive navigation, language and appearance controls, and placeholder pages. The original import interface is retained as a legacy reference until the new import UI is implemented.
 
 The next development phase focuses mainly on frontend, receipt management, and analysis features, including:
 

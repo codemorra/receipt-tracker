@@ -1,0 +1,36 @@
+// Sections and routing types for the application.
+export const sections = [
+  "import",
+  "receipts",
+  "analytics",
+  "warranties",
+  "settings",
+] as const;
+export type Section = (typeof sections)[number];
+export type Route = Section | "legacy" | "notFound";
+
+/**
+ * Extracts the receipt ID from the search string.
+ * @param search The search string from the URL.
+ * @returns The receipt ID if present and valid, otherwise null.
+ */
+export function receiptIdFromSearch(search: string): number | null {
+  const value = new URLSearchParams(search).get("receiptId");
+  const id = Number(value);
+  return value !== null && Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Resolves the route based on the pathname and search string.
+ * @param pathname The pathname from the URL.
+ * @param search The search string from the URL.
+ * @returns The resolved route.
+ */
+export function resolveRoute(pathname: string, search: string): Route {
+  // Existing shared receipt URLs always retain access to the reference workflow.
+  if (receiptIdFromSearch(search) !== null) return "legacy";
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (path === "/legacy-import") return "legacy";
+  if (path === "/") return "import";
+  return sections.find((section) => path === `/${section}`) ?? "notFound";
+}
