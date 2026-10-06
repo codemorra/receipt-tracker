@@ -72,9 +72,97 @@ export default function ScanPanel({
       aria-busy={busy !== null || locked}
       inert={locked}
     >
-      <h2 id={`${id}-heading`} className="mb-5 text-lg font-semibold">
-        {t("pages.import.scan.title")}
-      </h2>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h2 id={`${id}-heading`} className="text-lg font-semibold">
+          {t("pages.import.scan.title")}
+        </h2>
+        {scan && corners && !archive && (
+          <div className="ml-auto flex flex-wrap justify-end gap-2">
+            <>
+              <button
+                type="button"
+                disabled={busy !== null || failed}
+                onClick={() =>
+                  dispatch({
+                    type: "corners",
+                    corners: {
+                      topLeft: [0, 0],
+                      topRight: [1, 0],
+                      bottomRight: [1, 1],
+                      bottomLeft: [0, 1],
+                    },
+                  })
+                }
+                className={secondary}
+              >
+                {t("pages.import.scan.fullImage")}
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null || failed}
+                onClick={() => dispatch({ type: "receipt-frame" })}
+                className={secondary}
+              >
+                {t("pages.import.scan.receiptOnly")}
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null || failed}
+                onClick={() => dispatch({ type: "rotate", turn: 270 })}
+                aria-label={t("pages.import.scan.rotateLeft")}
+                title={t("pages.import.scan.rotateLeft")}
+                className={`${secondary} flex items-center justify-center`}
+              >
+                <svg
+                  aria-hidden="true"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null || failed}
+                onClick={() => dispatch({ type: "rotate", turn: 90 })}
+                aria-label={t("pages.import.scan.rotateRight")}
+                title={t("pages.import.scan.rotateRight")}
+                className={`${secondary} flex items-center justify-center`}
+              >
+                <svg
+                  aria-hidden="true"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="-scale-x-100"
+                >
+                  <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
+                </svg>
+              </button>
+            </>
+            {processed && editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className={secondary}
+              >
+                {t("pages.import.scan.showArchive")}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       {!scan ? (
         <>
           <UploadDropzone
@@ -129,92 +217,6 @@ export default function ScanPanel({
                   onError("preview_unavailable");
                 }}
               />
-            )}
-            {!archive && (
-              <div className="mt-4 flex flex-wrap justify-start gap-2">
-                <>
-                  <button
-                    type="button"
-                    disabled={busy !== null || failed}
-                    onClick={() => dispatch({ type: "rotate", turn: 270 })}
-                    aria-label={t("pages.import.scan.rotateLeft")}
-                    title={t("pages.import.scan.rotateLeft")}
-                    className={`${secondary} flex items-center justify-center`}
-                  >
-                    <svg
-                      aria-hidden="true"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy !== null || failed}
-                    onClick={() => dispatch({ type: "rotate", turn: 90 })}
-                    aria-label={t("pages.import.scan.rotateRight")}
-                    title={t("pages.import.scan.rotateRight")}
-                    className={`${secondary} flex items-center justify-center`}
-                  >
-                    <svg
-                      aria-hidden="true"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="-scale-x-100"
-                    >
-                      <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy !== null || failed}
-                    onClick={() =>
-                      dispatch({
-                        type: "corners",
-                        corners: {
-                          topLeft: [0, 0],
-                          topRight: [1, 0],
-                          bottomRight: [1, 1],
-                          bottomLeft: [0, 1],
-                        },
-                      })
-                    }
-                    className={secondary}
-                  >
-                    {t("pages.import.scan.fullImage")}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy !== null || failed}
-                    onClick={() => dispatch({ type: "receipt-frame" })}
-                    className={secondary}
-                  >
-                    {t("pages.import.scan.receiptOnly")}
-                  </button>
-                </>
-                {processed && editing && (
-                  <button
-                    type="button"
-                    onClick={() => setEditing(false)}
-                    className={secondary}
-                  >
-                    {t("pages.import.scan.showArchive")}
-                  </button>
-                )}
-              </div>
             )}
             <div
               className={archive ? "mt-4" : "mt-6 border-t border-shell pt-5"}

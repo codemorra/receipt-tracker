@@ -62,7 +62,7 @@ export default function ImportPage({
           }
         />
       )}
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+      <div className="grid items-start gap-6 xl:grid-cols-2">
         <ScanPanel
           key={workflow.state.scan?.scanId ?? "upload"}
           state={workflow.state}

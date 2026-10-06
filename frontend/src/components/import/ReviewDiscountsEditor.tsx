@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { useReceiptReview } from "../../hooks/useReceiptReview";
 import { SelectField, TextField } from "../ui/FormField";
-import ConfirmDialog from "../ui/ConfirmDialog";
+import InlineConfirmation from "../ui/InlineConfirmation";
 
 /**
  * Renders the editor for managing discounts on a receipt, allowing the user to add, edit, and remove discounts.
@@ -22,7 +22,7 @@ export default function ReviewDiscountsEditor({
   return (
     <section className="space-y-3">
       {removalTarget && (
-        <ConfirmDialog
+        <InlineConfirmation
           title={t("pages.import.review.removeDiscount")}
           message={t("pages.import.review.removeDiscountConfirmation", {
             name:

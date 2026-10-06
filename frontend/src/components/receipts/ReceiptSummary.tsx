@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { ReceiptSummaryModel } from "../../receipts/receipt-summary";
 import Card from "../ui/Card";
+import ReviewMatchBadge from "../import/ReviewMatchBadge";
 
 /**
  * Shared read-only receipt summary for saved receipts and the current import draft.
@@ -16,6 +17,14 @@ export default function ReceiptSummary({
   status?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
+  const [showProductDetails, setShowProductDetails] = useState(false);
+  const itemsId = useId();
+  const newProductCount = receipt.items.filter(
+    (item) =>
+      item.match &&
+      !item.match.selected &&
+      (item.match.status === "NEW" || item.match.status === null),
+  ).length;
   const money = (cents: number | null) => {
     if (cents === null) return t("pages.receiptSummary.unknown");
     return new Intl.NumberFormat(
@@ -63,7 +72,7 @@ export default function ReceiptSummary({
           </span>
         )}
       </header>
-      <dl className="grid grid-cols-2 gap-4 text-sm">
+      <dl className="flex flex-wrap justify-end gap-x-10 gap-y-3 text-sm">
         {[
           {
             label: t("pages.receiptSummary.purchaseDate"),
@@ -81,24 +90,48 @@ export default function ReceiptSummary({
             label: t("pages.receiptSummary.total"),
             value: money(receipt.totalCents),
           },
-        ].map((field) => (
-          <div key={field.label}>
+        ].map((field, index) => (
+          <div
+            key={field.label}
+            className={index === 3 ? "text-right" : undefined}
+          >
             <dt className="text-xs text-muted">{field.label}</dt>
             <dd className="mt-1 font-medium">{field.value}</dd>
           </div>
         ))}
       </dl>
       <section className="space-y-3 border-t border-shell pt-5">
-        <h3 className="text-sm font-semibold">
-          {t("pages.receiptSummary.items")}
-        </h3>
-        <ul>
-          {receipt.items.map((item) => (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h3 className="text-sm font-semibold">
+            {t("pages.receiptSummary.items")}
+          </h3>
+          {receipt.items.length > 0 && (
+            <button
+              type="button"
+              aria-expanded={showProductDetails}
+              aria-controls={itemsId}
+              onClick={() => setShowProductDetails((visible) => !visible)}
+              className="cursor-pointer rounded text-xs font-medium text-muted hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              <span aria-hidden="true">{showProductDetails ? "▾" : "▸"}</span>{" "}
+              {t("pages.receiptSummary.moreDetails")}
+            </button>
+          )}
+          {newProductCount > 0 && (
+            <span className="rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent">
+              {t("pages.receiptSummary.newProducts", {
+                count: newProductCount,
+              })}
+            </span>
+          )}
+        </div>
+        <ul id={itemsId} className="pl-3">
+          {receipt.items.map((item, index) => (
             <li
               key={item.key}
               className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 py-1.5 text-sm"
             >
-              <span className="min-w-0 wrap-break-word">
+              <span className="flex min-w-0 flex-wrap items-baseline gap-x-1 gap-y-1 wrap-break-word">
                 <strong className="font-semibold">
                   {item.name || t("pages.receiptSummary.unknown")}
                 </strong>{" "}
@@ -108,10 +141,99 @@ export default function ReceiptSummary({
                     : number(item.quantity)}{" "}
                   {unit(item.unit)}
                 </span>
+                {showProductDetails && item.match && (
+                  <ReviewMatchBadge
+                    status={item.match.status}
+                    selected={item.match.selected}
+                  />
+                )}
               </span>
               <span className="text-right whitespace-nowrap tabular-nums">
                 {money(item.totalPriceCents)}
               </span>
+              {showProductDetails && (
+                <div className="col-span-2 min-w-0 space-y-3 pt-2 pb-2">
+                  <div className="space-y-2 text-xs">
+                    {[
+                      [
+                        {
+                          label: t("pages.receiptSummary.rawName"),
+                          value: item.rawName,
+                        },
+                        {
+                          label: t("pages.receiptSummary.lineType"),
+                          value: t(
+                            `pages.import.review.lineTypes.${item.lineType}`,
+                          ),
+                        },
+                        {
+                          label: t("pages.receiptSummary.unitPrice"),
+                          value: money(item.unitPriceCents),
+                        },
+                        {
+                          label: t("pages.receiptSummary.packageUnit"),
+                          value: unit(item.product?.packageUnit ?? null),
+                        },
+                        {
+                          label: t("pages.receiptSummary.packageAmount"),
+                          value:
+                            item.product?.packageAmount == null
+                              ? null
+                              : number(item.product.packageAmount),
+                        },
+                      ],
+                      [
+                        {
+                          label: t("pages.receiptSummary.category"),
+                          value: item.product?.categoryName
+                            ? t(
+                                `pages.import.review.categories.${item.product.categoryName}`,
+                                {
+                                  defaultValue: item.product.categoryName,
+                                },
+                              )
+                            : null,
+                        },
+                        {
+                          label: t("pages.receiptSummary.productGroupName"),
+                          value: item.product?.productGroupName,
+                        },
+                        {
+                          label: t("pages.receiptSummary.brandName"),
+                          value: item.product?.brandName?.trim() || "—",
+                        },
+                      ],
+                    ].map((row, rowIndex) =>
+                      row.some((field) => field.value) ? (
+                        <dl
+                          key={rowIndex}
+                          className="grid gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))]"
+                        >
+                          {row.map((field, column) =>
+                            field.value ? (
+                              <div
+                                key={field.label}
+                                className={`min-w-0 ${["sm:col-start-1", "sm:col-start-2", "sm:col-start-3", "sm:col-start-4", "sm:col-start-5"][column]}`}
+                              >
+                                <dt className="text-muted">{field.label}</dt>
+                                <dd className="mt-0.5 wrap-break-word">
+                                  {field.value}
+                                </dd>
+                              </div>
+                            ) : null,
+                          )}
+                        </dl>
+                      ) : null,
+                    )}
+                  </div>
+                  {index < receipt.items.length - 1 && (
+                    <hr
+                      aria-hidden="true"
+                      className="w-96/100 border-0 border-t border-shell"
+                    />
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -186,84 +308,6 @@ export default function ReceiptSummary({
             )}
           </ul>
         </section>
-      )}
-      {receipt.items.length > 0 && (
-        <details className="border-t border-shell pt-4">
-          <summary className="cursor-pointer text-xs font-medium text-muted hover:text-accent">
-            {t("pages.receiptSummary.moreDetails")}
-          </summary>
-          <ul className="mt-4 space-y-5">
-            {receipt.items.map((item, index) => (
-              <li key={item.key} className="space-y-2">
-                <p className="text-xs font-semibold wrap-break-word">
-                  {item.name || item.rawName}
-                </p>
-                <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
-                  {[
-                    {
-                      label: t("pages.receiptSummary.unitPrice"),
-                      value: money(item.unitPriceCents),
-                    },
-                    {
-                      label: t("pages.receiptSummary.lineType"),
-                      value: t(
-                        `pages.import.review.lineTypes.${item.lineType}`,
-                      ),
-                    },
-                    {
-                      label: t("pages.receiptSummary.rawName"),
-                      value: item.rawName,
-                    },
-                    {
-                      label: t("pages.receiptSummary.brandName"),
-                      value: item.product?.brandName,
-                    },
-                    {
-                      label: t("pages.receiptSummary.productGroupName"),
-                      value: item.product?.productGroupName,
-                    },
-                    {
-                      label: t("pages.receiptSummary.category"),
-                      value: item.product?.categoryName
-                        ? t(
-                            `pages.import.review.categories.${item.product.categoryName}`,
-                            { defaultValue: item.product.categoryName },
-                          )
-                        : null,
-                    },
-                    {
-                      label: t("pages.receiptSummary.packageAmount"),
-                      value:
-                        item.product?.packageAmount === null ||
-                        item.product?.packageAmount === undefined
-                          ? null
-                          : number(item.product.packageAmount),
-                    },
-                    {
-                      label: t("pages.receiptSummary.packageUnit"),
-                      value: unit(item.product?.packageUnit ?? null),
-                    },
-                  ]
-                    .filter((field) => field.value)
-                    .map((field) => (
-                      <div key={field.label} className="min-w-0">
-                        <dt className="text-muted">{field.label}</dt>
-                        <dd className="mt-0.5 wrap-break-word">
-                          {field.value}
-                        </dd>
-                      </div>
-                    ))}
-                </dl>
-                {index < receipt.items.length - 1 && (
-                  <hr
-                    aria-hidden="true"
-                    className="w-3/5 border-0 border-t border-shell"
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
       )}
     </Card>
   );

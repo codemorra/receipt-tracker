@@ -11,6 +11,7 @@ export default function ReceiptsPage() {
   const heading = useRef<HTMLHeadingElement>(null);
   const browser = useReceiptBrowser();
   const [receiptId, setReceiptId] = useState<number | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const data = browser.data;
   const stale = browser.loading || browser.error !== null;
   useEffect(() => {
@@ -103,6 +104,7 @@ export default function ReceiptsPage() {
                     if (stale) return;
                     event.currentTarget.querySelector("button")?.focus();
                     setReceiptId(receipt.id);
+                    setDetailOpen(true);
                   }}
                   className={`border-b border-shell last:border-0 ${stale ? "" : "cursor-pointer hover:bg-surface-hover"}`}
                 >
@@ -207,7 +209,8 @@ export default function ReceiptsPage() {
       {receiptId !== null && (
         <ReceiptDetailModal
           receiptId={receiptId}
-          onClose={() => setReceiptId(null)}
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
         />
       )}
     </>

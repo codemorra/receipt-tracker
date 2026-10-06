@@ -11,7 +11,7 @@ function ReceiptDetailLoader({ receiptId }: { receiptId: number }) {
   const { t } = useTranslation();
   const saved = useSavedReceipt(receiptId);
   return saved.receipt ? (
-    <ReceiptDetail receipt={saved.receipt} />
+    <ReceiptDetail receipt={saved.receipt} panel />
   ) : (
     <div
       className="min-h-64 rounded-xl border border-shell p-5"
@@ -41,22 +41,28 @@ function ReceiptDetailLoader({ receiptId }: { receiptId: number }) {
  * Modal component for displaying receipt details.
  * @param receiptId The ID of the receipt to display.
  * @param onClose Callback function to close the modal.
+ * @param open Boolean indicating if the modal is currently open.
  */
 export default function ReceiptDetailModal({
   receiptId,
   onClose,
+  open,
 }: {
   receiptId: number;
   onClose: () => void;
+  open: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <Modal
+      open={open}
+      placement="right"
+      scrollContent={false}
       title={t("pages.receiptDetail.title", { id: receiptId })}
       size="wide"
       onClose={onClose}
     >
-      <div className="mt-6">
+      <div className="mt-6 min-h-0 flex-1">
         <ReceiptDetailLoader key={receiptId} receiptId={receiptId} />
       </div>
     </Modal>

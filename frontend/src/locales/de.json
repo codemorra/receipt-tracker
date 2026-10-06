@@ -54,7 +54,7 @@
         "keyboardHint": "Pfeiltasten verschieben den Eckpunkt, Umschalt beschleunigt die Bewegung.",
         "rotateLeft": "Links drehen",
         "rotateRight": "Rechts drehen",
-        "fullImage": "Ganzes Bild verwenden",
+        "fullImage": "Ganzes Bild",
         "showArchive": "Archivbild anzeigen",
         "provider": "AI-Provider",
         "chooseProvider": "Provider auswählen",
@@ -67,7 +67,7 @@
           "bottomRight": "Ecke unten rechts",
           "bottomLeft": "Ecke unten links"
         },
-        "receiptOnly": "Nur Bon verwenden",
+        "receiptOnly": "Nur Bon",
         "edit": "Erneut bearbeiten"
       },
       "errors": {
@@ -214,7 +214,7 @@
         "existingGroup": "Gespeicherte Produktgruppe",
         "discountNumber": "Rabatt {{number}}",
         "issuesHeading": "Angaben prüfen: {{count}}",
-        "possibleDuplicate": "Es wurden mögliche doppelte Belege gefunden.",
+        "possibleDuplicate": "Dieser Bon wurde möglicherweise bereits importiert.\nBitte vergleiche ihn mit den gespeicherten Belegen.",
         "retryCategories": "Kategorien erneut laden",
         "match": {
           "MATCHED": "Automatisch zugeordnet",
@@ -242,18 +242,22 @@
         "cancel": "Abbrechen",
         "editWarranty": "Bearbeiten",
         "saveWarranty": "Änderungen übernehmen",
-        "removeDiscountConfirmation": "„{{name}}“ wirklich aus dem Beleg entfernen?"
+        "removeDiscountConfirmation": "„{{name}}“ wirklich aus dem Beleg entfernen?",
+        "correctionsRequired": "Korrigiere die aufgeführten Felder unter „Daten bearbeiten“, bevor du den Beleg speicherst."
       },
       "duplicates": {
-        "title": "Mögliche doppelte Belege",
-        "hint": "Vergleiche die Belege. Du kannst den Import abbrechen oder diesen Beleg trotzdem speichern.",
+        "title": "Möglicherweise bereits importiert",
+        "hint": "Dieser Bon ähnelt einem bereits gespeicherten Beleg. Vergleiche die Angaben und Bilder. Mit „Trotzdem importieren“ bestätigst du die Prüfung und kehrst zur Übersicht zurück. Dort kannst du den Bon speichern.",
         "current": "Aktueller Beleg",
-        "existing": "Gespeicherter Beleg #{{id}}"
+        "existing": "Gespeicherter Beleg #{{id}}",
+        "review": "Duplikat prüfen",
+        "confirmed": "Duplikatprüfung bestätigt. Du kannst den Bon jetzt über „Beleg speichern“ importieren.",
+        "chooseReceipt": "Gespeicherten Beleg auswählen"
       },
       "save": {
         "save": "Beleg speichern",
         "saving": "Wird gespeichert…",
-        "override": "Trotzdem speichern",
+        "override": "Trotzdem importieren",
         "cancelImport": "Import abbrechen",
         "cancelling": "Wird abgebrochen…",
         "errors": {
@@ -276,6 +280,11 @@
         "loading": "Beleg wird geladen…",
         "unavailable": "Der Beleg ist derzeit nicht verfügbar.",
         "retry": "Erneut laden"
+      },
+      "advanced": {
+        "title": "Daten bearbeiten",
+        "hint": "Änderungen erscheinen direkt in der Übersicht. Speichere den Beleg dort, wenn du fertig bist.",
+        "done": "Zurück zur Übersicht"
       }
     },
     "receipts": {
@@ -348,7 +357,8 @@
       "discount": "Rabatt",
       "moreDetails": "Weitere Produktdetails",
       "lineType": "Positionstyp",
-      "warranties": "Garantien und Gewährleistung"
+      "warranties": "Garantien und Gewährleistung",
+      "newProducts": "Neue Produkte: {{count}}"
     },
     "receiptDetail": {
       "archive": "Archivbild",
