@@ -36,14 +36,16 @@ export default function AnalyticsFilters({
   const [merchant, setMerchant] = useState<{ id: number; name: string } | null>(
     null,
   );
-  const [lookupError, setLookupError] = useState<AnalyticsErrorCode | null>(
-    null,
-  );
+  const [lookupError, setLookupError] = useState<{
+    merchantId: number;
+    code: AnalyticsErrorCode;
+  } | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (state.merchantId === null) return;
+    const merchantId = state.merchantId;
+    if (merchantId === null) return;
     const controller = new AbortController();
-    getAnalyticsMerchant(state.merchantId, controller.signal)
+    getAnalyticsMerchant(merchantId, controller.signal)
       .then((value) => {
         if (!controller.signal.aborted) {
           setMerchant(value);
@@ -52,11 +54,13 @@ export default function AnalyticsFilters({
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted)
-          setLookupError(
-            error instanceof AnalyticsApiError
-              ? error.code
-              : "unexpected_response",
-          );
+          setLookupError({
+            merchantId,
+            code:
+              error instanceof AnalyticsApiError
+                ? error.code
+                : "unexpected_response",
+          });
       });
     return () => controller.abort();
   }, [state.merchantId, attempt]);
@@ -158,10 +162,10 @@ export default function AnalyticsFilters({
           )}
         </form>
       )}
-      {lookupError && (
+      {lookupError && lookupError.merchantId === state.merchantId && (
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <p role="alert" className="text-warning">
-            {t(`pages.analytics.errors.${lookupError}`)}
+            {t(`pages.analytics.errors.${lookupError.code}`)}
           </p>
           <button
             type="button"
