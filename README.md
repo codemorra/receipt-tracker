@@ -26,17 +26,13 @@ The application keeps the user involved in the import process by allowing uncert
 - Persistent storage of processed receipts and receipt images
 - German and English user interface with light/dark themes and accent colors
 
-### Planned Receipt Management & Analysis
+### Receipt Archive
 
-- Receipt overview and navigation to saved receipts
-- General search and filtering
-- Product and merchant browsing
-- Product price history
-- Price comparisons
-- Expense statistics
-- Category-based analysis
-- Merchant-based analysis
-- Dedicated warranty overview
+- Saved receipt table with merchant, purchase date/time, total, and warranty count
+- One search field for merchant and product names, including learned aliases
+- Pagination with 20 receipts per page and newest receipts first
+- Read-only receipt details in a full-height side panel with the archive image
+- Shared compact summaries for import drafts and saved receipts, with expandable product details
 
 ## Technical Overview
 
@@ -85,7 +81,7 @@ The currently tested model configurations are:
 
 Requires Node.js 22.12 or newer, npm, and Python 3.12.
 
-Currently tested on Linux only. The setup below assumes Linux, including the OCR worker's high-performance inference dependencies. Native Windows and macOS support has not been verified; Windows users can try the Linux setup through WSL2.
+The setup below assumes Linux. See [Known Limitations and Planned Improvements](#known-limitations-and-planned-improvements) for platform support.
 
 ### Clone the repository
 
@@ -169,7 +165,7 @@ Providers start unconfigured and disabled, with no default. You can configure mu
 
 Cloud API keys are encrypted in SQLite using AES-256-GCM. When the first key is saved, the backend creates a random master key in `$XDG_CONFIG_HOME/receipt-tracker/keys/master.key`, or `~/.config/receipt-tracker/keys/master.key` when `XDG_CONFIG_HOME` is unset. Set `SECRETS_KEY_DIR` to an absolute path outside the repository to change this location. On Unix-like systems, storage requires owner-only access; new directories and key files use `0700` and `0600` permissions.
 
-Saved API keys are never returned to the frontend or written to logs. Settings lets you replace or remove them. Keep the master key separate from the database and back up both. If the key is missing or does not match, restore the original key; otherwise remove all stored API keys in Settings before entering new ones. Encryption protects a database copy without its master key; it does not protect against access to both files or the running backend. The application is intended for local use and has no user authentication.
+Saved API keys are never returned to the frontend or written to logs. Settings lets you replace or remove them. Keep the master key separate from the database and back up both. If the key is missing or does not match, restore the original key; otherwise remove all stored API keys in Settings before entering new ones. See [Known Limitations and Planned Improvements](#known-limitations-and-planned-improvements) for the local-use security boundaries.
 
 ## LLM Providers and Runtime Example
 
@@ -187,7 +183,7 @@ All three models produced correct core extraction results for this example recei
 
 The Qwen run was executed locally on an AMD Radeon RX 7900 XTX. Cloud timings depend on provider and network load. These values are example measurements from one receipt and one run per model, not general model benchmarks.
 
-The three configurations are currently used as practical reference points for receipt extraction. All tested models still show occasional extraction issues on some receipts, so further optimization is needed. Future tuning is expected to focus primarily on Luna, while user review remains important regardless of the selected provider.
+The three configurations are currently used as practical reference points for receipt extraction.
 
 ## Import Workflow
 
@@ -195,9 +191,9 @@ The following activity diagram shows the receipt import process, from image uplo
 
 ![Import Workflow](docs/import-workflow.svg)
 
-The desktop workspace shows the scan on the left and editable receipt data on the right; smaller screens stack the sections. Uploading an image immediately creates the corrected preview. Adjust the frame or rotation, select a provider, and process the receipt. The resulting archive image remains visible while reviewing matches, items, discounts, and warranty periods.
+Upload an image, adjust its frame or rotation, select a provider, and process the receipt. Review the compact summary or open **Edit data** to correct the draft alongside its image. Closing the editor preserves your inputs; saving requires valid data.
 
-Possible duplicates are compared with saved receipts and their images. You can cancel the import or explicitly save anyway; the backend checks for duplicates again using the final reviewed values. After saving, the application shows the stored receipt, including its associations, discounts, warranties, and archive image. Direct links such as `/import?receiptId=123` also load it after a refresh.
+**Review duplicate** compares possible matches. **Import anyway** confirms the comparison and enables **Save receipt** without saving immediately. The backend checks the final values again. Saved receipts also load through direct links such as `/import?receiptId=123`.
 
 The processing flow is:
 
@@ -225,6 +221,10 @@ Final Duplicate Check
 Persistent Storage
 ```
 
+## Browsing Saved Receipts
+
+**Receipts** lists saved receipts, newest first, with 20 entries per page. One search field matches merchant and product names and their learned aliases. Selecting a row opens a read-only panel with the archive image, receipt details, and expandable product metadata.
+
 ## Database Model
 
 The database separates receipts, receipt items, products, merchants, aliases, categories, discounts, and warranty information.
@@ -235,20 +235,26 @@ Aliases allow the application to learn confirmed receipt labels over time and au
 
 ## Project Status
 
-The core receipt import, review, duplicate-check, and save workflow is implemented, including direct loading of a saved receipt by its ID.
+Receipt import, review, duplicate checking, saving, and archive search are implemented, together with AI provider settings, German/English language support, and appearance controls. Analysis and the dedicated warranty overview remain placeholder pages. The project is under active development.
 
-The responsive frontend includes the complete import workflow, AI provider settings, and language and appearance controls. Saved receipts can be displayed after import or through a direct ID link; the receipt management section, analysis, and the warranty overview remain placeholder pages.
+## Known Limitations and Planned Improvements
 
-The next development phase focuses on receipt management and analysis features, including:
+### Current Limitations
 
-- Receipt overview and search/filtering
-- Product and merchant browsing
-- Product price history and comparisons
-- Expense statistics
-- Category- and merchant-based analysis
-- Warranty overview
+- **Extraction accuracy:** all tested models occasionally produce incorrect receipt data. User review remains necessary.
+- **Platform support:** only Linux has been tested, including the OCR worker's high-performance inference dependencies. Native Windows and macOS support is unverified; Windows users can try WSL2.
+- **Saved receipts:** archive details are read-only; editing and deleting stored receipts are not available.
+- **Local use and security:** there is no user authentication. API-key encryption protects a database copy without its master key, but not access to both files or the running application.
+- **Custom backend ports:** changing `PORT` also requires updating the frontend API proxy manually.
 
-The project is still under active development and is not production-ready.
+### Planned Improvements
+
+- Integrate import editing directly into the expanded product details, replacing the separate **Edit data** panel.
+- Improve extraction accuracy, with future model tuning expected to focus primarily on Luna.
+- Add receipt filters and product/merchant browsing.
+- Add product price history and price comparisons.
+- Add expense statistics and category-/merchant-based analysis.
+- Add a dedicated warranty overview.
 
 ## License
 
