@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useSavedReceipt } from "../hooks/useSavedReceipt";
-import SavedReceiptSummary from "../components/receipts/SavedReceiptSummary";
-import ReceiptArchiveImage from "../components/receipts/ReceiptArchiveImage";
+import ReceiptDetail from "../components/receipts/ReceiptDetail";
 import Card from "../components/ui/Card";
 import PageHeader from "../components/ui/PageHeader";
 import Toast from "../components/ui/Toast";
@@ -53,18 +52,10 @@ export default function SavedReceiptPage({
         />
       )}
       {saved.receipt ? (
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-          <Card className="min-w-0 p-5 sm:p-6">
-            <h2 className="mb-5 text-lg font-semibold">
-              {t("pages.import.saved.archive")}
-            </h2>
-            <ReceiptArchiveImage
-              url={saved.receipt.imageUrl}
-              alt={t("pages.import.saved.imageAlt")}
-            />
-          </Card>
-          <SavedReceiptSummary receipt={saved.receipt} />
-        </div>
+        <ReceiptDetail
+          receipt={saved.receipt}
+          status={t("pages.import.saved.status")}
+        />
       ) : (
         <Card aria-busy={!saved.error}>
           <p role="status" className="text-sm text-muted">

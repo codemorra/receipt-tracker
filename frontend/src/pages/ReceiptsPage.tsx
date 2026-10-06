@@ -1,18 +1,16 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useReceiptBrowser } from "../hooks/useReceiptBrowser";
 import Card from "../components/ui/Card";
 import PageHeader from "../components/ui/PageHeader";
+import ReceiptDetailModal from "../components/receipts/ReceiptDetailModal";
 
 /** Receipt archive with one shared search and fixed-size pagination. */
-export default function ReceiptsPage({
-  onOpenReceipt,
-}: {
-  onOpenReceipt: (id: number) => void;
-}) {
+export default function ReceiptsPage() {
   const { t, i18n } = useTranslation();
   const heading = useRef<HTMLHeadingElement>(null);
   const browser = useReceiptBrowser();
+  const [receiptId, setReceiptId] = useState<number | null>(null);
   const data = browser.data;
   const stale = browser.loading || browser.error !== null;
   useEffect(() => {
@@ -104,7 +102,7 @@ export default function ReceiptsPage({
                   onClick={(event) => {
                     if (stale) return;
                     event.currentTarget.querySelector("button")?.focus();
-                    onOpenReceipt(receipt.id);
+                    setReceiptId(receipt.id);
                   }}
                   className={`border-b border-shell last:border-0 ${stale ? "" : "cursor-pointer hover:bg-surface-hover"}`}
                 >
@@ -206,6 +204,12 @@ export default function ReceiptsPage({
           </nav>
         )}
       </Card>
+      {receiptId !== null && (
+        <ReceiptDetailModal
+          receiptId={receiptId}
+          onClose={() => setReceiptId(null)}
+        />
+      )}
     </>
   );
 }

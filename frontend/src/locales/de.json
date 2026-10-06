@@ -10,7 +10,8 @@
       "openMenu": "Menü öffnen",
       "closeMenu": "Menü schließen",
       "skipToContent": "Zum Inhalt springen",
-      "dismissNotification": "Meldung schließen"
+      "dismissNotification": "Meldung schließen",
+      "closeDialog": "Dialog schließen"
     }
   },
   "navigation": {
@@ -272,14 +273,9 @@
         "description": "Dein gespeicherter Beleg mit allen Angaben und dem Archivbild.",
         "status": "Gespeichert",
         "newImport": "Neuen Beleg importieren",
-        "archive": "Archivbild",
-        "imageAlt": "Archivbild des gespeicherten Belegs",
-        "imageMissing": "Das Archivbild ist nicht verfügbar.",
         "loading": "Beleg wird geladen…",
         "unavailable": "Der Beleg ist derzeit nicht verfügbar.",
-        "retry": "Erneut laden",
-        "itemDetails": "Produktdetails",
-        "discount": "Rabatt"
+        "retry": "Erneut laden"
       }
     },
     "receipts": {
@@ -331,6 +327,37 @@
     "notFound": {
       "title": "Seite nicht gefunden",
       "description": "Wähle einen Bereich in der Navigation."
+    },
+    "receiptSummary": {
+      "merchantRawName": "Händlername auf dem Beleg",
+      "purchaseDate": "Kaufdatum",
+      "purchaseTime": "Uhrzeit",
+      "currency": "Währung",
+      "total": "Gesamtbetrag",
+      "items": "Positionen",
+      "unitPrice": "Einzelpreis",
+      "rawName": "Bezeichnung auf dem Beleg",
+      "brandName": "Marke",
+      "productGroupName": "Produktgruppe",
+      "packageAmount": "Packungsgröße",
+      "packageUnit": "Packungseinheit",
+      "category": "Kategorie",
+      "unknown": "Nicht angegeben",
+      "discounts": "Rabatte",
+      "wholeReceipt": "Gesamten Beleg",
+      "discount": "Rabatt",
+      "moreDetails": "Weitere Produktdetails",
+      "lineType": "Positionstyp",
+      "warranties": "Garantien und Gewährleistung"
+    },
+    "receiptDetail": {
+      "archive": "Archivbild",
+      "imageAlt": "Archivbild des gespeicherten Belegs",
+      "imageMissing": "Das Archivbild ist nicht verfügbar.",
+      "title": "Beleg #{{id}}",
+      "loading": "Beleg wird geladen…",
+      "unavailable": "Der Beleg ist derzeit nicht verfügbar.",
+      "retry": "Erneut laden"
     }
   },
   "providerSettings": {

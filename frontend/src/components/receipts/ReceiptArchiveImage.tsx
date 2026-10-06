@@ -23,7 +23,7 @@ export default function ReceiptArchiveImage({
       role="status"
       className="rounded-xl border border-shell bg-canvas/30 p-4 text-xs text-muted"
     >
-      {t("pages.import.saved.imageMissing")}
+      {t("pages.receiptDetail.imageMissing")}
     </p>
   ) : (
     <img

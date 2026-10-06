@@ -10,7 +10,8 @@
       "openMenu": "Open menu",
       "closeMenu": "Close menu",
       "skipToContent": "Skip to content",
-      "dismissNotification": "Dismiss notification"
+      "dismissNotification": "Dismiss notification",
+      "closeDialog": "Close dialog"
     }
   },
   "navigation": {
@@ -272,14 +273,9 @@
         "description": "Your saved receipt with all details and its archive image.",
         "status": "Saved",
         "newImport": "Import another receipt",
-        "archive": "Archive image",
-        "imageAlt": "Archive image of the saved receipt",
-        "imageMissing": "The archive image is unavailable.",
         "loading": "Loading receipt…",
         "unavailable": "The receipt is currently unavailable.",
-        "retry": "Reload",
-        "itemDetails": "Product details",
-        "discount": "Discount"
+        "retry": "Reload"
       }
     },
     "receipts": {
@@ -331,6 +327,37 @@
     "notFound": {
       "title": "Page not found",
       "description": "Choose a section in the navigation."
+    },
+    "receiptSummary": {
+      "merchantRawName": "Merchant name on receipt",
+      "purchaseDate": "Purchase date",
+      "purchaseTime": "Time",
+      "currency": "Currency",
+      "total": "Total",
+      "items": "Items",
+      "unitPrice": "Unit price",
+      "rawName": "Name on receipt",
+      "brandName": "Brand",
+      "productGroupName": "Product group",
+      "packageAmount": "Package amount",
+      "packageUnit": "Package unit",
+      "category": "Category",
+      "unknown": "Not provided",
+      "discounts": "Discounts",
+      "wholeReceipt": "Whole receipt",
+      "discount": "Discount",
+      "moreDetails": "More product details",
+      "lineType": "Line type",
+      "warranties": "Warranties"
+    },
+    "receiptDetail": {
+      "archive": "Archive image",
+      "imageAlt": "Archive image of the saved receipt",
+      "imageMissing": "The archive image is unavailable.",
+      "title": "Receipt #{{id}}",
+      "loading": "Loading receipt…",
+      "unavailable": "The receipt is currently unavailable.",
+      "retry": "Reload"
     }
   },
   "providerSettings": {
