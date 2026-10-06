@@ -34,6 +34,15 @@ The application keeps the user involved in the import process by allowing uncert
 - Read-only receipt details in a full-height side panel with the archive image
 - Shared compact summaries for import drafts and saved receipts, with expandable product details
 
+### Analytics
+
+- Spending totals, receipt counts, average receipt values, and merchant breakdowns
+- Spending timeline with daily, weekly, or monthly totals
+- Product price history with name and alias search, price statistics, and purchase history
+- Shared period presets, custom date ranges, and searchable merchant filters
+- Shareable filter URLs with reload and browser Back/Forward support
+- Receipt details accessible directly from purchase history
+
 ## Technical Overview
 
 ### Frontend
@@ -43,6 +52,7 @@ The application keeps the user involved in the import process by allowing uncert
 - Vite
 - Tailwind CSS
 - react-i18next
+- Chart.js with react-chartjs-2
 
 ### Backend
 
@@ -225,6 +235,16 @@ Persistent Storage
 
 **Receipts** lists saved receipts, newest first, with 20 entries per page. One search field matches merchant and product names and their learned aliases. Selecting a row opens a read-only panel with the archive image, receipt details, and expandable product metadata.
 
+## Using Analytics
+
+Open **Analytics** and choose **Spending** or **Price History**. Both tabs offer **Last 30 days**, **Last 3 months**, **This year**, **All time**, and **Custom range**, with inclusive dates and an optional merchant filter. Preset links calculate their date boundaries from the current local date when opened; only custom ranges store fixed dates in the URL.
+
+**Spending** sums the saved final receipt totals, including receipt-wide discounts already reflected in those totals. The timeline groups ranges of up to 45 days by day, up to 183 days by week, and longer ranges by month. Weeks start on Monday, and empty periods have zero totals. Average receipt value is unavailable when no receipts match.
+
+**Price History** requires selecting a saved product; the search matches canonical names and learned aliases. Statistics and the chart use unit prices as recorded on receipts. Purchases with missing unit prices remain in the table but are excluded from statistics and the chart. Select a receipt in the table to open its existing detail panel.
+
+Analytics does not convert currencies. Spending rejects selections containing multiple receipt currencies; Price History rejects selections whose available unit prices use multiple currencies. Narrow the date range or merchant filter to view a single currency. Prices are not normalized to package sizes or units such as €/kg or €/l, and category analysis is not included.
+
 ## Database Model
 
 The database separates receipts, receipt items, products, merchants, aliases, categories, discounts, and warranty information.
@@ -235,7 +255,7 @@ Aliases allow the application to learn confirmed receipt labels over time and au
 
 ## Project Status
 
-Receipt import, review, duplicate checking, saving, and archive search are implemented, together with AI provider settings, German/English language support, and appearance controls. Analysis and the dedicated warranty overview remain placeholder pages. The project is under active development.
+Receipt import, review, duplicate checking, saving, archive search, spending analytics, and product price history are implemented, together with AI provider settings, German/English language support, and appearance controls. The dedicated warranty overview remains a placeholder page. The project is under active development.
 
 ## Known Limitations and Planned Improvements
 
@@ -252,8 +272,8 @@ Receipt import, review, duplicate checking, saving, and archive search are imple
 - Integrate import editing directly into the expanded product details, replacing the separate **Edit data** panel.
 - Improve extraction accuracy, with future model tuning expected to focus primarily on Luna.
 - Add receipt filters and product/merchant browsing.
-- Add product price history and price comparisons.
-- Add expense statistics and category-/merchant-based analysis.
+- Add product price comparisons.
+- Add category-based analysis.
 - Add a dedicated warranty overview.
 
 ## License
