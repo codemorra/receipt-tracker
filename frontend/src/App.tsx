@@ -51,9 +51,7 @@ function App() {
           <ImportPage onSaved={(id) => navigateTo(`/import?receiptId=${id}`)} />
         )
       ) : route === "receipts" ? (
-        <ReceiptsPage
-          onOpenReceipt={(id) => navigateTo(`/import?receiptId=${id}`)}
-        />
+        <ReceiptsPage />
       ) : (
         <PlaceholderPage route={route} />
       )}
