@@ -3,6 +3,7 @@ import {
   isValidDate,
   parseCents,
   type LineType,
+  type MatchStatus,
   type ReviewDraft,
   type WarrantyType,
 } from "../review/review-state.ts";
@@ -25,6 +26,7 @@ export interface ReceiptSummaryModel {
     unitPriceCents: number | null;
     totalPriceCents: number | null;
     lineType: LineType;
+    match?: { status: MatchStatus | null; selected: boolean };
     product: null | {
       name: string;
       brandName: string | null;
@@ -152,6 +154,7 @@ export function reviewDraftToSummary(draft: ReviewDraft): ReceiptSummaryModel {
         unitPriceCents: parseCents(item.unitPrice),
         totalPriceCents: parseCents(item.totalPrice),
         lineType: item.lineType,
+        ...(isProduct ? { match: { status: item.matchStatus, selected } } : {}),
         product: !isProduct
           ? null
           : {

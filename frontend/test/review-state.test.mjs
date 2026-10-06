@@ -26,6 +26,11 @@ import {
   isSavedReceipt,
   ReceiptApiError,
 } from "../src/api/receipt-api.ts";
+import {
+  duplicateIdentity,
+  duplicateReviewDecision,
+  confirmDuplicateReview,
+} from "../src/review/duplicate-review.ts";
 
 // Sample review object used for testing the review state functions.
 const review = {
@@ -609,6 +614,119 @@ test("confirmation sends the reviewed associations, discounts and warranties, an
     }),
     false,
   );
+});
+
+// Tests for the duplicate review logic, including explicit decisions, stale candidate invalidation, and final save conflicts.
+test("duplicate review requires an explicit decision, invalidates stale candidates and handles final save conflicts", async (t) => {
+  const draft = createReviewDraft(review);
+  const checked = {
+    identity: duplicateIdentity(draft),
+    candidates: [duplicate],
+  };
+  assert.deepEqual(duplicateReviewDecision(draft, checked), {
+    action: "review",
+    candidates: [duplicate],
+  });
+  assert.equal(
+    duplicateReviewDecision(draft, confirmDuplicateReview(draft, checked))
+      .action,
+    "override",
+  );
+  // Closing a comparison without confirming leaves saving blocked.
+  assert.equal(duplicateReviewDecision(draft, checked).action, "review");
+  assert.equal(
+    duplicateReviewDecision(
+      draft,
+      confirmDuplicateReview(draft, { ...checked, candidates: [] }),
+    ).action,
+    "save",
+  );
+  const approved = confirmDuplicateReview(draft, checked);
+  assert.equal(approved.confirmed, true);
+  assert.equal(checked.confirmed, undefined);
+  assert.equal(duplicateReviewDecision(draft, approved).action, "override");
+  assert.equal(duplicateReviewDecision(draft, approved).action, "override");
+  const original = structuredClone(draft);
+  for (const changes of [
+    { merchantId: 9 },
+    { purchaseDate: "2026-09-30" },
+    { purchaseTime: "15:00" },
+    { total: "2.49" },
+  ]) {
+    const edited = { ...draft, ...changes };
+    assert.deepEqual(
+      duplicateReviewDecision(edited, confirmDuplicateReview(draft, checked)),
+      {
+        action: "save",
+        candidates: [],
+      },
+    );
+  }
+  const itemEdited = structuredClone(draft);
+  itemEdited.items[0].quantity = "2";
+  itemEdited.items[0].normalizedName = "Corrected product";
+  itemEdited.items[0].warranties = [
+    {
+      id: "warranty",
+      type: "statutory",
+      startDate: "2026-09-29",
+      endDate: "2028-09-29",
+      notes: "",
+    },
+  ];
+  assert.equal(duplicateReviewDecision(itemEdited, checked).action, "review");
+  assert.equal(
+    duplicateIdentity({ ...draft, total: "1,19" }),
+    duplicateIdentity(draft),
+  );
+
+  // After identity edits a normal save must still reach the backend without override.
+  const edited = { ...draft, total: "2.49" };
+  const finalCandidate = { ...duplicate, totalCents: 249 };
+  t.mock.method(globalThis, "fetch", async (_url, init) => {
+    const payload = JSON.parse(init.body);
+    assert.equal(payload.duplicateOverride, false);
+    assert.equal(payload.totalCents, 249);
+    return Response.json(
+      {
+        error: "duplicate_confirmation_required",
+        candidates: [finalCandidate],
+      },
+      { status: 409 },
+    );
+  });
+  const result = await confirmReceipt(scanId, buildFinalSaveDto(edited));
+  assert.equal(result.kind, "duplicates");
+  const finalCheck = {
+    identity: duplicateIdentity(edited),
+    candidates: result.candidates,
+  };
+  assert.equal(duplicateReviewDecision(edited, finalCheck).action, "review");
+  assert.equal(
+    duplicateReviewDecision(edited, confirmDuplicateReview(edited, finalCheck))
+      .action,
+    "override",
+  );
+  assert.equal(duplicateReviewDecision(edited, finalCheck).action, "review");
+  // Only the later normal Save request imports the receipt using the confirmed comparison.
+  const approvedFinalCheck = confirmDuplicateReview(edited, finalCheck);
+  let saves = 0;
+  t.mock.method(globalThis, "fetch", async (_url, init) => {
+    saves += 1;
+    assert.equal(JSON.parse(init.body).duplicateOverride, true);
+    return Response.json({ receiptId: 7 }, { status: 201 });
+  });
+  assert.equal(saves, 0);
+  const saved = await confirmReceipt(
+    scanId,
+    buildFinalSaveDto(edited),
+    duplicateReviewDecision(edited, approvedFinalCheck).action === "override",
+  );
+  assert.equal(saved.kind, "saved");
+  assert.equal(saves, 1);
+  assert.equal(duplicateReviewDecision(edited, finalCheck).action, "review");
+  assert.equal(confirmDuplicateReview(edited, checked).confirmed, false);
+  assert.deepEqual(draft, original);
 });
 
 // Tests for classification of save errors and handling of broken duplicate payloads.

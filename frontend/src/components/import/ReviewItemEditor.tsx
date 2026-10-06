@@ -5,7 +5,7 @@ import type { useReceiptReview } from "../../hooks/useReceiptReview";
 import type { ItemDraft, LineType, Unit } from "../../review/review-state";
 import { SelectField, TextField } from "../ui/FormField";
 import LookupField from "../ui/LookupField";
-import ConfirmDialog from "../ui/ConfirmDialog";
+import InlineConfirmation from "../ui/InlineConfirmation";
 import ReviewMatchBadge from "./ReviewMatchBadge";
 import ItemWarrantyEditor from "./ItemWarrantyEditor";
 
@@ -64,7 +64,7 @@ export default function ReviewItemEditor({
   return (
     <article className="min-w-0 space-y-3 rounded-xl border border-shell bg-canvas/25 p-4">
       {confirmRemoval && (
-        <ConfirmDialog
+        <InlineConfirmation
           title={t("pages.import.review.removeItem", { number: index + 1 })}
           message={t("pages.import.review.removeItemConfirmation", {
             name:

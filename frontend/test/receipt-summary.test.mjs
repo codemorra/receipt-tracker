@@ -131,7 +131,17 @@ test("saved receipt and import draft produce the same read-only data and discoun
   const savedBefore = structuredClone(saved);
   const draftBefore = structuredClone(current);
   const fromSaved = savedReceiptToSummary(saved);
-  assert.deepEqual(reviewDraftToSummary(current), fromSaved);
+  const fromDraft = reviewDraftToSummary(current);
+  assert.deepEqual(fromDraft.items[0].match, { status: null, selected: true });
+  assert.equal(fromDraft.items[1].match, undefined);
+  assert.ok(fromSaved.items.every((item) => item.match === undefined));
+  assert.deepEqual(
+    {
+      ...fromDraft,
+      items: fromDraft.items.map(({ match, ...item }) => item),
+    },
+    fromSaved,
+  );
   assert.equal(fromSaved.items[0].name, "Canonical milk");
   assert.equal(fromSaved.items[0].rawName, "MILCH");
   assert.equal(fromSaved.items[0].quantity, 1.5);
@@ -162,6 +172,7 @@ test("summary follows current product selections, edits and item removal without
     packageUnit: "g",
   });
   assert.equal(summary.items[0].totalPriceCents, -50);
+  assert.deepEqual(summary.items[0].match, { status: null, selected: false });
   current.items[0] = chooseProduct(current.items[0], {
     id: 8,
     name: "New selection",
@@ -170,6 +181,24 @@ test("summary follows current product selections, edits and item removal without
   assert.equal(summary.items[0].name, "New selection");
   assert.equal(summary.items[0].product.brandName, null);
   assert.equal(summary.items[0].product.packageAmount, null);
+  assert.deepEqual(summary.items[0].match, { status: null, selected: true });
+  for (const [status, selected] of [
+    ["NEW", false],
+    ["SUGGESTED", false],
+    ["MATCHED", true],
+    [null, true],
+    [null, false],
+  ]) {
+    const candidate = structuredClone(current);
+    candidate.items[0].matchStatus = status;
+    candidate.items[0].productId = selected ? 8 : null;
+    const before = structuredClone(candidate);
+    assert.deepEqual(reviewDraftToSummary(candidate).items[0].match, {
+      status,
+      selected,
+    });
+    assert.deepEqual(candidate, before);
+  }
   current = removeReviewItem(current, "11");
   summary = reviewDraftToSummary(current);
   assert.deepEqual(

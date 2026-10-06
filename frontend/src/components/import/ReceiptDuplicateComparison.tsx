@@ -1,10 +1,12 @@
 import { useTranslation } from "react-i18next";
+import { useRef, useState } from "react";
 import {
   parseCents,
   type DuplicateCandidate,
   type ReviewDraft,
 } from "../../review/review-state";
 import ReceiptArchiveImage from "../receipts/ReceiptArchiveImage";
+import Select from "../ui/Select";
 
 /**
  * Component for comparing a receipt with its potential duplicate candidates.
@@ -23,6 +25,8 @@ export default function ReceiptDuplicateComparison({
   candidates: DuplicateCandidate[];
 }) {
   const { t, i18n } = useTranslation();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const scrollArea = useRef<HTMLDivElement>(null);
   const money = (cents: number | null, currency: string) =>
     cents === null
       ? "—"
@@ -66,17 +70,14 @@ export default function ReceiptDuplicateComparison({
       })),
     })),
   ];
+  const selectedPanel =
+    panels.slice(1).find((panel) => panel.key === selectedId) ?? panels[1];
   const renderPanel = (panel: (typeof panels)[number]) => (
     <div
       key={panel.key}
       className="min-w-0 space-y-3 rounded-xl border border-shell bg-surface/70 p-3"
     >
       <h4 className="text-xs font-semibold">{panel.title}</h4>
-      <ReceiptArchiveImage
-        url={panel.url}
-        alt={panel.title}
-        className="max-h-64"
-      />
       <div className="space-y-1 text-xs">
         <p className="font-medium wrap-break-word">{panel.merchant}</p>
         <p className="text-muted">
@@ -84,7 +85,7 @@ export default function ReceiptDuplicateComparison({
         </p>
         <p className="font-semibold">{money(panel.total, panel.currency)}</p>
       </div>
-      <ul className="max-h-48 space-y-2 overflow-y-auto text-xs">
+      <ul className="space-y-2 text-xs">
         {panel.items.map((item) => (
           <li key={item.key} className="flex justify-between gap-2">
             <span className="min-w-0 wrap-break-word">
@@ -96,25 +97,52 @@ export default function ReceiptDuplicateComparison({
           </li>
         ))}
       </ul>
+      <hr className="border-0 border-t border-shell" />
+      <ReceiptArchiveImage
+        url={panel.url}
+        alt={panel.title}
+        className="h-auto"
+      />
     </div>
   );
   return (
     <section
       aria-label={t("pages.import.duplicates.title")}
-      className="space-y-4 rounded-xl border border-accent/30 bg-accent-soft/30 p-4"
+      className="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-accent/30 bg-accent-soft/30 p-4"
     >
-      <div>
-        <h3 className="text-sm font-semibold">
-          {t("pages.import.duplicates.title")}
-        </h3>
+      <div className="shrink-0">
         <p className="mt-1 text-xs leading-relaxed text-muted">
           {t("pages.import.duplicates.hint")}
         </p>
       </div>
-      <div className="grid items-start gap-4 sm:grid-cols-2">
-        {renderPanel(panels[0])}
-        <div className="min-w-0 space-y-4">
-          {panels.slice(1).map(renderPanel)}
+      {candidates.length > 1 && selectedPanel && (
+        <div className="shrink-0 overflow-y-auto pr-3 scrollbar-gutter-stable">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-start-2">
+              <Select
+                label={t("pages.import.duplicates.chooseReceipt")}
+                value={selectedPanel.key}
+                options={panels
+                  .slice(1)
+                  .map((panel) => ({ value: panel.key, label: panel.title }))}
+                compact
+                floatingPanel
+                onChange={(value) => {
+                  setSelectedId(value);
+                  scrollArea.current?.scrollTo({ top: 0 });
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      <div
+        ref={scrollArea}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-3 scrollbar-gutter-stable"
+      >
+        <div className="grid items-start gap-4 sm:grid-cols-2">
+          {renderPanel(panels[0])}
+          {selectedPanel && renderPanel(selectedPanel)}
         </div>
       </div>
     </section>

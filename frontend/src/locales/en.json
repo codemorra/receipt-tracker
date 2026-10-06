@@ -54,7 +54,7 @@
         "keyboardHint": "Arrow keys move the corner; Shift moves it further.",
         "rotateLeft": "Rotate left",
         "rotateRight": "Rotate right",
-        "fullImage": "Use full image",
+        "fullImage": "Full image",
         "showArchive": "Show archive image",
         "provider": "AI provider",
         "chooseProvider": "Choose a provider",
@@ -214,7 +214,7 @@
         "existingGroup": "Saved product group",
         "discountNumber": "Discount {{number}}",
         "issuesHeading": "Fields to review: {{count}}",
-        "possibleDuplicate": "Possible duplicate receipts were found.",
+        "possibleDuplicate": "This receipt may have already been imported.\nPlease compare it with the saved receipts.",
         "retryCategories": "Reload categories",
         "match": {
           "MATCHED": "Automatically matched",
@@ -242,18 +242,22 @@
         "cancel": "Cancel",
         "editWarranty": "Edit",
         "saveWarranty": "Apply changes",
-        "removeDiscountConfirmation": "Remove “{{name}}” from the receipt?"
+        "removeDiscountConfirmation": "Remove “{{name}}” from the receipt?",
+        "correctionsRequired": "Correct the listed fields in “Edit data” before saving."
       },
       "duplicates": {
-        "title": "Possible duplicate receipts",
-        "hint": "Compare the receipts. You can cancel the import or save this receipt anyway.",
+        "title": "Possibly already imported",
+        "hint": "This receipt resembles a saved receipt. Compare the details and images. “Import anyway” confirms your review and returns to the overview, where you can save the receipt.",
         "current": "Current receipt",
-        "existing": "Saved receipt #{{id}}"
+        "existing": "Saved receipt #{{id}}",
+        "review": "Review duplicate",
+        "confirmed": "Duplicate review confirmed. You can now import the receipt using “Save receipt”.",
+        "chooseReceipt": "Choose saved receipt"
       },
       "save": {
         "save": "Save receipt",
         "saving": "Saving…",
-        "override": "Save anyway",
+        "override": "Import anyway",
         "cancelImport": "Cancel import",
         "cancelling": "Cancelling…",
         "errors": {
@@ -276,6 +280,11 @@
         "loading": "Loading receipt…",
         "unavailable": "The receipt is currently unavailable.",
         "retry": "Reload"
+      },
+      "advanced": {
+        "title": "Edit data",
+        "hint": "Changes appear immediately in the overview. Use Save receipt there when you are ready.",
+        "done": "Back to overview"
       }
     },
     "receipts": {
@@ -348,7 +357,8 @@
       "discount": "Discount",
       "moreDetails": "More product details",
       "lineType": "Line type",
-      "warranties": "Warranties"
+      "warranties": "Warranties",
+      "newProducts": "New products: {{count}}"
     },
     "receiptDetail": {
       "archive": "Archive image",
