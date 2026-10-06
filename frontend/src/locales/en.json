@@ -319,7 +319,65 @@
     },
     "analytics": {
       "title": "Analytics",
-      "description": "An overview of your spending."
+      "description": "Explore your spending and product prices over time.",
+      "tabs": {
+        "label": "Analytics views",
+        "spending": "Spending",
+        "price-history": "Price History"
+      },
+      "loading": "Loading spending…",
+      "updating": "Updating filters… Previous results are shown dimmed.",
+      "retry": "Try again",
+      "priceHistory": {
+        "pending": "Product price history will be available in the next implementation step."
+      },
+      "filters": {
+        "period": "Period",
+        "merchant": "Merchant",
+        "allMerchants": "All merchants",
+        "merchantId": "Merchant #{{id}}",
+        "searchMerchant": "Search merchants",
+        "lookupLoading": "Searching merchants…",
+        "lookupEmpty": "No merchants found.",
+        "lookupRetry": "Retry search",
+        "from": "From",
+        "to": "To",
+        "apply": "Apply",
+        "presets": {
+          "last-30-days": "Last 30 days",
+          "last-3-months": "Last 3 months",
+          "this-year": "This year",
+          "all-time": "All time",
+          "custom": "Custom range"
+        }
+      },
+      "spending": {
+        "total": "Total Spending",
+        "receipts": "Receipts",
+        "average": "Average Receipt Value",
+        "timeline": "Spending over time",
+        "merchants": "Merchant breakdown",
+        "share": "Share",
+        "empty": "No receipts match this period and merchant.",
+        "receiptCount": "Receipts: {{count}}",
+        "chartLabel": "Spending over time; the values are also available in the table below.",
+        "timelineData": "Show timeline values",
+        "period": "Period start",
+        "granularity": {
+          "daily": "Daily totals",
+          "weekly": "Weekly totals, starting Monday. Edge weeks include only dates within the filter.",
+          "monthly": "Monthly totals. Edge months include only dates within the filter."
+        }
+      },
+      "errors": {
+        "invalid_analytics_query": "Choose valid filters and a date range whose start is on or before its end.",
+        "merchant_not_found": "This merchant is no longer available. Select another merchant or all merchants.",
+        "analytics_mixed_currencies": "These receipts use different currencies and cannot be combined. Try a narrower period or a specific merchant.",
+        "analytics_spending_failed": "Spending could not be loaded. Please try again.",
+        "merchant_lookup_failed": "Merchants could not be loaded. Please try again.",
+        "network_error": "The backend could not be reached. Check the connection and try again.",
+        "unexpected_response": "The backend returned unexpected analytics data. Please try again."
+      }
     },
     "warranties": {
       "title": "Warranties",

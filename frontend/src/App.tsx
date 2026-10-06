@@ -5,6 +5,7 @@ import SettingsPage from "./pages/SettingsPage";
 import ImportPage from "./pages/ImportPage";
 import SavedReceiptPage from "./pages/SavedReceiptPage";
 import ReceiptsPage from "./pages/ReceiptsPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import { receiptIdFromSearch, resolveRoute } from "./routes/routing";
 import "./App.css";
 
@@ -52,6 +53,8 @@ function App() {
         )
       ) : route === "receipts" ? (
         <ReceiptsPage />
+      ) : route === "analytics" ? (
+        <AnalyticsPage search={location.search} navigate={navigateTo} />
       ) : (
         <PlaceholderPage route={route} />
       )}

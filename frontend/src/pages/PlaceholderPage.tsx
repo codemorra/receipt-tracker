@@ -6,7 +6,7 @@ import PageHeader from "../components/ui/PageHeader";
 
 // Props for the PlaceholderPage component.
 interface Props {
-  route: Exclude<Route, "import" | "settings" | "receipts">;
+  route: Exclude<Route, "import" | "settings" | "receipts" | "analytics">;
 }
 
 /**

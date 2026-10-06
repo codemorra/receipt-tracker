@@ -1,5 +1,7 @@
 import type { Express } from "express";
 import type { Database } from "../db/database.js";
+import { eq } from "drizzle-orm";
+import { merchants } from "../db/schema.js";
 import {
   listBrands,
   listCategories,
@@ -21,6 +23,26 @@ export function registerLookupRoutes(app: Express, db: Database) {
 
   // Merchants endpoint
   app.get("/api/merchants", (request, response) => {
+    if (request.query.id !== undefined) {
+      const value = request.query.id;
+      const id =
+        typeof value === "string" && /^\d+$/.test(value) ? Number(value) : NaN;
+      if (!Number.isSafeInteger(id) || id <= 0) {
+        response.status(400).json({ error: "invalid_merchant_query" });
+        return;
+      }
+      const merchant = db
+        .select({ id: merchants.id, name: merchants.name })
+        .from(merchants)
+        .where(eq(merchants.id, id))
+        .get();
+      if (!merchant) {
+        response.status(404).json({ error: "merchant_not_found" });
+        return;
+      }
+      response.json([merchant]);
+      return;
+    }
     const query =
       typeof request.query.query === "string" ? request.query.query : "";
     response.json(listMerchants(db, query));

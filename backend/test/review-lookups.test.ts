@@ -90,6 +90,42 @@ test("review lookups return selectable entities and filter by name", async (t) =
     { id: merchantId, name: "Edeka" },
   ]);
   assert.deepEqual(await getJson("/api/merchants?query=unknown"), []);
+  // Restoring a URL selection must work even outside the first 50 lookup results.
+  const insertExtraMerchant = sqlite.prepare(
+    "INSERT INTO merchant (name, created_at, updated_at) VALUES (?, ?, ?)",
+  );
+  let lastMerchantId = 0;
+  for (let index = 0; index < 55; index++)
+    lastMerchantId = Number(
+      insertExtraMerchant.run(`Z-${String(index).padStart(2, "0")}`, now, now)
+        .lastInsertRowid,
+    );
+  assert.equal((await getJson("/api/merchants")).length, 50);
+  assert.deepEqual(await getJson(`/api/merchants?id=${lastMerchantId}`), [
+    { id: lastMerchantId, name: "Z-54" },
+  ]);
+  assert.deepEqual(await getJson("/api/merchants?query=EDE"), [
+    { id: merchantId, name: "Edeka" },
+  ]);
+  for (const query of [
+    "id=",
+    "id=0",
+    "id=-1",
+    "id=1.5",
+    "id=9007199254740992",
+    "id=1&id=2",
+  ]) {
+    const response = await fetch(`${base}/api/merchants?${query}`);
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {
+      error: "invalid_merchant_query",
+    });
+  }
+  const unknownMerchant = await fetch(`${base}/api/merchants?id=999999`);
+  assert.equal(unknownMerchant.status, 404);
+  assert.deepEqual(await unknownMerchant.json(), {
+    error: "merchant_not_found",
+  });
   assert.deepEqual(await getJson("/api/brands?query=alpen"), [
     { id: brandId, name: "Alpenhof" },
   ]);
