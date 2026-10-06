@@ -284,7 +284,33 @@
     },
     "receipts": {
       "title": "Belege",
-      "description": "Deine gespeicherten Belege an einem Ort."
+      "description": "Deine gespeicherten Belege an einem Ort.",
+      "searchLabel": "Belege durchsuchen",
+      "searchPlaceholder": "Händler- oder Produktname",
+      "loading": "Belege werden geladen…",
+      "retry": "Erneut laden",
+      "resultCount": "Gefundene Belege: {{count}}",
+      "tableLabel": "Gespeicherte Belege",
+      "merchant": "Händler",
+      "date": "Datum",
+      "total": "Gesamtbetrag",
+      "warranty": "Garantie",
+      "openDetail": "Beleg von {{merchant}} vom {{date}} öffnen",
+      "warrantyCount": "Garantieeinträge: {{count}}",
+      "noWarranty": "Keine Garantieeinträge",
+      "emptyArchive": "Noch keine Belege gespeichert. Importiere einen Beleg, um zu beginnen.",
+      "noResults": "Keine Belege passen zu deiner Suche.",
+      "emptyPage": "Auf dieser Seite sind keine Belege vorhanden.",
+      "pagination": "Belegseiten",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "pageStatus": "Seite {{page}} von {{totalPages}}",
+      "errors": {
+        "receipt_list_failed": "Die Belege konnten nicht geladen werden. Versuche es erneut.",
+        "invalid_receipt_query": "Die Suchanfrage ist ungültig. Versuche es erneut.",
+        "network_error": "Das Backend ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
+        "unexpected_response": "Das Backend hat eine unerwartete Antwort geliefert. Versuche es erneut."
+      }
     },
     "analytics": {
       "title": "Auswertungen",

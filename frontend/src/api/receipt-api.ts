@@ -15,6 +15,8 @@ export type ReceiptErrorCode =
   | "receipt_save_failed"
   | "receipt_not_found"
   | "receipt_detail_failed"
+  | "receipt_list_failed"
+  | "invalid_receipt_query"
   | "scan_cancel_failed"
   | "network_error"
   | "unexpected_response";
@@ -73,6 +75,24 @@ export interface SavedReceipt {
   }[];
 }
 
+// Interface for the receipt list response from the API.
+export interface ReceiptList {
+  items: (Pick<
+    SavedReceipt,
+    | "id"
+    | "merchantId"
+    | "merchantName"
+    | "purchaseDate"
+    | "purchaseTime"
+    | "totalCents"
+    | "currency"
+  > & { warrantyCount: number })[];
+  page: number;
+  pageSize: 20;
+  totalItems: number;
+  totalPages: number;
+}
+
 // Type guards for primitive and structured types used in SavedReceipt validation
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -91,6 +111,52 @@ const date = (value: unknown): value is string => {
     parsed.toISOString().slice(0, 10) === value
   );
 };
+
+/**
+ * Type guard for verifying if a value conforms to the ReceiptList interface.
+ * @param value - The value to check.
+ * @returns True if the value is a ReceiptList, false otherwise.
+ */
+export function isReceiptList(value: unknown): value is ReceiptList {
+  if (
+    !record(value) ||
+    !id(value.page) ||
+    value.pageSize !== 20 ||
+    !Number.isSafeInteger(value.totalItems) ||
+    (value.totalItems as number) < 0 ||
+    value.totalPages !== Math.ceil((value.totalItems as number) / 20) ||
+    (value.totalItems === 0 && value.page !== 1) ||
+    !Array.isArray(value.items)
+  )
+    return false;
+  const expectedItems =
+    (value.page as number) > (value.totalPages as number)
+      ? 0
+      : Math.min(
+          20,
+          (value.totalItems as number) - ((value.page as number) - 1) * 20,
+        );
+  return (
+    value.items.length === expectedItems &&
+    value.items.every(
+      (item: unknown) =>
+        record(item) &&
+        id(item.id) &&
+        id(item.merchantId) &&
+        typeof item.merchantName === "string" &&
+        date(item.purchaseDate) &&
+        (item.purchaseTime === null ||
+          (typeof item.purchaseTime === "string" &&
+            /^([01]\d|2[0-3]):[0-5]\d$/.test(item.purchaseTime))) &&
+        Number.isSafeInteger(item.totalCents) &&
+        typeof item.currency === "string" &&
+        /^[A-Z]{3}$/.test(item.currency) &&
+        Number.isSafeInteger(item.warrantyCount) &&
+        (item.warrantyCount as number) >= 0,
+    ) &&
+    new Set(value.items.map((item) => item.id)).size === value.items.length
+  );
+}
 
 /**
  * Type guard for verifying if a value conforms to the SavedReceipt interface.
@@ -287,6 +353,35 @@ export async function getSavedReceipt(
     );
   const value = await json(response);
   if (!isSavedReceipt(value) || value.id !== receiptId)
+    throw new ReceiptApiError("unexpected_response");
+  return value;
+}
+
+/**
+ * Retrieves a paginated list of receipts based on the search query.
+ * @param search - The search query string.
+ * @param page - The page number to retrieve (default is 1).
+ * @param signal - Optional AbortSignal for request cancellation.
+ * @returns The receipt list for the specified page.
+ * @throws ReceiptApiError if the query is invalid or the response is unexpected.
+ */
+export async function getReceipts(
+  search: string,
+  page = 1,
+  signal?: AbortSignal,
+): Promise<ReceiptList> {
+  if (!id(page)) throw new ReceiptApiError("invalid_receipt_query");
+  const query = new URLSearchParams({
+    search: search.trim(),
+    page: String(page),
+  });
+  const response = await request(`/api/receipts?${query}`, { signal });
+  if (!response.ok)
+    throw new ReceiptApiError(
+      response.status === 400 ? "invalid_receipt_query" : "receipt_list_failed",
+    );
+  const value = await json(response);
+  if (!isReceiptList(value) || (value.totalItems > 0 && value.page !== page))
     throw new ReceiptApiError("unexpected_response");
   return value;
 }
