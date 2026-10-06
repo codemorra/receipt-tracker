@@ -7,6 +7,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createApp } from "../src/app.js";
 import { createDatabase } from "../src/db/database.js";
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
+import { normalizeAlias } from "../src/matching/alias-normalizer.js";
 
 // Test for review lookups API endpoints
 test("review lookups return selectable entities and filter by name", async (t) => {
@@ -146,6 +147,123 @@ test("review lookups return selectable entities and filter by name", async (t) =
       packageUnit: "l",
     },
   ]);
+
+  const originalProduct = await getJson("/api/products?query=Whole");
+  const insertAlias = sqlite.prepare(
+    "INSERT INTO product_alias (product_id, alias, normalized_alias, created_at) VALUES (?, ?, ?, ?)",
+  );
+  for (const alias of ["MILCH-1L", "MILCH-2L", "SÜßE-MILCH"])
+    insertAlias.run(productId, alias, normalizeAlias(alias), now);
+  for (const query of [
+    " WHOLE milk ",
+    "MILK",
+    "Alpenhof",
+    "milch",
+    "MILCH 1 l",
+    "suesse milch",
+  ]) {
+    assert.deepEqual(
+      await getJson(`/api/products?query=${encodeURIComponent(query)}`),
+      originalProduct,
+      query,
+    );
+  }
+  for (const query of ["no match", "%_", "' OR 1=1 --"])
+    assert.deepEqual(
+      await getJson(`/api/products?query=${encodeURIComponent(query)}`),
+      [],
+    );
+
+  // Keep brand/group filtering and the import response shape, including nullable metadata.
+  const bakeryBrandId = Number(
+    sqlite
+      .prepare(
+        "INSERT INTO brand (name, created_at, updated_at) VALUES ('Bäcker & Söhne', ?, ?)",
+      )
+      .run(now, now).lastInsertRowid,
+  );
+  const bakeryGroupId = Number(
+    sqlite
+      .prepare(
+        "INSERT INTO product_group (category_id, name, created_at, updated_at) VALUES (?, 'Süßes Gebäck', ?, ?)",
+      )
+      .run(categoryId, now, now).lastInsertRowid,
+  );
+  const bakeryProductId = Number(
+    sqlite
+      .prepare(
+        "INSERT INTO product (product_group_id, brand_id, name, created_at, updated_at) VALUES (?, ?, 'Straßen-Brötchen', ?, ?)",
+      )
+      .run(bakeryGroupId, bakeryBrandId, now, now).lastInsertRowid,
+  );
+  const bakeryProduct = {
+    id: bakeryProductId,
+    name: "Straßen-Brötchen",
+    productGroupId: bakeryGroupId,
+    productGroupName: "Süßes Gebäck",
+    categoryId,
+    categoryName: "food",
+    brandId: bakeryBrandId,
+    brandName: "Bäcker & Söhne",
+    packageAmount: null,
+    packageUnit: null,
+  };
+  for (const query of [
+    "STRASSEN BROETCHEN",
+    "baecker und soehne",
+    "sUeSsEs GeBaEcK",
+  ])
+    assert.deepEqual(
+      await getJson(`/api/products?query=${encodeURIComponent(query)}`),
+      [bakeryProduct],
+    );
+
+  const insertProduct = sqlite.prepare(
+    "INSERT INTO product (product_group_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+  );
+  const sameNameId = Number(
+    insertProduct.run(groupId, "Whole Milk", now, now).lastInsertRowid,
+  );
+  const sameNameProduct = {
+    ...originalProduct[0],
+    id: sameNameId,
+    brandId: null,
+    brandName: null,
+    packageAmount: null,
+    packageUnit: null,
+  };
+  assert.deepEqual(await getJson("/api/products?query=whole"), [
+    originalProduct[0],
+    sameNameProduct,
+  ]);
+  assert.deepEqual(await getJson("/api/products?query=ALPEN"), originalProduct);
+  assert.deepEqual(await getJson("/api/products?query=MILK"), [
+    originalProduct[0],
+    sameNameProduct,
+  ]);
+  for (let index = 0; index < 55; index++)
+    insertProduct.run(groupId, `Z-${String(index).padStart(2, "0")}`, now, now);
+  const needleId = Number(
+    insertProduct.run(groupId, "Zulu Needle", now, now).lastInsertRowid,
+  );
+  assert.equal((await getJson("/api/products")).length, 50);
+  assert.deepEqual(
+    await getJson("/api/products?query=%20%20%20"),
+    await getJson("/api/products"),
+  );
+  assert.deepEqual(await getJson("/api/products?query=needle"), [
+    { ...sameNameProduct, id: needleId, name: "Zulu Needle" },
+  ]);
+  insertAlias.run(
+    needleId,
+    "NEEDLE-ALIAS",
+    normalizeAlias("NEEDLE-ALIAS"),
+    now,
+  );
+  assert.equal(
+    (await getJson("/api/products?query=NEEDLE-ALIAS"))[0].id,
+    needleId,
+  );
 
   const archiveDirectory = join(directory, "receipts", "2026", "09");
   await mkdir(archiveDirectory, { recursive: true });

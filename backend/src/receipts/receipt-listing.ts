@@ -3,13 +3,13 @@ import type { Database } from "../db/database.js";
 import {
   merchantAliases,
   merchants,
-  productAliases,
   products,
   receiptItems,
   receipts,
   warranties,
 } from "../db/schema.js";
 import { normalizeAlias } from "../matching/alias-normalizer.js";
+import { productNameOrAliasMatches } from "../lookups/product-search.js";
 
 const PAGE_SIZE = 20;
 
@@ -37,14 +37,7 @@ export function listReceipts(db: Database, search = "", page = 1) {
             SELECT 1 FROM ${receiptItems}
             INNER JOIN ${products} ON ${products.id} = ${receiptItems.productId}
             WHERE ${receiptItems.receiptId} = ${receipts.id}
-              AND (
-                instr(receipt_search_normalize(${products.name}), ${query}) > 0
-                OR EXISTS (
-                  SELECT 1 FROM ${productAliases}
-                  WHERE ${productAliases.productId} = ${products.id}
-                    AND instr(${productAliases.normalizedAlias}, ${query}) > 0
-                )
-              )
+              AND ${productNameOrAliasMatches(query)}
           )
         `;
 
