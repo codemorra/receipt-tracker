@@ -1,4 +1,6 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, or, sql } from "drizzle-orm";
+import { normalizeAlias } from "../matching/alias-normalizer.js";
+import { productNameOrAliasMatches } from "./product-search.js";
 import type { Database } from "../db/database.js";
 import {
   brands,
@@ -91,12 +93,22 @@ export function listProductGroups(db: Database, query: string) {
 }
 
 /**
- * Lists all products in the database, ordered by name, and filters them based on the query string.
+ * Searches products by normalized name, aliases, product group, or brand in SQL.
  * @param db The database instance.
  * @param query The query string to filter products by name, product group name, or brand name.
  * @returns An array of product objects containing the ID, name, product group ID and name, category ID and name, brand ID and name, package amount, and package unit, limited to a maximum number of results.
  */
 export function listProducts(db: Database, query: string) {
+  const normalized = normalizeAlias(query);
+  const predicate = !query.trim()
+    ? undefined
+    : !normalized
+      ? sql`0`
+      : or(
+          productNameOrAliasMatches(normalized),
+          sql`instr(receipt_search_normalize(${productGroups.name}), ${normalized}) > 0`,
+          sql`instr(receipt_search_normalize(coalesce(${brands.name}, '')), ${normalized}) > 0`,
+        );
   return db
     .select({
       id: products.id,
@@ -114,15 +126,8 @@ export function listProducts(db: Database, query: string) {
     .innerJoin(productGroups, eq(products.productGroupId, productGroups.id))
     .innerJoin(categories, eq(productGroups.categoryId, categories.id))
     .leftJoin(brands, eq(products.brandId, brands.id))
-    .orderBy(asc(products.name))
-    .all()
-    .filter((product) =>
-      matchesQuery(
-        query,
-        product.name,
-        product.productGroupName,
-        product.brandName,
-      ),
-    )
-    .slice(0, MAX_RESULTS);
+    .where(predicate)
+    .orderBy(asc(products.name), asc(products.id))
+    .limit(MAX_RESULTS)
+    .all();
 }
