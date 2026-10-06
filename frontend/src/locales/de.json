@@ -319,7 +319,65 @@
     },
     "analytics": {
       "title": "Auswertungen",
-      "description": "Ein Überblick über deine Ausgaben."
+      "description": "Deine Ausgaben und Produktpreise im zeitlichen Verlauf.",
+      "tabs": {
+        "label": "Auswertungsbereiche",
+        "spending": "Ausgaben",
+        "price-history": "Preisverlauf"
+      },
+      "loading": "Ausgaben werden geladen…",
+      "updating": "Filter werden aktualisiert… Bisherige Ergebnisse erscheinen abgeblendet.",
+      "retry": "Erneut versuchen",
+      "priceHistory": {
+        "pending": "Der Produktpreisverlauf wird im nächsten Umsetzungsschritt verfügbar."
+      },
+      "filters": {
+        "period": "Zeitraum",
+        "merchant": "Händler",
+        "allMerchants": "Alle Händler",
+        "merchantId": "Händler #{{id}}",
+        "searchMerchant": "Händler suchen",
+        "lookupLoading": "Händler werden gesucht…",
+        "lookupEmpty": "Keine Händler gefunden.",
+        "lookupRetry": "Suche wiederholen",
+        "from": "Von",
+        "to": "Bis",
+        "apply": "Anwenden",
+        "presets": {
+          "last-30-days": "Letzte 30 Tage",
+          "last-3-months": "Letzte 3 Monate",
+          "this-year": "Dieses Jahr",
+          "all-time": "Gesamter Zeitraum",
+          "custom": "Eigener Zeitraum"
+        }
+      },
+      "spending": {
+        "total": "Gesamtausgaben",
+        "receipts": "Belege",
+        "average": "Durchschnittlicher Belegwert",
+        "timeline": "Ausgaben im Zeitverlauf",
+        "merchants": "Ausgaben nach Händler",
+        "share": "Anteil",
+        "empty": "Keine Belege für diesen Zeitraum und Händler vorhanden.",
+        "receiptCount": "Belege: {{count}}",
+        "chartLabel": "Ausgaben im Zeitverlauf; die Werte sind auch in der Tabelle darunter verfügbar.",
+        "timelineData": "Zeitverlauf als Tabelle anzeigen",
+        "period": "Periodenbeginn",
+        "granularity": {
+          "daily": "Tagessummen",
+          "weekly": "Wochensummen ab Montag. Randwochen enthalten nur Daten innerhalb des Filters.",
+          "monthly": "Monatssummen. Randmonate enthalten nur Daten innerhalb des Filters."
+        }
+      },
+      "errors": {
+        "invalid_analytics_query": "Wähle gültige Filter und einen Zeitraum, dessen Beginn vor oder auf dem Enddatum liegt.",
+        "merchant_not_found": "Dieser Händler ist nicht mehr verfügbar. Wähle einen anderen Händler oder alle Händler.",
+        "analytics_mixed_currencies": "Diese Belege verwenden unterschiedliche Währungen und können nicht zusammengefasst werden. Wähle einen kürzeren Zeitraum oder einen bestimmten Händler.",
+        "analytics_spending_failed": "Die Ausgaben konnten nicht geladen werden. Bitte versuche es erneut.",
+        "merchant_lookup_failed": "Die Händler konnten nicht geladen werden. Bitte versuche es erneut.",
+        "network_error": "Das Backend ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
+        "unexpected_response": "Das Backend hat unerwartete Auswertungsdaten geliefert. Bitte versuche es erneut."
+      }
     },
     "warranties": {
       "title": "Garantie & Gewährleistung",

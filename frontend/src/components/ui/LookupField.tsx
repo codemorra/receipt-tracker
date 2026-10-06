@@ -17,9 +17,21 @@ interface Props {
   initialOptions?: LookupOption[];
   optionLabel?: (option: LookupOption) => string;
   onSelect: (option: LookupOption | null) => void;
-  onError: (code: ReviewErrorCode) => void;
+  onError?: (code: ReviewErrorCode) => void;
   footer?: ReactNode;
+  emptyLabel?: string;
+  clearOptionLabel?: string;
+  texts?: {
+    search: string;
+    loading: string;
+    empty: string;
+    retry: string;
+    clear: string;
+    error?: string;
+  };
 }
+
+const ignoreLookupError = () => {};
 
 /**
  * Renders a lookup field with a search input and dropdown options.
@@ -32,6 +44,9 @@ interface Props {
  * @param onSelect - Callback invoked when an option is selected.
  * @param onError - Callback invoked when an error occurs during lookup.
  * @param footer - Optional footer content to display below the dropdown.
+ * @param emptyLabel - Label to display when no option is selected.
+ * @param clearOptionLabel - Label for the clear option button.
+ * @param texts - Object containing localized text for various UI elements.
  */
 export default function LookupField({
   label,
@@ -41,8 +56,11 @@ export default function LookupField({
   initialOptions = [],
   optionLabel = (option) => option.name,
   onSelect,
-  onError,
+  onError = ignoreLookupError,
   footer,
+  emptyLabel,
+  clearOptionLabel,
+  texts,
 }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -74,7 +92,7 @@ export default function LookupField({
           <>
             <span className="min-w-0 flex-1 truncate">
               {selectedId === null
-                ? t("pages.import.review.lookup.search")
+                ? (emptyLabel ?? t("pages.import.review.lookup.search"))
                 : selectedName}
             </span>
             <span aria-hidden="true" className="text-muted">
@@ -85,12 +103,25 @@ export default function LookupField({
       >
         <input
           type="search"
-          aria-label={t("pages.import.review.lookup.search")}
-          placeholder={t("pages.import.review.lookup.search")}
+          aria-label={texts?.search ?? t("pages.import.review.lookup.search")}
+          placeholder={texts?.search ?? t("pages.import.review.lookup.search")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="mb-2 w-full rounded-lg border border-shell bg-canvas px-3 py-2 text-sm"
         />
+        {clearOptionLabel && (
+          <>
+            <button
+              type="button"
+              aria-pressed={selectedId === null}
+              onClick={() => onSelect(null)}
+              className="block w-full rounded-lg px-3 py-2.5 text-left text-sm hover:bg-surface-hover aria-pressed:bg-accent-soft aria-pressed:text-accent"
+            >
+              {clearOptionLabel}
+            </button>
+            <hr className="my-2 border-shell" />
+          </>
+        )}
         <div className="max-h-60 space-y-1 overflow-y-auto overscroll-contain">
           {choices.map((option) => (
             <button
@@ -105,38 +136,45 @@ export default function LookupField({
           ))}
           {lookup.loading && (
             <p role="status" className="px-3 py-2 text-xs text-muted">
-              {t("pages.import.review.lookup.loading")}
+              {texts?.loading ?? t("pages.import.review.lookup.loading")}
             </p>
           )}
           {!lookup.loading && !lookup.failed && choices.length === 0 && (
             <p className="px-3 py-2 text-xs text-muted">
-              {t("pages.import.review.lookup.empty")}
+              {texts?.empty ?? t("pages.import.review.lookup.empty")}
             </p>
           )}
           {lookup.failed && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                lookup.retry();
-              }}
-              className="px-3 py-2 text-xs text-accent underline"
-            >
-              {t("pages.import.review.lookup.retry")}
-            </button>
+            <>
+              {texts?.error && (
+                <p role="alert" className="px-3 py-2 text-xs text-warning">
+                  {texts.error}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  lookup.retry();
+                }}
+                className="px-3 py-2 text-xs text-accent underline"
+              >
+                {texts?.retry ?? t("pages.import.review.lookup.retry")}
+              </button>
+            </>
           )}
         </div>
       </Dropdown>
-      {(footer || selectedId !== null) && (
+      {(footer || (selectedId !== null && !clearOptionLabel)) && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           {footer}
-          {selectedId !== null && (
+          {selectedId !== null && !clearOptionLabel && (
             <button
               type="button"
               onClick={() => onSelect(null)}
               className="ml-auto cursor-pointer rounded text-xs text-accent underline underline-offset-4"
             >
-              {t("pages.import.review.lookup.clear")}
+              {texts?.clear ?? t("pages.import.review.lookup.clear")}
             </button>
           )}
         </div>
