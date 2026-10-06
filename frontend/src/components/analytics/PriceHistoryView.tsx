@@ -99,8 +99,15 @@ export default function PriceHistoryView({
       </Card>
       {state.productId === null ? (
         <Card>
-          <p className="text-sm text-muted">
-            {t("pages.analytics.priceHistory.selectPrompt")}
+          <p
+            role={query === null ? "alert" : undefined}
+            className={`text-sm ${query === null ? "text-warning" : "text-muted"}`}
+          >
+            {t(
+              query === null
+                ? "pages.analytics.errors.invalid_analytics_query"
+                : "pages.analytics.priceHistory.selectPrompt",
+            )}
           </p>
         </Card>
       ) : (

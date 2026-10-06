@@ -25,9 +25,9 @@ export interface SpendingFilters {
 }
 
 /**
- * Parses the analytics search string from the URL and returns the corresponding state and validity.
- * @param search The URL search string.
- * @returns An object containing the parsed state and a flag indicating if the search string is invalid.
+ * Checks if a given value is a valid calendar date in the format YYYY-MM-DD.
+ * @param value The value to check.
+ * @returns True if the value is a valid calendar date, false otherwise.
  */
 export function isCalendarDate(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))
@@ -39,9 +39,9 @@ export function isCalendarDate(value: unknown): value is string {
 }
 
 /**
- * Checks if a given value is a valid calendar date in the format YYYY-MM-DD.
- * @param value The value to check.
- * @returns True if the value is a valid calendar date, false otherwise.
+ * Parses the analytics search string from the URL and returns the corresponding state and validity.
+ * @param search The URL search string.
+ * @returns An object containing the parsed state and a flag indicating if the search string is invalid.
  */
 export function parseAnalyticsSearch(search: string): {
   state: AnalyticsState;
