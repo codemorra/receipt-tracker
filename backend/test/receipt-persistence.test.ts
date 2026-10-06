@@ -18,6 +18,9 @@ import { receipts } from "../src/db/schema.js";
 import { saveReceipt } from "../src/receipts/receipt-save-service.js";
 import { finalSaveSchema } from "../src/receipts/final-save.js";
 import { loadReceiptDetail } from "../src/receipts/receipt-detail.js";
+import { listReceipts } from "../src/receipts/receipt-listing.js";
+import { persistReceipt } from "../src/receipts/receipt-persistence.js";
+import { learnMerchantAlias } from "../src/matching/alias-learning.js";
 import {
   ConfirmedEntityNotFoundError,
   DuplicateConfirmationRequiredError,
@@ -663,4 +666,257 @@ test("saved receipt detail reloads from a new database connection", async (t) =>
   } finally {
     reopened.sqlite.close();
   }
+});
+
+// Test case for verifying that receipt listing correctly searches by merchant and product names, respects learned aliases, maintains stable pagination, and includes warranty counts.
+test("receipt listing searches names and learned aliases with stable pagination and warranty counts", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const firstInput = {
+    ...validReceipt,
+    merchant: { id: null, name: "Bäcker Straße", rawName: "MARKT-17" },
+    purchaseDate: "2026-09-29",
+    purchaseTime: "23:59",
+    items: [
+      {
+        ...validReceipt.items[0],
+        productName: "Süße Milch",
+        rawName: "DRINK-1L",
+      },
+      {
+        ...validReceipt.items[0],
+        productName: "Süße Milch",
+        rawName: "DRINK-2L",
+        warranties: [],
+      },
+    ],
+  };
+  const firstId = persistReceipt(
+    data.db,
+    finalSaveSchema.parse(firstInput),
+    "receipts/first.webp",
+  );
+  const detail = loadReceiptDetail(data.db, firstId)!;
+  data.db.transaction((tx) => {
+    learnMerchantAlias(tx, detail.merchantId, "MARKT-18", "now");
+  });
+  const ids = [firstId];
+  for (let index = 1; index < 25; index++) {
+    ids.push(
+      persistReceipt(
+        data.db,
+        finalSaveSchema.parse({
+          ...firstInput,
+          merchant: {
+            ...firstInput.merchant,
+            id: detail.merchantId,
+            rawName: "OTHER MERCHANT LABEL",
+          },
+          purchaseDate: index === 1 ? "2026-10-01" : "2026-09-30",
+          purchaseTime: index <= 2 ? null : "12:30",
+          duplicateOverride: true,
+          items: firstInput.items.map((item, position) => ({
+            ...item,
+            productId: detail.items[position].product!.id,
+            rawName: "OTHER PRODUCT LABEL",
+            warranties:
+              index === 1
+                ? Array.from(
+                    { length: position === 0 ? 2 : 1 },
+                    () => validReceipt.items[0].warranties[0],
+                  )
+                : [],
+          })),
+        }),
+        `receipts/${index}.webp`,
+      ),
+    );
+  }
+  const unrelatedId = persistReceipt(
+    data.db,
+    finalSaveSchema.parse({
+      ...validReceipt,
+      merchant: { id: null, name: "Unrelated", rawName: null },
+      purchaseDate: "2026-09-28",
+      items: [{ ...validReceipt.items[0], lineType: "fee", warranties: [] }],
+    }),
+    "receipts/unrelated.webp",
+  );
+  const expectedIds = [ids[1], ...ids.slice(3).reverse(), ids[2], ids[0]];
+
+  // Every path finds the same receipts even though later receipts use different raw labels.
+  for (const search of [
+    "  BÄCKER STRASSE  ",
+    "mArKt",
+    "SÜSSE MILCH",
+    "dRiNk",
+  ]) {
+    for (const [page, expected] of [
+      [1, expectedIds.slice(0, 20)],
+      [2, expectedIds.slice(20)],
+      [3, []],
+      [Number.MAX_SAFE_INTEGER, []],
+    ] as const) {
+      const result = listReceipts(data.db, search, page);
+      assert.deepEqual(
+        result.items.map((item) => item.id),
+        expected,
+        `${search}, page ${page}`,
+      );
+      assert.deepEqual(
+        {
+          page: result.page,
+          pageSize: result.pageSize,
+          totalItems: result.totalItems,
+          totalPages: result.totalPages,
+        },
+        { page, pageSize: 20, totalItems: 25, totalPages: 2 },
+      );
+      for (const item of result.items) {
+        assert.equal(
+          item.warrantyCount,
+          item.id === ids[1] ? 3 : item.id === ids[0] ? 1 : 0,
+        );
+      }
+    }
+  }
+  for (const search of ["", "   "]) {
+    const pages = [
+      listReceipts(data.db, search),
+      listReceipts(data.db, search, 2),
+    ];
+    assert.deepEqual(
+      pages.flatMap((page) => page.items.map((item) => item.id)),
+      [...expectedIds, unrelatedId],
+    );
+    assert.equal(pages[0].totalItems, 26);
+    assert.equal(pages[0].totalPages, 2);
+    assert.deepEqual(listReceipts(data.db, search), pages[0]);
+  }
+  for (const search of ["no match", "%_", "' OR 1=1 --"]) {
+    assert.deepEqual(listReceipts(data.db, search, 7), {
+      items: [],
+      page: 1,
+      pageSize: 20,
+      totalItems: 0,
+      totalPages: 0,
+    });
+  }
+  assert.deepEqual(listReceipts(data.db).items[0], {
+    id: ids[1],
+    merchantId: detail.merchantId,
+    merchantName: "Bäcker Straße",
+    purchaseDate: "2026-10-01",
+    purchaseTime: null,
+    totalCents: 199,
+    currency: "EUR",
+    warrantyCount: 3,
+  });
+  // A new connection must register the same receipt-search normalizer.
+  const reopened = createDatabase(join(data.root, "test.sqlite"));
+  try {
+    assert.deepEqual(
+      listReceipts(reopened.db, "SÜSSE MILCH"),
+      listReceipts(data.db, "SÜSSE MILCH"),
+    );
+  } finally {
+    reopened.sqlite.close();
+  }
+});
+
+// Test case for verifying that the receipt listing API validates queries and correctly handles empty and out-of-range pagination metadata.
+test("receipt listing API validates queries and preserves empty and out-of-range metadata", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const events: string[] = [];
+  const app = createApp(
+    data.scans,
+    data.db,
+    () => ({
+      async extractReceipt() {
+        throw new Error("unused");
+      },
+    }),
+    data.dataRoot,
+    (_level, operation) => {
+      events.push(operation);
+    },
+  );
+  const server = app.listen(0);
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const url = `http://127.0.0.1:${address.port}/api/receipts`;
+  assert.deepEqual(await (await fetch(`${url}?page=9`)).json(), {
+    items: [],
+    page: 1,
+    pageSize: 20,
+    totalItems: 0,
+    totalPages: 0,
+  });
+  for (const query of [
+    "page=0",
+    "page=-1",
+    "page=abc",
+    "page=",
+    "page=1.5",
+    "page=1e2",
+    "page=9007199254740992",
+    "page=1&page=2",
+    "search=a&search=b",
+  ]) {
+    const response = await fetch(`${url}?${query}`);
+    assert.equal(response.status, 400, query);
+    assert.deepEqual(await response.json(), { error: "invalid_receipt_query" });
+  }
+  const receiptId = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    validReceipt,
+  );
+  for (const query of [
+    "",
+    "?search=EDEKA%20CITY",
+    "?search=MILCH%201L&page=1",
+  ]) {
+    const response = await fetch(`${url}${query}`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      items: [
+        {
+          id: receiptId,
+          merchantId: 1,
+          merchantName: "Edeka",
+          purchaseDate: "2026-09-30",
+          purchaseTime: "12:30",
+          totalCents: 199,
+          currency: "EUR",
+          warrantyCount: 1,
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      totalItems: 1,
+      totalPages: 1,
+    });
+  }
+  for (const page of [2, Number.MAX_SAFE_INTEGER]) {
+    const response = await fetch(`${url}?page=${page}`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      items: [],
+      page,
+      pageSize: 20,
+      totalItems: 1,
+      totalPages: 1,
+    });
+  }
+  // Exercise the route's own database failure path without breaking fixture cleanup.
+  data.sqlite.exec("ALTER TABLE receipt RENAME TO unavailable_receipt");
+  const failed = await fetch(url);
+  assert.equal(failed.status, 500);
+  assert.deepEqual(await failed.json(), { error: "receipt_list_failed" });
+  assert.ok(events.includes("receipt.list.failed"));
 });
