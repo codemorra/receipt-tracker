@@ -4,6 +4,7 @@ import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
 import ImportPage from "./pages/ImportPage";
 import SavedReceiptPage from "./pages/SavedReceiptPage";
+import ReceiptsPage from "./pages/ReceiptsPage";
 import { receiptIdFromSearch, resolveRoute } from "./routes/routing";
 import "./App.css";
 
@@ -49,6 +50,10 @@ function App() {
         ) : (
           <ImportPage onSaved={(id) => navigateTo(`/import?receiptId=${id}`)} />
         )
+      ) : route === "receipts" ? (
+        <ReceiptsPage
+          onOpenReceipt={(id) => navigateTo(`/import?receiptId=${id}`)}
+        />
       ) : (
         <PlaceholderPage route={route} />
       )}

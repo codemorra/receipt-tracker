@@ -284,7 +284,33 @@
     },
     "receipts": {
       "title": "Receipts",
-      "description": "Your saved receipts in one place."
+      "description": "Your saved receipts in one place.",
+      "searchLabel": "Search receipts",
+      "searchPlaceholder": "Merchant or product name",
+      "loading": "Loading receipts…",
+      "retry": "Retry loading",
+      "resultCount": "Receipts found: {{count}}",
+      "tableLabel": "Saved receipts",
+      "merchant": "Merchant",
+      "date": "Date",
+      "total": "Total",
+      "warranty": "Warranty",
+      "openDetail": "Open receipt from {{merchant}} dated {{date}}",
+      "warrantyCount": "Warranty entries: {{count}}",
+      "noWarranty": "No warranty entries",
+      "emptyArchive": "No receipts saved yet. Import a receipt to get started.",
+      "noResults": "No receipts match your search.",
+      "emptyPage": "There are no receipts on this page.",
+      "pagination": "Receipt pages",
+      "previous": "Previous",
+      "next": "Next",
+      "pageStatus": "Page {{page}} of {{totalPages}}",
+      "errors": {
+        "receipt_list_failed": "The receipts could not be loaded. Try again.",
+        "invalid_receipt_query": "The search request is invalid. Try again.",
+        "network_error": "The backend is unreachable. Check your connection and try again.",
+        "unexpected_response": "The backend returned an unexpected response. Try again."
+      }
     },
     "analytics": {
       "title": "Analytics",
