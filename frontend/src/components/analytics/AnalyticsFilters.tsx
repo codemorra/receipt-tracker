@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   periods,
@@ -24,9 +24,11 @@ import LookupField from "../ui/LookupField";
 export default function AnalyticsFilters({
   state,
   onChange,
+  children,
 }: {
   state: AnalyticsState;
   onChange: (state: AnalyticsState) => void;
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [from, setFrom] = useState(state.from);
@@ -61,7 +63,10 @@ export default function AnalyticsFilters({
   const validRange = isCalendarDate(from) && isCalendarDate(to) && from <= to;
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div
+        className={`grid gap-4 ${children ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+      >
+        {children}
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted">
             {t("pages.analytics.filters.period")}

@@ -11,6 +11,7 @@ import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
 import AnalyticsFilters from "../components/analytics/AnalyticsFilters";
 import SpendingView from "../components/analytics/SpendingView";
+import PriceHistoryView from "../components/analytics/PriceHistoryView";
 
 /**
  * Page component for displaying analytics, including spending and price history tabs.
@@ -83,11 +84,11 @@ export default function AnalyticsPage({
           />
         </>
       ) : (
-        <Card>
-          <p className="text-sm text-muted">
-            {t("pages.analytics.priceHistory.pending")}
-          </p>
-        </Card>
+        <PriceHistoryView
+          state={state}
+          query={invalid || !filters ? null : spendingQuery(filters)}
+          onChange={change}
+        />
       )}
     </>
   );

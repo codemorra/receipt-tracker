@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Chart as ChartJS,
@@ -11,6 +10,7 @@ import {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import type { SpendingDto } from "../../api/analytics-api";
+import { useChartColors } from "../../hooks/useChartColors";
 
 // Register Chart.js components for the bar chart.
 ChartJS.register(
@@ -22,35 +22,12 @@ ChartJS.register(
 );
 
 /**
- * Reads the current CSS custom properties for the chart colors.
- * @returns An object containing the resolved color values.
- */
-function readColors() {
-  const style = getComputedStyle(document.documentElement);
-  return {
-    accent: style.getPropertyValue("--accent").trim(),
-    text: style.getPropertyValue("--muted").trim(),
-    grid: style.getPropertyValue("--border").trim(),
-    surface: style.getPropertyValue("--surface").trim(),
-    foreground: style.getPropertyValue("--text").trim(),
-  };
-}
-
-/**
  * Component for rendering a spending chart using Chart.js.
  * @param data The spending data to display in the chart.
  */
 export default function SpendingChart({ data }: { data: SpendingDto }) {
   const { t, i18n } = useTranslation();
-  const [colors, setColors] = useState(readColors);
-  useEffect(() => {
-    const observer = new MutationObserver(() => setColors(readColors()));
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme", "data-accent"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  const colors = useChartColors();
   const money = new Intl.NumberFormat(i18n.language, {
     style: "currency",
     currency: data.currency ?? "EUR",

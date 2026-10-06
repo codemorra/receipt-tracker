@@ -29,6 +29,9 @@ export type AnalyticsErrorCode =
   | "analytics_mixed_currencies"
   | "analytics_spending_failed"
   | "merchant_lookup_failed"
+  | "product_not_found"
+  | "product_lookup_failed"
+  | "analytics_price_history_failed"
   | "network_error"
   | "unexpected_response";
 
@@ -210,4 +213,171 @@ export async function getAnalyticsMerchant(
   )
     throw new AnalyticsApiError("unexpected_response");
   return { id: merchantId, name: value[0].name };
+}
+
+// Interface for the price history analytics data returned by the API.
+export interface PriceHistoryDto {
+  product: {
+    id: number;
+    name: string;
+    brandName: string | null;
+    productGroupName: string;
+    packageAmount: number | null;
+    packageUnit: string | null;
+  };
+  currency: string | null;
+  statistics: {
+    latestCents: number | null;
+    minimumCents: number | null;
+    maximumCents: number | null;
+    averageCents: number | null;
+  };
+  history: {
+    receiptItemId: number;
+    receiptId: number;
+    purchaseDate: string;
+    purchaseTime: string | null;
+    merchantId: number;
+    merchantName: string;
+    currency: string;
+    unitPriceCents: number | null;
+    quantity: number;
+  }[];
+}
+
+// Validates that a string is a three-letter uppercase currency code (ISO 4217).
+const currency = (value: unknown): value is string =>
+  typeof value === "string" && /^[A-Z]{3}$/.test(value);
+
+/**
+ * Type guard to check if a value conforms to the PriceHistoryDto structure.
+ * @param value The value to check.
+ * @returns True if the value is a valid PriceHistoryDto, false otherwise.
+ */
+export function isPriceHistoryDto(value: unknown): value is PriceHistoryDto {
+  if (
+    !record(value) ||
+    !record(value.product) ||
+    !record(value.statistics) ||
+    !Array.isArray(value.history)
+  )
+    return false;
+  const product = value.product;
+  if (
+    !id(product.id) ||
+    typeof product.name !== "string" ||
+    !(product.brandName === null || typeof product.brandName === "string") ||
+    typeof product.productGroupName !== "string" ||
+    !(
+      product.packageAmount === null ||
+      (typeof product.packageAmount === "number" &&
+        Number.isFinite(product.packageAmount) &&
+        product.packageAmount > 0)
+    ) ||
+    !(
+      product.packageUnit === null ||
+      ["pcs", "g", "kg", "ml", "l"].includes(product.packageUnit as string)
+    ) ||
+    !(value.currency === null || currency(value.currency)) ||
+    !["latestCents", "minimumCents", "maximumCents", "averageCents"].every(
+      (key) =>
+        value.statistics &&
+        record(value.statistics) &&
+        (value.statistics[key] === null ||
+          Number.isSafeInteger(value.statistics[key])),
+    ) ||
+    !value.history.every(
+      (row) =>
+        record(row) &&
+        id(row.receiptItemId) &&
+        id(row.receiptId) &&
+        id(row.merchantId) &&
+        typeof row.merchantName === "string" &&
+        isCalendarDate(row.purchaseDate) &&
+        (row.purchaseTime === null ||
+          (typeof row.purchaseTime === "string" &&
+            /^([01]\d|2[0-3]):[0-5]\d$/.test(row.purchaseTime))) &&
+        currency(row.currency) &&
+        (row.unitPriceCents === null ||
+          Number.isSafeInteger(row.unitPriceCents)) &&
+        typeof row.quantity === "number" &&
+        Number.isFinite(row.quantity) &&
+        row.quantity > 0,
+    )
+  )
+    return false;
+  const history = value.history as PriceHistoryDto["history"];
+  const statistics = value.statistics as PriceHistoryDto["statistics"];
+  const validPrices = history.filter((row) => row.unitPriceCents !== null);
+  if (validPrices.length === 0) {
+    if (
+      value.currency !== null ||
+      Object.values(statistics).some((price) => price !== null)
+    )
+      return false;
+  } else if (
+    value.currency === null ||
+    Object.values(statistics).some((price) => price === null) ||
+    validPrices.some((row) => row.currency !== value.currency)
+  )
+    return false;
+  return (
+    new Set(history.map((row) => row.receiptItemId)).size === history.length &&
+    history.every((row, index) => {
+      if (index === 0) return true;
+      const previous = history[index - 1];
+      return (
+        previous.purchaseDate < row.purchaseDate ||
+        (previous.purchaseDate === row.purchaseDate &&
+          ((previous.purchaseTime ?? "") < (row.purchaseTime ?? "") ||
+            (previous.purchaseTime === row.purchaseTime &&
+              previous.receiptId <= row.receiptId)))
+      );
+    })
+  );
+}
+
+/**
+ * Fetches the price history for a specific product from the analytics API.
+ * @param productId The ID of the product to fetch the price history for.
+ * @param query The query string containing optional filters such as date range and merchant ID.
+ * @param signal Optional AbortSignal to cancel the request.
+ * @returns A promise that resolves to the PriceHistoryDto for the specified product.
+ * @throws AnalyticsApiError if the request fails or the response is invalid.
+ */
+export async function getPriceHistory(
+  productId: number,
+  query: string,
+  signal?: AbortSignal,
+): Promise<PriceHistoryDto> {
+  if (!id(productId)) throw new AnalyticsApiError("invalid_analytics_query");
+  const params = new URLSearchParams(query);
+  params.set("productId", String(productId));
+  const response = await request(
+    `/api/analytics/price-history?${params}`,
+    signal,
+  );
+  if (!response.ok) {
+    if (response.status === 404) {
+      const error = await json(response);
+      throw new AnalyticsApiError(
+        record(error) &&
+          (error.error === "product_not_found" ||
+            error.error === "merchant_not_found")
+          ? error.error
+          : "unexpected_response",
+      );
+    }
+    throw new AnalyticsApiError(
+      response.status === 400
+        ? "invalid_analytics_query"
+        : response.status === 422
+          ? "analytics_mixed_currencies"
+          : "analytics_price_history_failed",
+    );
+  }
+  const value = await json(response);
+  if (!isPriceHistoryDto(value) || value.product.id !== productId)
+    throw new AnalyticsApiError("unexpected_response");
+  return value;
 }
