@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from .ocr_overlaps import merge_quantity_fragments
 from .ocr_quantities import separate_quantity_rows
 
 # Configuration options for the PaddleOCR instance.
@@ -185,4 +186,5 @@ def recognize_image(ocr, image_path):
     raw = results[0].json["res"]
     shaped = shape_ocr_result(raw, width, height)
     repaired = separate_quantity_rows(ocr, raw, image_path, width, height)
+    repaired = merge_quantity_fragments(ocr, repaired, image_path, width, height)
     return shaped if repaired is raw else shape_ocr_result(repaired, width, height)
