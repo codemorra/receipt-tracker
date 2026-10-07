@@ -34,6 +34,13 @@ The application keeps the user involved in the import process by allowing uncert
 - Read-only receipt details in a full-height side panel with the archive image
 - Shared compact summaries for import drafts and saved receipts, with expandable product details
 
+### Warranties
+
+- Read-only overview with one row per saved warranty or statutory warranty period
+- Product name and alias search, status and warranty type filters
+- Status based on saved calendar dates, including a fixed 30-day expiry window
+- Pagination with 20 entries per page and direct access to the existing receipt detail panel
+
 ### Analytics
 
 - Spending totals, receipt counts, average receipt values, and merchant breakdowns
@@ -245,6 +252,23 @@ Open **Analytics** and choose **Spending** or **Price History**. Both tabs offer
 
 Analytics does not convert currencies. Spending rejects selections containing multiple receipt currencies; Price History rejects selections whose available unit prices use multiple currencies. Narrow the date range or merchant filter to view a single currency. Prices are not normalized to package sizes or units such as €/kg or €/l, and category analysis is not included.
 
+## Using Warranties
+
+Open **Warranties** to see the product, warranty type, merchant, purchase date, saved start and end dates, and status. Each saved period has its own row, so a receipt item with multiple periods appears more than once. Search by canonical product name or learned alias, and filter by status or type: **Statutory warranty**, **Manufacturer warranty**, or **Extended warranty**. Changing the search or a filter returns to page 1.
+
+The table shows up to 20 entries per page. Periods that have begun and have not expired appear first, ordered by nearest end date, followed by future periods ordered by start date, then expired periods with the most recent end date first. Select a row to open its saved receipt in the existing detail panel, including warranty notes.
+
+Statuses use the backend server's current local calendar day and only the saved dates:
+
+| Status            | Rule                                                                   |
+| ----------------- | ---------------------------------------------------------------------- |
+| **Not started**   | Start date is after today.                                             |
+| **Active**        | Period has begun and ends more than 30 days from today.                |
+| **Expiring soon** | Period has begun and ends today or within the next 30 days, inclusive. |
+| **Expired**       | End date is before today.                                              |
+
+A period begins on its start date and remains unexpired on its end date. Warranty dates are calendar days without times. The overview does not generate periods or infer statutory durations. Editing or deleting saved warranties and expiry notifications are not available.
+
 ## Database Model
 
 The database separates receipts, receipt items, products, merchants, aliases, categories, discounts, and warranty information.
@@ -255,7 +279,7 @@ Aliases allow the application to learn confirmed receipt labels over time and au
 
 ## Project Status
 
-Receipt import, review, duplicate checking, saving, archive search, spending analytics, and product price history are implemented, together with AI provider settings, German/English language support, and appearance controls. The dedicated warranty overview remains a placeholder page. The project is under active development.
+Receipt import, review, duplicate checking, saving, archive search, spending analytics, product price history, and the warranty overview are implemented, together with AI provider settings, German/English language support, and appearance controls. The project is under active development.
 
 ## Known Limitations and Planned Improvements
 
@@ -274,7 +298,6 @@ Receipt import, review, duplicate checking, saving, archive search, spending ana
 - Add receipt filters and product/merchant browsing.
 - Add product price comparisons.
 - Add category-based analysis.
-- Add a dedicated warranty overview.
 
 ## License
 
