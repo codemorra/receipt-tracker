@@ -8,6 +8,7 @@ import {
 } from "../db/schema.js";
 import type { ReceiptExtraction } from "../extraction/receipt-extraction.js";
 import { normalizeAlias } from "./alias-normalizer.js";
+import { normalizedPackage } from "./package-normalizer.js";
 
 type Item = ReceiptExtraction["items"][number];
 
@@ -39,16 +40,12 @@ export interface ProductMatchOptions {
   minimumMargin?: number;
 }
 
-function normalizedPackage(
-  amount: number | null,
-  unit: string | null,
-): string | null {
-  if (amount === null || unit === null) return null;
-  if (unit === "kg" || unit === "l")
-    return `${amount * 1000} ${unit === "kg" ? "g" : "ml"}`;
-  return `${amount} ${unit}`;
-}
-
+/**
+ * Calculates the similarity between two product names based on normalized aliases and shared tokens.
+ * @param left The first product name.
+ * @param right The second product name.
+ * @returns A similarity score between 0 and 1.
+ */
 function nameSimilarity(left: string, right: string): number {
   const leftName = normalizeAlias(left);
   const rightName = normalizeAlias(right);
@@ -62,6 +59,12 @@ function nameSimilarity(left: string, right: string): number {
   return shared / (leftTokens.size + rightTokens.size - shared);
 }
 
+/**
+ * Scores a product against a receipt item based on name similarity, brand, product group, and package.
+ * @param item The receipt item to match.
+ * @param product The product row to score.
+ * @returns A similarity score between 0 and 1, or null if the product is not a valid match.
+ */
 function scoreProduct(item: Item, product: ProductRow): number | null {
   if (
     item.brand &&
@@ -95,6 +98,13 @@ function scoreProduct(item: Item, product: ProductRow): number | null {
   return score / availableWeight;
 }
 
+/**
+ * Matches a receipt item to a product in the database, considering name similarity, brand, product group, and package.
+ * @param db The database instance to query.
+ * @param item The receipt item to match.
+ * @param options Optional matching parameters, such as minimum score and margin.
+ * @returns The match result, including status, matched product ID, and candidate products.
+ */
 export function matchProduct(
   db: Database,
   item: Item,

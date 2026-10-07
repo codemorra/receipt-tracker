@@ -17,6 +17,7 @@ import { createApp } from "../src/app.js";
 import { receipts } from "../src/db/schema.js";
 import { saveReceipt } from "../src/receipts/receipt-save-service.js";
 import { finalSaveSchema } from "../src/receipts/final-save.js";
+import type { FinalSaveDto } from "../src/receipts/final-save.js";
 import { loadReceiptDetail } from "../src/receipts/receipt-detail.js";
 import { listReceipts } from "../src/receipts/receipt-listing.js";
 import { persistReceipt } from "../src/receipts/receipt-persistence.js";
@@ -232,6 +233,219 @@ test("save persists confirmed entities, aliases, receipt rows, warranty, and arc
   );
 });
 
+// Test for ensuring that identical new products share an ID while retaining receipt items and aliases.
+test("identical new products share an ID while retaining receipt items and aliases", async (t) => {
+  for (const rawNames of [
+    ["MILCH 1L", "MILCH 1L"],
+    ["MILCH 1L", "MILCH 1L", "FRESH MILK"],
+  ]) {
+    await t.test(`${rawNames.length} positions`, async (t) => {
+      const data = await fixture();
+      t.after(data.cleanup);
+      const input = finalSaveSchema.parse({
+        ...validReceipt,
+        items: rawNames.map((rawName, index) => ({
+          ...validReceipt.items[0],
+          rawName,
+          quantity: index + 1,
+          unitPriceCents: 100 + index,
+          totalPriceCents: (index + 1) * (100 + index),
+        })),
+      });
+      const receiptId = await saveReceipt(
+        data.db,
+        data.scans,
+        data.dataRoot,
+        data.scanId,
+        input,
+      );
+      const detail = loadReceiptDetail(data.db, receiptId)!;
+      assert.equal(detail.items.length, rawNames.length);
+      assert.equal(
+        new Set(detail.items.map((item) => item.id)).size,
+        rawNames.length,
+      );
+      assert.equal(
+        new Set(detail.items.map((item) => item.product!.id)).size,
+        1,
+      );
+      assert.deepEqual(
+        detail.items.map((item) => ({
+          rawName: item.rawName,
+          position: item.position,
+          quantity: item.quantity,
+          unit: item.unit,
+          unitPriceCents: item.unitPriceCents,
+          totalPriceCents: item.totalPriceCents,
+        })),
+        input.items.map((item, position) => ({
+          rawName: item.rawName,
+          position,
+          quantity: item.quantity,
+          unit: item.unit,
+          unitPriceCents: item.unitPriceCents,
+          totalPriceCents: item.totalPriceCents,
+        })),
+      );
+      assert.deepEqual(
+        data.sqlite.prepare("SELECT COUNT(*) AS count FROM product").get(),
+        { count: 1 },
+      );
+      assert.deepEqual(
+        data.sqlite
+          .prepare(
+            "SELECT product_id AS productId, normalized_alias AS alias FROM product_alias ORDER BY id",
+          )
+          .all(),
+        [...new Set(rawNames)].map((rawName) => ({
+          productId: detail.items[0].product!.id,
+          alias: rawName === "FRESH MILK" ? "fresh milk" : "milch 1 l",
+        })),
+      );
+      assert.equal(detail.discounts[0].receiptItemId, detail.items[0].id);
+      assert.ok(detail.items.every((item) => item.warranties.length === 1));
+      const reopened = createDatabase(join(data.root, "test.sqlite"));
+      try {
+        assert.deepEqual(loadReceiptDetail(reopened.db, receiptId), detail);
+      } finally {
+        reopened.sqlite.close();
+      }
+    });
+  }
+});
+
+// Test for ensuring that new products with different identities remain separate.
+test("new products with different identities remain separate", async (t) => {
+  const differences: [string, Partial<FinalSaveDto["items"][number]>][] = [
+    ["name", { productName: "Andere Milch" }],
+    ["brand", { brandName: "Other" }],
+    ["unknown brand", { brandName: null }],
+    ["package size", { packageAmount: 500, packageUnit: "ml" }],
+    ["unknown package", { packageAmount: null, packageUnit: null }],
+    ["group", { productGroupName: "other milk" }],
+    ["category", { categoryName: "other food" }],
+  ];
+  for (const [name, difference] of differences) {
+    await t.test(name, async (t) => {
+      const data = await fixture();
+      t.after(data.cleanup);
+      const receiptId = persistReceipt(
+        data.db,
+        finalSaveSchema.parse({
+          ...validReceipt,
+          items: [
+            validReceipt.items[0],
+            { ...validReceipt.items[0], ...difference },
+          ],
+        }),
+        "receipts/test.webp",
+      );
+      const detail = loadReceiptDetail(data.db, receiptId)!;
+      assert.equal(detail.items.length, 2);
+      assert.notEqual(detail.items[0].product!.id, detail.items[1].product!.id);
+      assert.deepEqual(
+        data.sqlite.prepare("SELECT COUNT(*) AS count FROM product").get(),
+        { count: 2 },
+      );
+    });
+  }
+});
+
+// Test for ensuring that new products reuse resolved brand and group IDs and equivalent packages.
+test("new products reuse resolved brand and group IDs and equivalent packages", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const now = "2026-09-30";
+  const categoryId = Number(
+    data.sqlite
+      .prepare(
+        "INSERT INTO category (name, created_at, updated_at) VALUES (?, ?, ?)",
+      )
+      .run("identity food", now, now).lastInsertRowid,
+  );
+  const groupId = Number(
+    data.sqlite
+      .prepare(
+        "INSERT INTO product_group (category_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(categoryId, "milk", now, now).lastInsertRowid,
+  );
+  const brandId = Number(
+    data.sqlite
+      .prepare(
+        "INSERT INTO brand (name, created_at, updated_at) VALUES (?, ?, ?)",
+      )
+      .run("Gut & Günstig", now, now).lastInsertRowid,
+  );
+  const receiptId = persistReceipt(
+    data.db,
+    finalSaveSchema.parse({
+      ...validReceipt,
+      items: [
+        { ...validReceipt.items[0], categoryName: "identity food" },
+        {
+          ...validReceipt.items[0],
+          categoryName: "identity food",
+          brandId,
+          productGroupId: groupId,
+          packageAmount: 1000,
+          packageUnit: "ml",
+        },
+      ],
+    }),
+    "receipts/test.webp",
+  );
+  const detail = loadReceiptDetail(data.db, receiptId)!;
+  assert.equal(detail.items[0].product!.id, detail.items[1].product!.id);
+  assert.deepEqual(
+    data.sqlite.prepare("SELECT COUNT(*) AS count FROM product").get(),
+    { count: 1 },
+  );
+  assert.equal(detail.items[0].product!.packageAmount, 1);
+  assert.equal(detail.items[0].product!.packageUnit, "l");
+});
+
+// Test for ensuring that explicit product IDs and new products stay distinct across saves.
+test("explicit product IDs and new products stay distinct across saves", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const save = (items: FinalSaveDto["items"]) =>
+    persistReceipt(
+      data.db,
+      finalSaveSchema.parse({
+        ...validReceipt,
+        items,
+      }),
+      "receipts/test.webp",
+    );
+  const item = finalSaveSchema.parse(validReceipt).items[0];
+  const firstId = loadReceiptDetail(data.db, save([item]))!.items[0].product!
+    .id;
+  const secondId = loadReceiptDetail(data.db, save([item]))!.items[0].product!
+    .id;
+  assert.notEqual(firstId, secondId);
+  // New positions surround the explicit selections to cover both processing orders.
+  const detail = loadReceiptDetail(
+    data.db,
+    save([
+      item,
+      { ...item, productId: firstId },
+      { ...item, productId: secondId },
+      item,
+    ]),
+  )!;
+  const ids = detail.items.map((entry) => entry.product!.id);
+  assert.equal(ids[1], firstId);
+  assert.equal(ids[2], secondId);
+  assert.equal(ids[0], ids[3]);
+  assert.notEqual(ids[0], firstId);
+  assert.notEqual(ids[0], secondId);
+  assert.deepEqual(
+    data.sqlite.prepare("SELECT COUNT(*) AS count FROM product").get(),
+    { count: 3 },
+  );
+});
+
 // Test case for verifying that confirmed existing entities are reused without creating duplicate aliases
 test("confirmed existing entities are reused without duplicate aliases", async (t) => {
   const data = await fixture();
@@ -296,7 +510,11 @@ test("failed entity resolution rolls back reference data and removes the copied 
   await assert.rejects(
     saveReceipt(data.db, data.scans, data.dataRoot, data.scanId, {
       ...validReceipt,
-      items: [{ ...validReceipt.items[0], productId: 999 }],
+      items: [
+        { ...validReceipt.items[0], categoryName: "rollback category" },
+        { ...validReceipt.items[0], categoryName: "rollback category" },
+        { ...validReceipt.items[0], productId: 999 },
+      ],
     }),
     ConfirmedEntityNotFoundError,
   );
@@ -306,6 +524,11 @@ test("failed entity resolution rolls back reference data and removes the copied 
     "receipt",
     "receipt_item",
     "product",
+    "product_alias",
+    "product_group",
+    "brand",
+    "warranty",
+    "discount",
   ]) {
     assert.equal(
       (
@@ -318,6 +541,12 @@ test("failed entity resolution rolls back reference data and removes the copied 
     );
   }
   assert.deepEqual(await readdir(join(data.dataRoot, "receipts")), []);
+  assert.equal(
+    data.sqlite
+      .prepare("SELECT id FROM category WHERE name = ?")
+      .get("rollback category"),
+    undefined,
+  );
   assert.equal(
     await readFile(
       join(data.dataRoot, "scans", data.scanId, "archive.webp"),
