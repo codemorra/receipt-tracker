@@ -7,6 +7,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from .ocr_quantities import separate_quantity_rows
+
 # Configuration options for the PaddleOCR instance.
 OCR_OPTIONS = {
     "text_detection_model_name": "PP-OCRv6_medium_det",
@@ -180,4 +182,7 @@ def recognize_image(ocr, image_path):
         results = ocr.predict(str(Path(image_path)))
     if len(results) != 1:
         raise ValueError("PaddleOCR returned an unexpected number of results")
-    return shape_ocr_result(results[0].json["res"], width, height)
+    raw = results[0].json["res"]
+    shaped = shape_ocr_result(raw, width, height)
+    repaired = separate_quantity_rows(ocr, raw, image_path, width, height)
+    return shaped if repaired is raw else shape_ocr_result(repaired, width, height)
