@@ -4,6 +4,7 @@ import sys
 from contextlib import redirect_stdout
 from functools import cache
 from pathlib import Path
+from statistics import median
 
 from PIL import Image
 
@@ -85,6 +86,7 @@ def shape_ocr_result(result, width, height):
         raise ValueError("OCR text, confidence, and box counts differ")
 
     lines = []
+    row_tilts = []
 
     # Process each OCR line and normalize its bounding box.
     for position, (raw_text, raw_score, raw_box) in enumerate(zip(texts, scores, boxes)):
@@ -96,6 +98,7 @@ def shape_ocr_result(result, width, height):
             raise ValueError("OCR confidence must be between 0 and 1")
         box = normalized_box(raw_box, width, height)
         center = (float(raw_box[1]) + float(raw_box[3])) / 2
+        tilt = None
         if polygons is not None:
             polygon = polygons[position]
             if len(polygon) != 4 or any(
@@ -114,12 +117,43 @@ def shape_ocr_result(result, width, height):
             if right_x > left_x and not narrow_character:
                 slope = (right_y - left_y) / (right_x - left_x)
                 center = (left_y + right_y) / 2 + slope * (width / 2 - (left_x + right_x) / 2)
-        lines.append({
+                if len(text) > 1:
+                    tilt = {
+                        "width": right_x - left_x,
+                        "height": float(raw_box[3]) - float(raw_box[1]),
+                        "centerX": (left_x + right_x) / 2,
+                        "centerY": (left_y + right_y) / 2,
+                        "boxCenterY": (float(raw_box[1]) + float(raw_box[3])) / 2,
+                        "slope": slope,
+                    }
+        line = {
             "rowCenter": center / height,
             "text": text,
             "confidence": score,
             "box": box,
-        })
+        }
+        lines.append(line)
+        if tilt is not None:
+            row_tilts.append((line, tilt))
+
+    # Estimate short segments' tilt from already validated, wider neighboring
+    # text. Disagreeing anchors must not override the original polygon geometry.
+    anchors = [tilt for _, tilt in row_tilts if tilt["width"] >= 4 * tilt["height"]]
+    for line, tilt in row_tilts:
+        if tilt["width"] >= 3 * tilt["height"]:
+            continue
+        slopes = [
+            anchor["slope"] for anchor in anchors
+            if abs(anchor["boxCenterY"] - tilt["boxCenterY"]) <= 2 * tilt["height"]
+        ]
+        if len(slopes) < 2:
+            continue
+        distance = width / 2 - tilt["centerX"]
+        # Anchor disagreement may displace this segment by at most one third
+        # of its height, matching the tolerance used to group receipt rows.
+        if (max(slopes) - min(slopes)) * abs(distance) > tilt["height"] / 3:
+            continue
+        line["rowCenter"] = (tilt["centerY"] + median(slopes) * distance) / height
 
     lines.sort(
         key=lambda line: (line["rowCenter"], line["box"][0])
