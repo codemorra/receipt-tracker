@@ -140,6 +140,32 @@ def test_sloped_text_pairs_prices_without_merging_the_header_or_repeated_items()
     assert all("rowCenter" not in line for line in result["lines"])
 
 
+def test_isolated_quantity_stays_with_its_product_instead_of_the_previous_weight_row():
+    """Test that an isolated quantity stays with its product instead of the previous weight row."""
+    result = shape_ocr_result({
+        "rec_texts": ["0,278 kg × 1,29", "EUR/kg", "Gurken", "0,79 x", "4"],
+        "rec_scores": [0.9] * 5,
+        "rec_boxes": [
+            [79, 409, 509, 477], [537, 403, 712, 473], [32, 459, 201, 528],
+            [588, 461, 766, 529], [816, 463, 869, 523],
+        ],
+        "rec_polys": [
+            [[79, 409], [509, 409], [509, 477], [79, 477]],
+            [[537, 403], [712, 403], [712, 473], [537, 473]],
+            [[33, 459], [201, 462], [200, 528], [32, 525]],
+            [[589, 461], [766, 464], [765, 529], [588, 526]],
+            [[826, 463], [869, 471], [859, 523], [816, 515]],
+        ],
+    }, 1217, 3025)
+
+    assert [[segment["text"] for segment in row["segments"]] for row in result["rows"]] == [
+        ["0,278 kg × 1,29", "EUR/kg"], ["Gurken", "0,79 x", "4"],
+    ]
+    assert [row["lineIndexes"] for row in result["rows"]] == [[0, 1], [2, 3, 4]]
+    assert result["lines"][4]["confidence"] == 0.9
+    assert result["lines"][4]["box"] == [816 / 1217, 463 / 3025, 869 / 1217, 523 / 3025]
+
+
 def test_ocr_rejects_incomplete_or_nonfinite_polygons():
     """Test that OCR rejects incomplete or non-finite polygons."""
     for polygons in [[], [[[0, 0], [10, 0], [10, float("nan")], [0, 10]]]]:

@@ -104,7 +104,11 @@ def shape_ocr_result(result, width, height):
             right_x = (float(polygon[1][0]) + float(polygon[2][0])) / 2
             left_y = (float(polygon[0][1]) + float(polygon[3][1])) / 2
             right_y = (float(polygon[1][1]) + float(polygon[2][1])) / 2
-            if right_x > left_x:
+            # A narrow glyph's slant is not a reliable estimate of the row's tilt.
+            narrow_character = len(text) == 1 and right_x - left_x < 2 * (
+                float(raw_box[3]) - float(raw_box[1])
+            )
+            if right_x > left_x and not narrow_character:
                 slope = (right_y - left_y) / (right_x - left_x)
                 center = (left_y + right_y) / 2 + slope * (width / 2 - (left_x + right_x) / 2)
         lines.append({
