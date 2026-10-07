@@ -1,4 +1,5 @@
 import sys
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
@@ -197,4 +198,103 @@ def test_row_grouping_handles_both_directions_of_receipt_tilt(slope):
         "rec_boxes": boxes,
         "rec_polys": polygons,
     }, 1000, 1000)
+    assert [row["lineIndexes"] for row in result["rows"]] == [[0, 1], [2, 3]]
+
+
+@pytest.fixture
+def tax_total_with_neighboring_text():
+    """Fixture providing a sample OCR result with tax total and neighboring text."""
+    return {
+        "rec_texts": ["Gesantbetrag", "4,39", "0,23", "4,62", "Referenz:", "SYNTHETIC-REFERENCE-ONLY-FOR-TESTS"],
+        "rec_scores": [0.99] * 6,
+        "rec_boxes": [
+            [64, 1051, 249, 1091], [359, 1055, 427, 1094],
+            [565, 1057, 633, 1096], [767, 1057, 836, 1099],
+            [65, 1129, 260, 1170], [375, 1135, 864, 1170],
+        ],
+        "rec_polys": [
+            [[64, 1051], [249, 1053], [249, 1091], [64, 1089]],
+            [[359, 1055], [427, 1055], [427, 1094], [359, 1094]],
+            [[565, 1057], [633, 1057], [633, 1096], [565, 1096]],
+            [[767, 1060], [835, 1057], [836, 1096], [769, 1099]],
+            [[65, 1129], [260, 1132], [260, 1170], [65, 1168]],
+            [[375, 1135], [864, 1137], [864, 1170], [375, 1168]],
+        ],
+    }
+
+
+def test_local_tilt_keeps_the_tax_total_with_its_label_and_other_amounts(tax_total_with_neighboring_text):
+    """Test that the tax total remains correctly grouped with its label and other amounts after local tilting."""
+    raw = tax_total_with_neighboring_text
+    original = deepcopy(raw)
+    result = shape_ocr_result(raw, 929, 2418)
+
+    assert [[s["text"] for s in row["segments"]] for row in result["rows"]] == [
+        ["Gesantbetrag", "4,39", "0,23", "4,62"],
+        ["Referenz:", "SYNTHETIC-REFERENCE-ONLY-FOR-TESTS"],
+    ]
+    assert [row["lineIndexes"] for row in result["rows"]] == [[0, 1, 2, 3], [4, 5]]
+    assert result["lines"][3]["box"] == [767 / 929, 1057 / 2418, 836 / 929, 1099 / 2418]
+    assert all(line["confidence"] == 0.99 for line in result["lines"])
+    assert all(set(line) == {"index", "text", "confidence", "box"} for line in result["lines"])
+    assert raw == original
+
+
+@pytest.mark.parametrize("case", ["no_anchors", "one_anchor", "distant_anchors", "empty_anchors"])
+def test_missing_local_support_preserves_the_original_amount_geometry(tax_total_with_neighboring_text, case):
+    """Test that missing local support does not alter the geometry of the original amount."""
+    raw = tax_total_with_neighboring_text
+    if case == "no_anchors":
+        for key in raw:
+            raw[key] = raw[key][1:4]
+    elif case == "one_anchor":
+        for key in raw:
+            raw[key] = raw[key][:4]
+    elif case == "distant_anchors":
+        for box in raw["rec_boxes"][4:]:
+            box[1] += 1000
+            box[3] += 1000
+        for polygon in raw["rec_polys"][4:]:
+            for point in polygon:
+                point[1] += 1000
+    elif case == "empty_anchors":
+        raw["rec_texts"][4:] = ["", " "]
+    result = shape_ocr_result(raw, 929, 2418)
+    amount_row = next(row for row in result["rows"] if any(s["text"] == "4,62" for s in row["segments"]))
+    assert [s["text"] for s in amount_row["segments"]] == ["4,62"]
+
+
+def test_conflicting_anchor_tilts_cannot_move_a_correctly_grouped_amount():
+    """Test that conflicting anchor tilts cannot move a correctly grouped amount."""
+    polygons = [
+        [[20, 100], [420, 132], [420, 152], [20, 120]],
+        [[450, 110], [850, 158], [850, 178], [450, 130]],
+        [[880, 140], [940, 140], [940, 160], [880, 160]],
+    ]
+    boxes = [[min(p[0] for p in polygon), min(p[1] for p in polygon),
+              max(p[0] for p in polygon), max(p[1] for p in polygon)] for polygon in polygons]
+    result = shape_ocr_result({
+        "rec_texts": ["First wide text", "Conflicting wide text", "4,62"],
+        "rec_scores": [0.99] * 3, "rec_boxes": boxes, "rec_polys": polygons,
+    }, 1000, 400)
+    assert [[s["text"] for s in row["segments"]] for row in result["rows"]] == [
+        ["Conflicting wide text"], ["First wide text", "4,62"],
+    ]
+
+
+@pytest.mark.parametrize("slope", [-0.08, 0.08])
+def test_local_tilt_preserves_short_prices_on_a_consistently_tilted_receipt(slope):
+    """Test that local tilt preserves short prices on a consistently tilted receipt."""
+    polygons = []
+    for x, y, width in [(50, 120, 400), (800, 120, 60), (50, 170, 400), (800, 170, 60)]:
+        polygons.append([
+            [x, y + slope * x], [x + width, y + slope * (x + width)],
+            [x + width, y + 20 + slope * (x + width)], [x, y + 20 + slope * x],
+        ])
+    boxes = [[min(p[0] for p in polygon), min(p[1] for p in polygon),
+              max(p[0] for p in polygon), max(p[1] for p in polygon)] for polygon in polygons]
+    result = shape_ocr_result({
+        "rec_texts": ["Snack", "0,99", "Snack", "0,99"],
+        "rec_scores": [0.99] * 4, "rec_boxes": boxes, "rec_polys": polygons,
+    }, 1000, 400)
     assert [row["lineIndexes"] for row in result["rows"]] == [[0, 1], [2, 3]]
