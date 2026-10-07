@@ -8,7 +8,7 @@ import { productAliases, products } from "../db/schema.js";
  */
 export function productNameOrAliasMatches(normalizedQuery: string) {
   return sql`(
-    instr(receipt_search_normalize(${products.name}), ${normalizedQuery}) > 0
+    instr(receipt_search_normalize(coalesce(${products.name}, '')), ${normalizedQuery}) > 0
     OR EXISTS (
       SELECT 1 FROM ${productAliases}
       WHERE ${productAliases.productId} = ${products.id}

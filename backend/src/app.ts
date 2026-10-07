@@ -11,6 +11,7 @@ import { registerLookupRoutes } from "./routes/lookup-routes.js";
 import { registerReceiptRoutes } from "./routes/receipt-routes.js";
 import { registerScanRoutes } from "./routes/scan-routes.js";
 import { registerAnalyticsRoutes } from "./routes/analytics-routes.js";
+import { registerWarrantyRoutes } from "./routes/warranty-routes.js";
 
 /**
  * Creates and configures an Express application with routes for lookups, receipts, and scans.
@@ -40,6 +41,7 @@ export function createApp(
   registerLookupRoutes(app, db);
   registerReceiptRoutes(app, db, dataRoot, logger);
   registerAnalyticsRoutes(app, db, logger);
+  registerWarrantyRoutes(app, db, logger);
   const processing = new ReceiptProcessingService(
     scans,
     db,
