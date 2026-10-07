@@ -9,6 +9,7 @@ import {
 } from "../db/schema.js";
 import { ConfirmedEntityNotFoundError } from "./receipt-errors.js";
 import type { FinalSaveDto } from "./final-save.js";
+import { normalizedPackage } from "../matching/package-normalizer.js";
 
 /**
  * Resolves a merchant by ID or creates a new one if it doesn't exist.
@@ -44,6 +45,7 @@ export function resolveMerchant(
  * @param tx - The database transaction.
  * @param item - The item information from the final save DTO.
  * @param now - The current timestamp.
+ * @param newProductIds - Products created in the current save transaction, keyed by identity.
  * @returns The ID of the resolved or newly created product, or null if the line is not a product.
  * @throws ConfirmedEntityNotFoundError if the product ID is provided but not found.
  */
@@ -51,6 +53,7 @@ export function resolveProduct(
   tx: Transaction,
   item: FinalSaveDto["items"][number],
   now: string,
+  newProductIds: Map<string, number>,
 ) {
   if (item.lineType !== "product") return null;
   if (item.productId !== null) {
@@ -140,7 +143,18 @@ export function resolveProduct(
         .get().id;
   }
 
-  return tx
+  // Resolve and validate associations before reuse; only products created in this
+  // save participate. Explicit product selections return above without entering the map.
+  const identityKey = JSON.stringify([
+    item.productName!,
+    groupId,
+    brandId,
+    normalizedPackage(item.packageAmount, item.packageUnit),
+  ]);
+  const resolvedId = newProductIds.get(identityKey);
+  if (resolvedId !== undefined) return resolvedId;
+
+  const productId = tx
     .insert(products)
     .values({
       productGroupId: groupId,
@@ -153,4 +167,6 @@ export function resolveProduct(
     })
     .returning({ id: products.id })
     .get().id;
+  newProductIds.set(identityKey, productId);
+  return productId;
 }

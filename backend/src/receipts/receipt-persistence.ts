@@ -50,8 +50,9 @@ export function persistReceipt(
       .returning({ id: receipts.id })
       .get().id;
     const itemIds: number[] = [];
+    const newProductIds = new Map<string, number>();
     receipt.items.forEach((item, position) => {
-      const productId = resolveProduct(tx, item, now);
+      const productId = resolveProduct(tx, item, now, newProductIds);
       learnProductAlias(tx, productId, item.rawName, now);
       const itemId = tx
         .insert(receiptItems)
