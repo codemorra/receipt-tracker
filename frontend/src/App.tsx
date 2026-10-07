@@ -6,6 +6,7 @@ import ImportPage from "./pages/ImportPage";
 import SavedReceiptPage from "./pages/SavedReceiptPage";
 import ReceiptsPage from "./pages/ReceiptsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import WarrantiesPage from "./pages/WarrantiesPage";
 import { receiptIdFromSearch, resolveRoute } from "./routes/routing";
 import "./App.css";
 
@@ -55,6 +56,8 @@ function App() {
         <ReceiptsPage />
       ) : route === "analytics" ? (
         <AnalyticsPage search={location.search} navigate={navigateTo} />
+      ) : route === "warranties" ? (
+        <WarrantiesPage />
       ) : (
         <PlaceholderPage route={route} />
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useReceiptBrowser } from "../hooks/useReceiptBrowser";
+import PaginatedTable from "../components/ui/PaginatedTable";
 import Card from "../components/ui/Card";
 import PageHeader from "../components/ui/PageHeader";
 import ReceiptDetailModal from "../components/receipts/ReceiptDetailModal";
@@ -13,7 +14,6 @@ export default function ReceiptsPage() {
   const [receiptId, setReceiptId] = useState<number | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const data = browser.data;
-  const stale = browser.loading || browser.error !== null;
   useEffect(() => {
     heading.current?.focus();
   }, []);
@@ -24,8 +24,6 @@ export default function ReceiptsPage() {
     dateStyle: "medium",
     timeZone: "UTC",
   });
-  const buttonClass =
-    "cursor-pointer rounded-xl border border-shell px-4 py-2.5 text-sm hover:bg-surface-hover disabled:cursor-default disabled:opacity-50";
   return (
     <>
       <PageHeader
@@ -47,164 +45,103 @@ export default function ReceiptsPage() {
             className="w-full rounded-xl border border-shell bg-canvas px-4 py-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
         </div>
-        <div className="min-h-6 text-sm" aria-live="polite">
-          {browser.loading ? (
-            <p role="status" className="text-muted">
-              {t("pages.receipts.loading")}
-            </p>
-          ) : browser.error ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <p role="alert" className="text-muted">
-                {t(`pages.receipts.errors.${browser.error}`)}
-              </p>
-              <button
-                type="button"
-                onClick={browser.retry}
-                className={buttonClass}
-              >
-                {t("pages.receipts.retry")}
-              </button>
-            </div>
-          ) : (
-            data && (
-              <p className="text-muted">
-                {t("pages.receipts.resultCount", { count: data.totalItems })}
-              </p>
-            )
+        <PaginatedTable
+          data={data}
+          loading={browser.loading}
+          error={
+            browser.error ? t(`pages.receipts.errors.${browser.error}`) : null
+          }
+          onRetry={browser.retry}
+          onPageChange={browser.setPage}
+          onRowOpen={(row) => {
+            setReceiptId(row.id);
+            setDetailOpen(true);
+          }}
+          rowLabel={(receipt) =>
+            t("pages.receipts.openDetail", {
+              merchant: receipt.merchantName,
+              date: receipt.purchaseDate,
+            })
+          }
+          emptyMessage={t(
+            data && data.totalItems > 0
+              ? "pages.receipts.emptyPage"
+              : browser.search.trim()
+                ? "pages.receipts.noResults"
+                : "pages.receipts.emptyArchive",
           )}
-        </div>
-        <div className="min-h-80 overflow-x-auto" aria-busy={browser.loading}>
-          <table
-            className={`w-full text-left text-sm ${stale ? "opacity-60" : ""}`}
-          >
-            <caption className="sr-only">
-              {t("pages.receipts.tableLabel")}
-            </caption>
-            <thead>
-              <tr className="border-b border-shell text-xs text-muted">
-                <th scope="col" className="px-3 py-3">
-                  {t("pages.receipts.merchant")}
-                </th>
-                <th scope="col" className="px-3 py-3">
-                  {t("pages.receipts.date")}
-                </th>
-                <th scope="col" className="px-3 py-3 text-right">
-                  {t("pages.receipts.total")}
-                </th>
-                <th scope="col" className="px-3 py-3 text-right">
-                  {t("pages.receipts.warranty")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.items.map((receipt) => (
-                <tr
-                  key={receipt.id}
-                  onClick={(event) => {
-                    if (stale) return;
-                    event.currentTarget.querySelector("button")?.focus();
-                    setReceiptId(receipt.id);
-                    setDetailOpen(true);
-                  }}
-                  className={`border-b border-shell last:border-0 ${stale ? "" : "cursor-pointer hover:bg-surface-hover"}`}
-                >
-                  <td className="px-3 py-4 font-medium">
-                    <button
-                      type="button"
-                      disabled={stale}
-                      aria-label={t("pages.receipts.openDetail", {
-                        merchant: receipt.merchantName,
-                        date: receipt.purchaseDate,
+          labels={{
+            caption: t("pages.receipts.tableLabel"),
+            loading: t("pages.receipts.loading"),
+            retry: t("pages.receipts.retry"),
+            pagination: t("pages.receipts.pagination"),
+            previous: t("pages.receipts.previous"),
+            next: t("pages.receipts.next"),
+            resultCount: (count) => t("pages.receipts.resultCount", { count }),
+            pageStatus: (page, totalPages) =>
+              t("pages.receipts.pageStatus", { page, totalPages }),
+          }}
+          columns={[
+            {
+              key: "merchant",
+              label: t("pages.receipts.merchant"),
+              className: "font-medium",
+              render: (receipt) => receipt.merchantName,
+            },
+            {
+              key: "date",
+              label: t("pages.receipts.date"),
+              className: "whitespace-nowrap",
+              render: (receipt) => (
+                <>
+                  <time dateTime={receipt.purchaseDate}>
+                    {date.format(new Date(`${receipt.purchaseDate}T00:00:00Z`))}
+                  </time>
+                  {receipt.purchaseTime && (
+                    <span className="mt-1 block text-xs text-muted">
+                      {receipt.purchaseTime}
+                    </span>
+                  )}
+                </>
+              ),
+            },
+            {
+              key: "total",
+              label: t("pages.receipts.total"),
+              align: "right",
+              className: "whitespace-nowrap tabular-nums",
+              render: (receipt) =>
+                new Intl.NumberFormat(i18n.language, {
+                  style: "currency",
+                  currency: receipt.currency,
+                }).format(receipt.totalCents / 100),
+            },
+            {
+              key: "warranty",
+              label: t("pages.receipts.warranty"),
+              align: "right",
+              className: "whitespace-nowrap",
+              render: (receipt) =>
+                receipt.warrantyCount > 0 ? (
+                  <span className="rounded-lg bg-accent-soft px-2.5 py-1 text-xs text-accent">
+                    <span aria-hidden="true">{receipt.warrantyCount}</span>
+                    <span className="sr-only">
+                      {t("pages.receipts.warrantyCount", {
+                        count: receipt.warrantyCount,
                       })}
-                      className="cursor-pointer rounded text-left wrap-break-word focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-accent disabled:cursor-default"
-                    >
-                      {receipt.merchantName}
-                    </button>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap">
-                    <time dateTime={receipt.purchaseDate}>
-                      {date.format(
-                        new Date(`${receipt.purchaseDate}T00:00:00Z`),
-                      )}
-                    </time>
-                    {receipt.purchaseTime && (
-                      <span className="mt-1 block text-xs text-muted">
-                        {receipt.purchaseTime}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-4 text-right whitespace-nowrap tabular-nums">
-                    {new Intl.NumberFormat(i18n.language, {
-                      style: "currency",
-                      currency: receipt.currency,
-                    }).format(receipt.totalCents / 100)}
-                  </td>
-                  <td className="px-3 py-4 text-right whitespace-nowrap">
-                    {receipt.warrantyCount > 0 ? (
-                      <span className="rounded-lg bg-accent-soft px-2.5 py-1 text-xs text-accent">
-                        <span aria-hidden="true">{receipt.warrantyCount}</span>
-                        <span className="sr-only">
-                          {t("pages.receipts.warrantyCount", {
-                            count: receipt.warrantyCount,
-                          })}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-muted">
-                        <span aria-hidden="true">—</span>
-                        <span className="sr-only">
-                          {t("pages.receipts.noWarranty")}
-                        </span>
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!stale && data?.items.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-12 text-center text-muted">
-                    {t(
-                      data.totalItems > 0
-                        ? "pages.receipts.emptyPage"
-                        : browser.search.trim()
-                          ? "pages.receipts.noResults"
-                          : "pages.receipts.emptyArchive",
-                    )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {data && data.totalPages > 0 && (
-          <nav
-            aria-label={t("pages.receipts.pagination")}
-            className="flex flex-wrap items-center justify-between gap-3 border-t border-shell pt-5"
-          >
-            <button
-              type="button"
-              disabled={stale || data.page <= 1}
-              onClick={() => browser.setPage(data.page - 1)}
-              className={buttonClass}
-            >
-              {t("pages.receipts.previous")}
-            </button>
-            <p className="text-sm text-muted">
-              {t("pages.receipts.pageStatus", {
-                page: data.page,
-                totalPages: data.totalPages,
-              })}
-            </p>
-            <button
-              type="button"
-              disabled={stale || data.page >= data.totalPages}
-              onClick={() => browser.setPage(data.page + 1)}
-              className={buttonClass}
-            >
-              {t("pages.receipts.next")}
-            </button>
-          </nav>
-        )}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-muted">
+                    <span aria-hidden="true">—</span>
+                    <span className="sr-only">
+                      {t("pages.receipts.noWarranty")}
+                    </span>
+                  </span>
+                ),
+            },
+          ]}
+        />
       </Card>
       {receiptId !== null && (
         <ReceiptDetailModal

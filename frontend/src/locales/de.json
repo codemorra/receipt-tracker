@@ -414,7 +414,47 @@
     },
     "warranties": {
       "title": "Garantie & Gewährleistung",
-      "description": "Garantie und Gewährleistung deiner Einkäufe im Blick."
+      "description": "Garantie und Gewährleistung deiner Einkäufe im Blick.",
+      "searchLabel": "Produktsuche",
+      "searchPlaceholder": "Produktname oder Alias",
+      "statusLabel": "Status",
+      "typeLabel": "Art",
+      "allStatuses": "Alle Status",
+      "allTypes": "Alle Arten",
+      "statuses": {
+        "not_started": "Noch nicht begonnen",
+        "active": "Aktiv",
+        "expiring_soon": "Läuft bald ab",
+        "expired": "Abgelaufen"
+      },
+      "types": {
+        "statutory": "Gesetzliche Gewährleistung",
+        "manufacturer": "Herstellergarantie",
+        "extended": "Verlängerte Garantie"
+      },
+      "loading": "Garantieeinträge werden geladen…",
+      "retry": "Erneut versuchen",
+      "tableLabel": "Gespeicherte Garantie- und Gewährleistungszeiträume",
+      "product": "Produkt",
+      "merchant": "Händler",
+      "purchaseDate": "Kaufdatum",
+      "startDate": "Beginn",
+      "endDate": "Ende",
+      "openDetail": "Beleg für {{product}}, {{merchant}}, {{date}} öffnen",
+      "empty": "Es wurden noch keine Garantie- oder Gewährleistungseinträge gespeichert.",
+      "noResults": "Keine Garantieeinträge passen zu deiner Suche oder deinen Filtern.",
+      "emptyPage": "Auf dieser Seite gibt es keine Garantieeinträge. Gehe zu einer vorherigen Seite.",
+      "pagination": "Garantie-Seiten",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "pageStatus": "Seite {{page}} von {{totalPages}}",
+      "errors": {
+        "invalid_warranty_query": "Wähle gültige Such- und Filterwerte.",
+        "warranty_list_failed": "Die Garantieeinträge konnten nicht geladen werden. Bitte versuche es erneut.",
+        "network_error": "Das Backend ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
+        "unexpected_response": "Das Backend hat unerwartete Garantiedaten geliefert. Bitte versuche es erneut."
+      },
+      "resultCount": "Gefundene Garantieeinträge: {{count}}"
     },
     "settings": {
       "title": "Einstellungen",

@@ -6,6 +6,7 @@ interface Props {
   groupLabel: string;
   title?: string;
   trigger: ReactNode;
+  className?: string;
   triggerClassName?: string;
   panelClassName?: string;
   disabled?: boolean;
@@ -29,6 +30,7 @@ export default function Dropdown({
   groupLabel,
   title,
   trigger,
+  className = "",
   triggerClassName = "",
   panelClassName = "",
   disabled = false,
@@ -99,7 +101,7 @@ export default function Dropdown({
   return (
     <details
       ref={dropdown}
-      className="group/dropdown relative"
+      className={`group/dropdown relative ${className}`}
       onToggle={() => {
         if (floatingPanel) positionPanel();
         onOpenChange?.(dropdown.current?.open ?? false);

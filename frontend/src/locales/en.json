@@ -414,7 +414,47 @@
     },
     "warranties": {
       "title": "Warranties",
-      "description": "Keep track of warranties for your purchases."
+      "description": "Keep track of warranties for your purchases.",
+      "searchLabel": "Product search",
+      "searchPlaceholder": "Product name or alias",
+      "statusLabel": "Status",
+      "typeLabel": "Type",
+      "allStatuses": "All statuses",
+      "allTypes": "All types",
+      "statuses": {
+        "not_started": "Not started",
+        "active": "Active",
+        "expiring_soon": "Expiring soon",
+        "expired": "Expired"
+      },
+      "types": {
+        "statutory": "Statutory warranty",
+        "manufacturer": "Manufacturer warranty",
+        "extended": "Extended warranty"
+      },
+      "loading": "Loading warranties…",
+      "retry": "Try again",
+      "tableLabel": "Saved warranty periods",
+      "product": "Product",
+      "merchant": "Merchant",
+      "purchaseDate": "Purchase date",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "openDetail": "Open receipt for {{product}}, {{merchant}}, {{date}}",
+      "empty": "No warranty entries have been saved yet.",
+      "noResults": "No warranty entries match your search or filters.",
+      "emptyPage": "There are no warranty entries on this page. Go to a previous page.",
+      "pagination": "Warranty pages",
+      "previous": "Previous",
+      "next": "Next",
+      "pageStatus": "Page {{page}} of {{totalPages}}",
+      "errors": {
+        "invalid_warranty_query": "Choose valid search and filter values.",
+        "warranty_list_failed": "Warranties could not be loaded. Please try again.",
+        "network_error": "The backend could not be reached. Check the connection and try again.",
+        "unexpected_response": "The backend returned unexpected warranty data. Please try again."
+      },
+      "resultCount": "Warranty entries found: {{count}}"
     },
     "settings": {
       "title": "Settings",
