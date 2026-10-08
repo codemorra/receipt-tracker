@@ -28,14 +28,14 @@ test("review lookups return selectable entities and filter by name", async (t) =
       .prepare(
         "INSERT INTO merchant (name, created_at, updated_at) VALUES (?, ?, ?)",
       )
-      .run("Edeka", now, now).lastInsertRowid,
+      .run("Test Market", now, now).lastInsertRowid,
   );
   const brandId = Number(
     sqlite
       .prepare(
         "INSERT INTO brand (name, created_at, updated_at) VALUES (?, ?, ?)",
       )
-      .run("Alpenhof", now, now).lastInsertRowid,
+      .run("Test Brand", now, now).lastInsertRowid,
   );
   const groupId = Number(
     sqlite
@@ -87,8 +87,8 @@ test("review lookups return selectable entities and filter by name", async (t) =
         category.id === categoryId && category.name === "food",
     ),
   );
-  assert.deepEqual(await getJson("/api/merchants?query=EDE"), [
-    { id: merchantId, name: "Edeka" },
+  assert.deepEqual(await getJson("/api/merchants?query=MARKET"), [
+    { id: merchantId, name: "Test Market" },
   ]);
   assert.deepEqual(await getJson("/api/merchants?query=unknown"), []);
   // Restoring a URL selection must work even outside the first 50 lookup results.
@@ -105,8 +105,8 @@ test("review lookups return selectable entities and filter by name", async (t) =
   assert.deepEqual(await getJson(`/api/merchants?id=${lastMerchantId}`), [
     { id: lastMerchantId, name: "Z-54" },
   ]);
-  assert.deepEqual(await getJson("/api/merchants?query=EDE"), [
-    { id: merchantId, name: "Edeka" },
+  assert.deepEqual(await getJson("/api/merchants?query=MARKET"), [
+    { id: merchantId, name: "Test Market" },
   ]);
   for (const query of [
     "id=",
@@ -127,13 +127,13 @@ test("review lookups return selectable entities and filter by name", async (t) =
   assert.deepEqual(await unknownMerchant.json(), {
     error: "merchant_not_found",
   });
-  assert.deepEqual(await getJson("/api/brands?query=alpen"), [
-    { id: brandId, name: "Alpenhof" },
+  assert.deepEqual(await getJson("/api/brands?query=brand"), [
+    { id: brandId, name: "Test Brand" },
   ]);
   assert.deepEqual(await getJson("/api/product-groups?query=food"), [
     { id: groupId, name: "Milk", categoryId, categoryName: "food" },
   ]);
-  assert.deepEqual(await getJson("/api/products?query=alpen"), [
+  assert.deepEqual(await getJson("/api/products?query=brand"), [
     {
       id: productId,
       name: "Whole Milk",
@@ -142,7 +142,7 @@ test("review lookups return selectable entities and filter by name", async (t) =
       categoryId,
       categoryName: "food",
       brandId,
-      brandName: "Alpenhof",
+      brandName: "Test Brand",
       packageAmount: 1,
       packageUnit: "l",
     },
@@ -157,7 +157,7 @@ test("review lookups return selectable entities and filter by name", async (t) =
   for (const query of [
     " WHOLE milk ",
     "MILK",
-    "Alpenhof",
+    "Test Brand",
     "milch",
     "MILCH 1 l",
     "suesse milch",
@@ -236,7 +236,7 @@ test("review lookups return selectable entities and filter by name", async (t) =
     originalProduct[0],
     sameNameProduct,
   ]);
-  assert.deepEqual(await getJson("/api/products?query=ALPEN"), originalProduct);
+  assert.deepEqual(await getJson("/api/products?query=BRAND"), originalProduct);
   assert.deepEqual(await getJson("/api/products?query=MILK"), [
     originalProduct[0],
     sameNameProduct,

@@ -4,7 +4,7 @@ import { createReceiptExtractionSchema } from "../src/extraction/receipt-extract
 
 // Test data and utility functions for validating receipt extraction schema.
 const validExtraction = {
-  merchant: { rawName: "EDEKA", normalizedName: "Edeka" },
+  merchant: { rawName: "TEST MARKET", normalizedName: "Test Market" },
   purchaseDate: "2026-09-29",
   purchaseTime: "14:05",
   currency: "EUR",

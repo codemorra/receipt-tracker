@@ -12,7 +12,7 @@ def test_ocr_lines_are_ordered_indexed_and_normalized():
     """Test that OCR lines are ordered by their position, indexed correctly, and boxes are normalized."""
     result = shape_ocr_result(
         {
-            "rec_texts": ["  1,19  ", "EDEKA", "MILCH"],
+            "rec_texts": ["  1,19  ", "TEST MARKET", "MILCH"],
             "rec_scores": [0.91, 0.98, 0.93],
             "rec_boxes": [[90, 80, 210, 100], [20, 10, 100, 30], [10, 80, 80, 100]],
         },
@@ -20,12 +20,12 @@ def test_ocr_lines_are_ordered_indexed_and_normalized():
         100,
     )
 
-    assert result["plainText"] == "EDEKA\nMILCH\n1,19"
+    assert result["plainText"] == "TEST MARKET\nMILCH\n1,19"
     assert [line["index"] for line in result["lines"]] == [0, 1, 2]
     assert [line["confidence"] for line in result["lines"]] == [0.98, 0.93, 0.91]
     assert result["lines"][2]["box"] == [0.45, 0.8, 1.0, 1.0]
     assert result["rows"] == [
-        {"rowIndex": 0, "segments": [{"text": "EDEKA", "x": 0.1}], "lineIndexes": [0]},
+        {"rowIndex": 0, "segments": [{"text": "TEST MARKET", "x": 0.1}], "lineIndexes": [0]},
         {"rowIndex": 1, "segments": [
             {"text": "MILCH", "x": 0.05},
             {"text": "1,19", "x": 0.45},
@@ -350,7 +350,7 @@ def test_isolated_row_join_preserves_unrelated_or_insufficiently_supported_segme
     if case == "header":
         texts[1] = "Exampletown"
     elif case == "identifier":
-        texts[1] = "455600220978"
+        texts[1] = "000000000042"
     elif case == "tax_code":
         texts[1] = "18,401"
     elif case == "numeric_label":
