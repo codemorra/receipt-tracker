@@ -917,9 +917,11 @@ test("saved receipts reload with associations and reject foreign images, broken 
   ]) {
     const value = { ...savedReceipt, ...change };
     assert.equal(isSavedReceipt(value), false);
-    response = () => Response.json(value);
-    await assert.rejects(getSavedReceipt(7), { code: "unexpected_response" });
   }
+  // One malformed DTO verifies that the API actually applies the validator above.
+  response = () =>
+    Response.json({ ...savedReceipt, imageUrl: "https://foreign.test/image" });
+  await assert.rejects(getSavedReceipt(7), { code: "unexpected_response" });
   response = () =>
     Response.json({
       ...savedReceipt,

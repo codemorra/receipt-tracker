@@ -139,8 +139,8 @@ test("price history rejects wrong products, invalid metadata/prices and unordere
   }
 });
 
-// Tests for distinguishing removed products and merchants, and for sanitizing API/network failures.
-test("price history distinguishes removed products and merchants and sanitizes API/network failures", async (t) => {
+// Tests for distinguishing removed products and merchants, and for sanitizing API failures.
+test("price history distinguishes removed products and merchants and sanitizes API failures", async (t) => {
   for (const [status, code] of [
     [400, "invalid_analytics_query"],
     [404, "product_not_found"],
@@ -161,19 +161,7 @@ test("price history distinguishes removed products and merchants and sanitizes A
     await assert.rejects(getPriceHistory(id, ""), {
       code: "invalid_analytics_query",
     });
-  t.mock.method(globalThis, "fetch", async () => new Response("invalid json"));
-  await assert.rejects(getPriceHistory(17, ""), {
-    code: "unexpected_response",
-  });
-  t.mock.method(globalThis, "fetch", async () => {
-    throw new Error("private details");
-  });
-  await assert.rejects(getPriceHistory(17, ""), { code: "network_error" });
-  const controller = new AbortController();
-  controller.abort();
-  await assert.rejects(getPriceHistory(17, "", controller.signal), {
-    name: "AbortError",
-  });
+  // Shared JSON, network and cancellation handling is covered by analytics-api.test.mjs.
 });
 
 // Tests for the price chart points generation, ensuring correct handling of missing, zero, negative, and same-day prices.
