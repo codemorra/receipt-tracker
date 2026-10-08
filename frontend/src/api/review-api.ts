@@ -83,6 +83,7 @@ function match(value: unknown, kind: "merchant" | "product"): boolean {
       kind === "merchant" ||
       (nullableText(candidate.brand) &&
         typeof candidate.productGroup === "string" &&
+        typeof candidate.category === "string" &&
         packageAmount(candidate.packageAmount) &&
         unit(candidate.packageUnit) &&
         typeof candidate.score === "number" &&

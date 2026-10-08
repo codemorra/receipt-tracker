@@ -148,6 +148,14 @@ test("product aliases match once and reject conflicting brand or package", (t) =
   );
   assert.equal(matchProduct(data.db, item).status, "MATCHED");
   assert.equal(matchProduct(data.db, item).productId, id);
+  const correctedMatch = matchProduct(data.db, {
+    ...item,
+    productGroup: "Incorrect extracted group",
+    category: "other",
+  });
+  assert.equal(correctedMatch.status, "MATCHED");
+  assert.equal(correctedMatch.candidates[0].productGroup, "milk");
+  assert.equal(correctedMatch.candidates[0].category, "food");
   assert.equal(
     matchProduct(data.db, { ...item, brand: "Other" }).status,
     "NEW",

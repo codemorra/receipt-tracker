@@ -64,6 +64,7 @@ export interface ReviewDto {
         name: string;
         brand: string | null;
         productGroup: string;
+        category: string;
         packageAmount: number | null;
         packageUnit: string | null;
         score: number;
@@ -193,10 +194,20 @@ export function parseCents(value: string): number | null {
  * @returns A draft representation of the review suitable for editing.
  */
 export function createReviewDraft(review: ReviewDto): ReviewDraft {
+  const matchedMerchant =
+    review.merchant.match.status === "MATCHED"
+      ? review.merchant.match.candidates.find(
+          (candidate) =>
+            candidate.merchantId === review.merchant.match.merchantId,
+        )
+      : undefined;
   return {
     merchantRawName: review.merchant.rawName ?? "",
     merchantName:
-      review.merchant.normalizedName ?? review.merchant.rawName ?? "",
+      matchedMerchant?.name ??
+      review.merchant.normalizedName ??
+      review.merchant.rawName ??
+      "",
     merchantId: review.merchant.match.merchantId,
     merchantMatchStatus: review.merchant.match.status,
     merchantCandidates: review.merchant.match.candidates,
@@ -221,6 +232,7 @@ export function createReviewDraft(review: ReviewDto): ReviewDraft {
           ? {
               brandName: matched.brand,
               productGroupName: matched.productGroup,
+              categoryName: matched.category,
               packageAmount: matched.packageAmount,
               packageUnit: matched.packageUnit,
             }

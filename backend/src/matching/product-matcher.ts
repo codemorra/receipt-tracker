@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Database } from "../db/database.js";
 import {
   brands,
+  categories,
   productAliases,
   productGroups,
   products,
@@ -18,6 +19,7 @@ type ProductRow = {
   name: string;
   brand: string | null;
   productGroup: string;
+  category: string;
   packageAmount: number | null;
   packageUnit: string | null;
 };
@@ -119,11 +121,13 @@ export function matchProduct(
       name: products.name,
       brand: brands.name,
       productGroup: productGroups.name,
+      category: categories.name,
       packageAmount: products.packageAmount,
       packageUnit: products.packageUnit,
     })
     .from(products)
     .innerJoin(productGroups, eq(products.productGroupId, productGroups.id))
+    .innerJoin(categories, eq(productGroups.categoryId, categories.id))
     .leftJoin(brands, eq(products.brandId, brands.id))
     .all();
   const candidates = rows
