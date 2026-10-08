@@ -37,8 +37,8 @@ const review = {
   scanId: "scan",
   archiveUrl: "/archive",
   merchant: {
-    rawName: "EDEKA",
-    normalizedName: "Edeka",
+    rawName: "TEST MARKET",
+    normalizedName: "Test Market",
     match: { status: "MATCHED", merchantId: 4, candidates: [] },
   },
   purchaseDate: "2026-09-29",
@@ -79,7 +79,7 @@ const review = {
 test("review draft keeps extracted values and confirmed match IDs", () => {
   const draft = createReviewDraft(review);
   assert.equal(draft.merchantId, 4);
-  assert.equal(draft.merchantRawName, "EDEKA");
+  assert.equal(draft.merchantRawName, "TEST MARKET");
   assert.equal(draft.total, "1.19");
   assert.equal(draft.items[0].productId, 8);
   assert.equal(draft.items[0].unitPrice, "1.49");
@@ -156,24 +156,24 @@ test("only confirmed merchant matches replace the extracted name with the canoni
   const extracted = {
     ...review,
     merchant: {
-      rawName: "LDL",
-      normalizedName: "LDL",
+      rawName: "TST MRKT",
+      normalizedName: "TST MRKT",
       match: {
         status: "MATCHED",
         merchantId: 4,
         candidates: [
           { merchantId: 9, name: "Other merchant" },
-          { merchantId: 4, name: "Lidl" },
+          { merchantId: 4, name: "Test Market" },
         ],
       },
     },
   };
   const before = structuredClone(extracted);
   const draft = createReviewDraft(extracted);
-  assert.equal(draft.merchantName, "Lidl");
-  assert.equal(draft.merchantRawName, "LDL");
+  assert.equal(draft.merchantName, "Test Market");
+  assert.equal(draft.merchantRawName, "TST MRKT");
   assert.equal(draft.merchantId, 4);
-  assert.equal(buildFinalSaveDto(draft).merchant.name, "Lidl");
+  assert.equal(buildFinalSaveDto(draft).merchant.name, "Test Market");
   assert.deepEqual(extracted, before);
   for (const status of ["SUGGESTED", "NEW"]) {
     const unconfirmed = createReviewDraft({
@@ -183,7 +183,7 @@ test("only confirmed merchant matches replace the extracted name with the canoni
         match: { ...extracted.merchant.match, status, merchantId: null },
       },
     });
-    assert.equal(unconfirmed.merchantName, "LDL");
+    assert.equal(unconfirmed.merchantName, "TST MRKT");
     assert.equal(unconfirmed.merchantId, null);
   }
 });
@@ -228,8 +228,8 @@ test("review API requires the stored category on product candidates", () => {
 test("matched products show canonical names and categories while clearing restores the new-product draft", () => {
   const extractedItem = {
     ...review.items[0],
-    rawName: "Wellenschnitt Pommes",
-    normalizedName: "Pommes",
+    rawName: "Product Alpha RAW",
+    normalizedName: "Product Alpha",
     category: "other",
     match: {
       status: "MATCHED",
@@ -237,7 +237,7 @@ test("matched products show canonical names and categories while clearing restor
       candidates: [
         {
           productId: 8,
-          name: "Gubuhubu!",
+          name: "Stored Product Alpha",
           brand: null,
           productGroup: "fries",
           category: "food",
@@ -252,10 +252,10 @@ test("matched products show canonical names and categories while clearing restor
     ...review,
     items: [extractedItem],
   }).items[0];
-  assert.equal(matched.rawName, "Wellenschnitt Pommes");
-  assert.equal(matched.normalizedName, "Pommes");
+  assert.equal(matched.rawName, "Product Alpha RAW");
+  assert.equal(matched.normalizedName, "Product Alpha");
   assert.equal(matched.productId, 8);
-  assert.equal(matched.selectedProductName, "Gubuhubu!");
+  assert.equal(matched.selectedProductName, "Stored Product Alpha");
   assert.equal(matched.matchStatus, "MATCHED");
   assert.equal(matched.selectedProductDetails.categoryName, "food");
   assert.equal(matched.category, "other");
@@ -271,7 +271,7 @@ test("matched products show canonical names and categories while clearing restor
   });
   assert.equal(manuallySelected.selectedProductName, "Other saved product");
   assert.equal(manuallySelected.matchStatus, null);
-  assert.equal(manuallySelected.normalizedName, "Pommes");
+  assert.equal(manuallySelected.normalizedName, "Product Alpha");
   assert.deepEqual(manuallySelected.selectedProductDetails, {
     brandName: "Canonical brand",
     productGroupName: "Canonical group",
@@ -284,7 +284,7 @@ test("matched products show canonical names and categories while clearing restor
   assert.equal(cleared.productId, null);
   assert.equal(cleared.selectedProductName, null);
   assert.equal(cleared.selectedProductDetails, null);
-  assert.equal(cleared.normalizedName, "Pommes");
+  assert.equal(cleared.normalizedName, "Product Alpha");
   assert.equal(cleared.brand, matched.brand);
   assert.equal(cleared.category, "other");
 
@@ -318,8 +318,8 @@ test("final save data contains confirmed associations, cents, and warranties", (
   assert.ok(finalSave);
   assert.deepEqual(finalSave.merchant, {
     id: 4,
-    name: "Edeka",
-    rawName: "EDEKA",
+    name: "Test Market",
+    rawName: "TEST MARKET",
   });
   assert.equal(finalSave.totalCents, 119);
   assert.equal(finalSave.items[0].productId, 8);
@@ -435,7 +435,7 @@ test("a fresh extraction of the same scan rebuilds all edit and association stat
     ],
     discounts: [],
   });
-  assert.equal(next.merchantName, "Edeka");
+  assert.equal(next.merchantName, "Test Market");
   assert.equal(next.items[0].normalizedName, "New extraction");
   assert.equal(next.items[0].productId, null);
   assert.equal(next.items[0].selectedProductName, null);
@@ -578,7 +578,7 @@ const scanId = "5aa1a222-b333-4ccc-8ddd-555566667777";
 const duplicate = {
   receiptId: 7,
   merchantId: 4,
-  merchantName: "Edeka",
+  merchantName: "Test Market",
   purchaseDate: "2026-09-29",
   purchaseTime: "14:05",
   totalCents: 119,
@@ -600,8 +600,8 @@ const duplicate = {
 const savedReceipt = {
   id: 7,
   merchantId: 4,
-  merchantName: "Edeka",
-  merchantRawName: "EDEKA",
+  merchantName: "Test Market",
+  merchantRawName: "TEST MARKET",
   purchaseDate: "2026-09-29",
   purchaseTime: "14:05",
   totalCents: 119,

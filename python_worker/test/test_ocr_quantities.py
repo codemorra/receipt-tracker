@@ -17,7 +17,7 @@ def merged_quantities():
         [590, 1051, 770, 1122], [957, 1052, 1125, 1113],
     ]
     return {
-        "rec_texts": ["0,89 ×", "22", "Magyi Magic Chicken", "1,78 A", "Maggi Magic Beef", "0,89 x", "1,78 A"],
+        "rec_texts": ["0,89 ×", "22", "Product Alpha", "1,78 A", "Product Beta", "0,89 x", "1,78 A"],
         "rec_scores": [0.99] * 7,
         "rec_boxes": boxes,
         "rec_polys": [
@@ -75,8 +75,8 @@ def test_recognize_image_assigns_independently_confirmed_digits_to_their_rows(me
     result = recognize_image(ocr, image_path)
 
     assert [[s["text"] for s in row["segments"]] for row in result["rows"]] == [
-        ["Magyi Magic Chicken", "0,89 ×", digits[0], "1,78 A"],
-        ["Maggi Magic Beef", "0,89 x", digits[1], "1,78 A"],
+        ["Product Alpha", "0,89 ×", digits[0], "1,78 A"],
+        ["Product Beta", "0,89 x", digits[1], "1,78 A"],
     ]
     assert [row["lineIndexes"] for row in result["rows"]] == [[0, 1, 2, 3], [4, 5, 6, 7]]
     assert result["lines"][2]["box"] == [823 / 1217, 994 / 3025, 866 / 1217, 1060 / 3025]

@@ -30,7 +30,7 @@ import {
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
 
 const validReceipt = {
-  merchant: { id: null, name: "Edeka", rawName: "EDEKA CITY" },
+  merchant: { id: null, name: "Test Market", rawName: "TEST MARKET CITY" },
   purchaseDate: "2026-09-30",
   purchaseTime: "12:30",
   totalCents: 199,
@@ -41,7 +41,7 @@ const validReceipt = {
       productId: null,
       productName: "Milch",
       brandId: null,
-      brandName: "Gut & Günstig",
+      brandName: "Test Brand",
       productGroupId: null,
       productGroupName: "milk",
       categoryName: "food",
@@ -180,7 +180,7 @@ test("save persists confirmed entities, aliases, receipt rows, warranty, and arc
     .where(eq(receipts.id, receiptId))
     .get();
   assert.ok(receipt);
-  assert.equal(receipt.merchantRawName, "EDEKA CITY");
+  assert.equal(receipt.merchantRawName, "TEST MARKET CITY");
   assert.equal(receipt.totalCents, 199);
   assert.equal(
     await readFile(join(data.dataRoot, receipt.imagePath), "utf8"),
@@ -221,7 +221,7 @@ test("save persists confirmed entities, aliases, receipt rows, warranty, and arc
         .prepare("SELECT normalized_alias AS alias FROM merchant_alias")
         .get() as { alias: string }
     ).alias,
-    "edeka city",
+    "test market city",
   );
   assert.equal(
     (
@@ -375,7 +375,7 @@ test("new products reuse resolved brand and group IDs and equivalent packages", 
       .prepare(
         "INSERT INTO brand (name, created_at, updated_at) VALUES (?, ?, ?)",
       )
-      .run("Gut & Günstig", now, now).lastInsertRowid,
+      .run("Test Brand", now, now).lastInsertRowid,
   );
   const receiptId = persistReceipt(
     data.db,
@@ -659,7 +659,7 @@ test("confirm API validates requests and returns a saved receipt image", async (
     }[];
     discounts: { amountCents: number; receiptItemId: number }[];
   };
-  assert.equal(detail.merchantName, "Edeka");
+  assert.equal(detail.merchantName, "Test Market");
   assert.equal(detail.purchaseDate, "2026-09-30");
   assert.equal(detail.purchaseTime, "12:30");
   assert.equal(detail.totalCents, 199);
@@ -671,7 +671,7 @@ test("confirm API validates requests and returns a saved receipt image", async (
   assert.deepEqual(detail.items[0].product, {
     id: 1,
     name: "Milch",
-    brandName: "Gut & Günstig",
+    brandName: "Test Brand",
     productGroupName: "milk",
     categoryName: "food",
     packageAmount: 1,
@@ -885,7 +885,7 @@ test("saved receipt detail reloads from a new database connection", async (t) =>
   try {
     const detail = loadReceiptDetail(reopened.db, receiptId);
     assert.ok(detail);
-    assert.equal(detail.merchantName, "Edeka");
+    assert.equal(detail.merchantName, "Test Market");
     assert.equal(detail.items[0].product?.name, "Milch");
     assert.equal(detail.items[0].warranties[0].startDate, "2026-09-30");
     assert.equal(detail.discounts[0].amountCents, 19);
@@ -1107,7 +1107,7 @@ test("receipt listing API validates queries and preserves empty and out-of-range
   );
   for (const query of [
     "",
-    "?search=EDEKA%20CITY",
+    "?search=TEST%20MARKET%20CITY",
     "?search=MILCH%201L&page=1",
   ]) {
     const response = await fetch(`${url}${query}`);
@@ -1117,7 +1117,7 @@ test("receipt listing API validates queries and preserves empty and out-of-range
         {
           id: receiptId,
           merchantId: 1,
-          merchantName: "Edeka",
+          merchantName: "Test Market",
           purchaseDate: "2026-09-30",
           purchaseTime: "12:30",
           totalCents: 199,

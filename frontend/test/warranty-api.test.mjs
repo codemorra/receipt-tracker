@@ -42,7 +42,7 @@ test("warranty API encodes filters and preserves full, partial, empty and out-of
       const url = new URL(path, "http://localhost");
       assert.equal(url.pathname, "/api/warranties");
       assert.deepEqual(Object.fromEntries(url.searchParams), {
-        search: "O'Reilly & Söhne",
+        search: "Test's & Söhne",
         page: String(page),
         status: "active",
         type: "manufacturer",
@@ -54,7 +54,7 @@ test("warranty API encodes filters and preserves full, partial, empty and out-of
     assert.deepEqual(
       await getWarranties(
         {
-          search: "  O'Reilly & Söhne  ",
+          search: "  Test's & Söhne  ",
           page,
           status: "active",
           type: "manufacturer",

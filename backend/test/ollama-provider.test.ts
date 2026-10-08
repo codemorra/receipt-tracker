@@ -14,13 +14,17 @@ import { createReceiptExtractionSchema } from "../src/extraction/receipt-extract
 
 // Defines a sample input for receipt extraction tests.
 const input = {
-  plainText: "EDEKA\nMILCH 1L\n1,19",
+  plainText: "TEST MARKET\nMILCH 1L\n1,19",
   lines: [
-    { index: 0, text: "EDEKA", confidence: 0.98, box: [0, 0, 1, 0.1] },
+    { index: 0, text: "TEST MARKET", confidence: 0.98, box: [0, 0, 1, 0.1] },
     { index: 1, text: "MILCH 1L" },
   ],
   rows: [
-    { rowIndex: 0, segments: [{ text: "EDEKA", x: 0 }], lineIndexes: [0] },
+    {
+      rowIndex: 0,
+      segments: [{ text: "TEST MARKET", x: 0 }],
+      lineIndexes: [0],
+    },
     { rowIndex: 1, segments: [{ text: "MILCH 1L", x: 0.1 }], lineIndexes: [1] },
   ],
   categoryNames: ["food", "custom"],
@@ -81,7 +85,9 @@ test("sends only OCR data and categories with the extraction JSON schema", async
   assert.equal(messages[0].content.includes("productAliases"), false);
   assert.equal(messages[0].content.includes("Private Merchant"), false);
   assert.ok(
-    messages[0].content.includes('[0; x=0] "EDEKA"\n[1; x=0.1] "MILCH 1L"'),
+    messages[0].content.includes(
+      '[0; x=0] "TEST MARKET"\n[1; x=0.1] "MILCH 1L"',
+    ),
   );
 });
 

@@ -16,7 +16,7 @@ const now = "2026-09-29T00:00:00.000Z";
 const item: ReceiptExtraction["items"][number] = {
   rawName: "MILCH 1L",
   normalizedName: "Milch",
-  brand: "Gut & Günstig",
+  brand: "Test & Brand",
   productGroup: "milk",
   category: "food",
   packageAmount: 1,
@@ -114,15 +114,15 @@ function fixture() {
 test("merchant aliases match only one distinct merchant", (t) => {
   const data = fixture();
   t.after(data.cleanup);
-  const first = data.addMerchant("Edeka", "edeka");
-  assert.deepEqual(matchMerchant(data.db, "EDEKA"), {
+  const first = data.addMerchant("Test Market", "test market");
+  assert.deepEqual(matchMerchant(data.db, "TEST MARKET"), {
     status: "MATCHED",
     merchantId: first,
-    candidates: [{ merchantId: first, name: "Edeka" }],
+    candidates: [{ merchantId: first, name: "Test Market" }],
   });
-  data.addMerchant("Edeka Franchise", "edeka");
-  assert.equal(matchMerchant(data.db, "EDEKA").status, "SUGGESTED");
-  assert.equal(matchMerchant(data.db, "EDEKA").merchantId, null);
+  data.addMerchant("Test Market Franchise", "test market");
+  assert.equal(matchMerchant(data.db, "TEST MARKET").status, "SUGGESTED");
+  assert.equal(matchMerchant(data.db, "TEST MARKET").merchantId, null);
   assert.equal(matchMerchant(data.db, "Unknown").status, "NEW");
   assert.equal(matchMerchant(data.db, null).status, "NEW");
 });
@@ -131,8 +131,8 @@ test("merchant aliases match only one distinct merchant", (t) => {
 test("merchant canonical names are suggestions without a confirmed alias", (t) => {
   const data = fixture();
   t.after(data.cleanup);
-  data.addMerchant("Müller");
-  assert.equal(matchMerchant(data.db, "MUELLER").status, "SUGGESTED");
+  data.addMerchant("Testmühle");
+  assert.equal(matchMerchant(data.db, "TESTMUEHLE").status, "SUGGESTED");
 });
 
 // Tests for product alias matching, including handling of conflicting brands and package information.
@@ -141,7 +141,7 @@ test("product aliases match once and reject conflicting brand or package", (t) =
   t.after(data.cleanup);
   const id = data.addProduct(
     "Milch",
-    "Gut und Günstig",
+    "Test und Brand",
     1000,
     "ml",
     "milch 1 l",
@@ -174,7 +174,7 @@ test("product aliases match once and reject conflicting brand or package", (t) =
 test("product package comparison converts kilograms to grams", (t) => {
   const data = fixture();
   t.after(data.cleanup);
-  const id = data.addProduct("Milch", "Gut und Günstig", 1000, "g");
+  const id = data.addProduct("Milch", "Test und Brand", 1000, "g");
   const kilogramItem = {
     ...item,
     packageAmount: 1,
@@ -188,14 +188,14 @@ test("product package comparison converts kilograms to grams", (t) => {
 test("similar products are suggestions only with sufficient score and margin", (t) => {
   const data = fixture();
   t.after(data.cleanup);
-  const first = data.addProduct("Milch", "Gut und Günstig", 1000, "ml");
+  const first = data.addProduct("Milch", "Test und Brand", 1000, "ml");
   assert.equal(matchProduct(data.db, item).status, "SUGGESTED");
   assert.equal(matchProduct(data.db, item).candidates[0].productId, first);
   assert.equal(
     matchProduct(data.db, item, { minimumScore: 1.01 }).status,
     "NEW",
   );
-  data.addProduct("Milch", "Gut und Günstig", 1, "l");
+  data.addProduct("Milch", "Test und Brand", 1, "l");
   assert.equal(matchProduct(data.db, item).status, "NEW");
 });
 
@@ -203,8 +203,8 @@ test("similar products are suggestions only with sufficient score and margin", (
 test("ambiguous product aliases never create a matched product", (t) => {
   const data = fixture();
   t.after(data.cleanup);
-  data.addProduct("Milch", "Gut und Günstig", 1, "l", "milch 1 l");
-  data.addProduct("Milch", "Gut und Günstig", 1, "l", "milch 1 l");
+  data.addProduct("Milch", "Test und Brand", 1, "l", "milch 1 l");
+  data.addProduct("Milch", "Test und Brand", 1, "l", "milch 1 l");
   assert.equal(matchProduct(data.db, item).status, "NEW");
   assert.equal(matchProduct(data.db, item).productId, null);
 });

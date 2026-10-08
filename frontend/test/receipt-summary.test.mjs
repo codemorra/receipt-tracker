@@ -28,8 +28,8 @@ const warranty = {
 const saved = {
   id: 1,
   merchantId: 4,
-  merchantName: "Edeka",
-  merchantRawName: "EDEKA CITY",
+  merchantName: "Test Market",
+  merchantRawName: "TEST MARKET CITY",
   purchaseDate: "2026-09-30",
   purchaseTime: "12:30",
   totalCents: 180,
@@ -68,8 +68,8 @@ const saved = {
 };
 function draft() {
   return {
-    merchantName: "Edeka",
-    merchantRawName: "EDEKA CITY",
+    merchantName: "Test Market",
+    merchantRawName: "TEST MARKET CITY",
     merchantId: 4,
     merchantMatchStatus: "MATCHED",
     merchantCandidates: [],

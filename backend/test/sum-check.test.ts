@@ -5,7 +5,7 @@ import { checkReceiptSum } from "../src/review/sum-check.js";
 
 // Tests for the receipt sum check functionality.
 const extraction: ReceiptExtraction = {
-  merchant: { rawName: "EDEKA", normalizedName: "Edeka" },
+  merchant: { rawName: "TEST MARKET", normalizedName: "Test Market" },
   purchaseDate: "2026-09-29",
   purchaseTime: "14:05",
   currency: "EUR",

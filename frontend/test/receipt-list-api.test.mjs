@@ -16,7 +16,7 @@ function listing(page, totalItems = 41) {
       (_, index) => ({
         id: offset + index + 1,
         merchantId: 2,
-        merchantName: "O'Reilly & Söhne",
+        merchantName: "Test's & Söhne",
         purchaseDate: "2026-09-30",
         purchaseTime: index === 0 ? null : "12:30",
         totalCents: 199,
@@ -44,7 +44,7 @@ test("archive API encodes search and accepts full, partial, empty and out-of-ran
     t.mock.method(globalThis, "fetch", async (path, init) => {
       const url = new URL(path, "http://localhost");
       assert.equal(url.pathname, "/api/receipts");
-      assert.equal(url.searchParams.get("search"), "O'Reilly & Söhne");
+      assert.equal(url.searchParams.get("search"), "Test's & Söhne");
       assert.equal(url.searchParams.get("page"), String(page));
       assert.equal(url.searchParams.has("pageSize"), false);
       assert.equal(init.cache, "no-store");
@@ -52,7 +52,7 @@ test("archive API encodes search and accepts full, partial, empty and out-of-ran
       return Response.json(result);
     });
     assert.deepEqual(
-      await getReceipts("  O'Reilly & Söhne  ", page, controller.signal),
+      await getReceipts("  Test's & Söhne  ", page, controller.signal),
       result,
     );
   }

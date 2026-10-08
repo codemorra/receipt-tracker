@@ -35,7 +35,7 @@ const ocrLine = {
 };
 
 const validExtraction = {
-  merchant: { rawName: "EDEKA", normalizedName: "Edeka" },
+  merchant: { rawName: "TEST MARKET", normalizedName: "Test Market" },
   purchaseDate: "2026-09-29",
   purchaseTime: "14:05",
   currency: "EUR",
@@ -184,13 +184,13 @@ test("process endpoint returns a review DTO using current categories and databas
       .prepare(
         "INSERT INTO merchant (name, created_at, updated_at) VALUES (?, ?, ?)",
       )
-      .run("Edeka", now, now).lastInsertRowid,
+      .run("Test Market", now, now).lastInsertRowid,
   );
   sqlite
     .prepare(
       "INSERT INTO merchant_alias (merchant_id, alias, normalized_alias, created_at) VALUES (?, ?, ?, ?)",
     )
-    .run(merchantId, "EDEKA", "edeka", now);
+    .run(merchantId, "TEST MARKET", "test market", now);
   const categoryId = (
     sqlite.prepare("SELECT id FROM category WHERE name = ?").get("custom") as {
       id: number;
@@ -271,7 +271,7 @@ test("process endpoint returns a review DTO using current categories and databas
     match: {
       status: "MATCHED",
       merchantId,
-      candidates: [{ merchantId, name: "Edeka" }],
+      candidates: [{ merchantId, name: "Test Market" }],
     },
   });
   assert.equal(result.review.items[0].match.status, "MATCHED");

@@ -27,7 +27,7 @@ test("duplicate search uses merchant, date, and total while ranking by purchase 
         )
         .run(name, now, now).lastInsertRowid,
     );
-  const merchantId = addMerchant("Edeka");
+  const merchantId = addMerchant("Test Market");
   const otherMerchantId = addMerchant("Other");
   const addReceipt = (
     merchant: number,
@@ -74,7 +74,7 @@ test("duplicate search uses merchant, date, and total while ranking by purchase 
     candidates.map((candidate) => candidate.receiptId),
     [exactTimeId, nearTimeId, missingTimeId],
   );
-  assert.equal(candidates[0].merchantName, "Edeka");
+  assert.equal(candidates[0].merchantName, "Test Market");
   assert.equal(candidates[0].imagePath, "receipts/14:05.webp");
   assert.deepEqual(candidates[0].items, [
     {
