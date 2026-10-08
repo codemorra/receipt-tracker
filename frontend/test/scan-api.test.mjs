@@ -66,7 +66,7 @@ test("new import uploads raw bytes and explicitly sends the selected provider, f
     assert.deepEqual(JSON.parse(init.body), {
       corners,
       rotation: 270,
-      provider: "mistral",
+      provider: "openai",
     });
     return Response.json({
       ...result,
@@ -75,7 +75,7 @@ test("new import uploads raw bytes and explicitly sends the selected provider, f
     });
   });
   assert.deepEqual(await uploadScan(file), scan);
-  assert.deepEqual(await processScan(id, corners, 270, "mistral"), result);
+  assert.deepEqual(await processScan(id, corners, 270, "openai"), result);
 });
 
 // Tests for automatic orientation and receipt boundary detection during the import workflow.

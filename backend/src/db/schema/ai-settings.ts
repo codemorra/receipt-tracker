@@ -15,10 +15,7 @@ export const aiProviderSettings = sqliteTable(
     apiKeyEncrypted: text("api_key_encrypted"),
   },
   (table) => [
-    check(
-      "ai_provider_id",
-      sql`${table.provider} IN ('ollama', 'mistral', 'openai')`,
-    ),
+    check("ai_provider_id", sql`${table.provider} IN ('ollama', 'openai')`),
     check("ai_provider_enabled", sql`${table.enabled} IN (0, 1)`),
     check(
       "ai_provider_url",

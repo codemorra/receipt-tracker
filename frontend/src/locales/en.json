@@ -504,7 +504,6 @@
   "providerSettings": {
     "names": {
       "ollama": "Ollama",
-      "mistral": "Mistral",
       "openai": "OpenAI"
     },
     "cloud": "Cloud provider",

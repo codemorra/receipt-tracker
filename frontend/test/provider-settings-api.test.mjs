@@ -9,7 +9,7 @@ import {
 } from "../src/api/provider-settings-api.ts";
 
 // Mock data for AI providers used in the tests.
-const providers = ["ollama", "mistral", "openai"].map((provider) => ({
+const providers = ["ollama", "openai"].map((provider) => ({
   provider,
   enabled: false,
   model: "",
@@ -64,7 +64,7 @@ test("set/replace/remove key actions remain in JSON bodies and default changes a
     { action: "set", value: "test-private-key" },
     { action: "remove" },
   ]) {
-    await updateProviderSettings("mistral", {
+    await updateProviderSettings("openai", {
       enabled: false,
       model: "model",
       ...(apiKey ? { apiKey } : {}),
@@ -144,10 +144,10 @@ test("malformed or mismatched responses cannot enter settings state", async (t) 
   await assert.rejects(getProviderSettings(), { code: "unexpected_response" });
   payload = providers[0];
   await assert.rejects(
-    updateProviderSettings("mistral", { enabled: false, model: "model" }),
+    updateProviderSettings("openai", { enabled: false, model: "model" }),
     { code: "unexpected_response" },
   );
-  payload = { defaultProvider: "mistral" };
+  payload = { defaultProvider: "openai" };
   await assert.rejects(updateDefaultProvider("ollama"), {
     code: "unexpected_response",
   });
@@ -164,17 +164,13 @@ test("deleting a saved configuration resets the model and credentials for its pr
       providers.find((entry) => entry.provider === provider),
     );
   });
-  for (const provider of ["ollama", "mistral", "openai"]) {
+  for (const provider of ["ollama", "openai"]) {
     await updateProviderSettings(provider, providerResetUpdate(provider));
   }
   assert.deepEqual(requests, [
     {
       provider: "ollama",
       update: { enabled: false, model: "", baseUrl: "http://127.0.0.1:11434" },
-    },
-    {
-      provider: "mistral",
-      update: { enabled: false, model: "", apiKey: { action: "remove" } },
     },
     {
       provider: "openai",
