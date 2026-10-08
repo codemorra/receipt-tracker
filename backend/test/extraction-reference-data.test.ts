@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createDatabase } from "../src/db/database.js";
 import { loadExtractionReferenceData } from "../src/extraction/extraction-reference-data.js";
 
@@ -13,7 +12,6 @@ test("loads the current category names without unrelated database data", () => {
   const { sqlite, db } = createDatabase(join(directory, "test.sqlite"));
 
   try {
-    migrate(db, { migrationsFolder: "./drizzle" });
     sqlite
       .prepare("UPDATE category SET name = ? WHERE name = ?")
       .run("groceries", "food");

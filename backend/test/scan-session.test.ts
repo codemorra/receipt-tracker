@@ -14,7 +14,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createDatabase } from "../src/db/database.js";
 import { createApp } from "../src/app.js";
 import {
@@ -153,7 +152,6 @@ test("scan API creates a session and serves its preview", async (t) => {
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { sqlite, db } = createDatabase(":memory:");
   t.after(() => sqlite.close());
-  migrate(db, { migrationsFolder: "./drizzle" });
   const app = createApp(
     new ScanSessionService(directory, previewWorker(90)),
     db,

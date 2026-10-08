@@ -135,7 +135,8 @@ test("API errors preserve known codes and discard unknown details, HTML, and tra
 // Test suite for handling malformed or mismatched API responses.
 test("malformed or mismatched responses cannot enter settings state", async (t) => {
   let payload = {
-    providers: [providers[0], providers[0], providers[2]],
+    // Both entries are valid; only their duplicate identity is invalid.
+    providers: [providers[0], providers[0]],
     defaultProvider: null,
   };
   t.mock.method(globalThis, "fetch", async () => Response.json(payload));

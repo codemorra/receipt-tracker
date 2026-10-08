@@ -4,7 +4,6 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createApp } from "../src/app.js";
 import { createDatabase } from "../src/db/database.js";
 import {
@@ -67,7 +66,6 @@ test("process endpoint returns a review DTO using current categories and databas
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { sqlite, db } = createDatabase(":memory:");
   t.after(() => sqlite.close());
-  migrate(db, { migrationsFolder: "./drizzle" });
 
   let workerCalls = 0;
   const scans = new ScanSessionService(directory, {
