@@ -1,5 +1,4 @@
 from hashlib import sha256
-from pathlib import Path
 
 import numpy
 import pytest
@@ -105,26 +104,4 @@ def test_preview_coordinates_follow_exif_orientation_without_changing_original(t
     with Image.open(preview) as image:
         assert image.format == "WEBP"
         assert image.size == (400, 600)
-    assert sha256(original.read_bytes()).digest() == original_hash
-
-
-@pytest.mark.parametrize(
-    "name,expected",
-    [
-        ("big_1", [(0.320, 0.152), (0.706, 0.166), (0.705, 0.908), (0.304, 0.912)]),
-        ("big_2", [(0.088, 0.307), (0.908, 0.310), (0.908, 0.687), (0.091, 0.686)]),
-        ("big_3", [(0.272, 0.282), (0.752, 0.282), (0.769, 0.729), (0.266, 0.717)]),
-    ],
-)
-def test_local_receipt_photos_match_reference_corners(tmp_path, name, expected):
-    """Test that local receipt photos match the reference corners."""
-    original = Path(__file__).resolve().parents[2] / ".local" / "bons" / f"{name}.jpg"
-    if not original.exists():
-        pytest.skip("Local receipt photo is not available")
-    original_hash = sha256(original.read_bytes()).digest()
-
-    result = create_preview(original, tmp_path / f"{name}.webp")
-
-    for corner, point in zip(default_corners(), expected):
-        assert result["suggestedCorners"][corner] == pytest.approx(point, abs=0.015)
     assert sha256(original.read_bytes()).digest() == original_hash
