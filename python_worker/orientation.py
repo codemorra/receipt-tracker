@@ -31,6 +31,33 @@ def initialize_orientation():
         return None
 
 
+def orientation_prediction(model, image):
+    """Return a validated angle and confidence for an orientation-only image.
+
+    Args:
+        model: The orientation model.
+        image (PIL.Image.Image): The image to be analyzed for orientation.
+
+    Returns:
+        tuple: A tuple containing the angle (int) and confidence (float) of the orientation prediction.
+    """
+    pixels = numpy.asarray(image)[:, :, ::-1].copy()
+    with redirect_stdout(sys.stderr):
+        results = model.predict(pixels)
+    if len(results) != 1:
+        raise ValueError("Unexpected orientation result count")
+    result = results[0].json["res"]
+    angle = int(result["label_names"][0])
+    confidence = float(result["scores"][0])
+    if (
+        angle not in (0, 90, 180, 270)
+        or not math.isfinite(confidence)
+        or not 0 <= confidence <= 1
+    ):
+        raise ValueError("Invalid orientation result")
+    return angle, confidence
+
+
 def detect_rotation(image):
     """Detect the rotation needed to correctly orient the image.
 
@@ -44,23 +71,25 @@ def detect_rotation(image):
     if model is None:
         return 0
     try:
-        pixels = numpy.asarray(image)[:, :, ::-1].copy()
-        with redirect_stdout(sys.stderr):
-            results = model.predict(pixels)
-        if len(results) != 1:
-            raise ValueError("Unexpected orientation result count")
-        result = results[0].json["res"]
-        angle = int(result["label_names"][0])
-        confidence = float(result["scores"][0])
-        if (
-            angle not in (0, 90, 180, 270)
-            or not math.isfinite(confidence)
-            or not 0 <= confidence <= 1
-        ):
-            raise ValueError("Invalid orientation result")
-        if confidence < 0.8:
-            return 0
-        return (-angle) % 360
+        angle, confidence = orientation_prediction(model, image)
+        if confidence >= 0.8:
+            return (-angle) % 360
+
+        # Background can dominate an uncropped photo. Use center crops only to
+        # estimate orientation; receipt corners and final images stay intact.
+        crop_angles = []
+        for margin in (0.1, 0.2):
+            left, top = int(image.width * margin), int(image.height * margin)
+            crop = image.crop((left, top, image.width - left, image.height - top))
+            if min(crop.size) < 2:
+                return 0
+            crop_angle, crop_confidence = orientation_prediction(model, crop)
+            if crop_confidence < 0.9:
+                return 0
+            crop_angles.append(crop_angle)
+        if crop_angles[0] == crop_angles[1]:
+            return (-crop_angles[0]) % 360
+        return 0
     except (OSError, RuntimeError, ValueError, TypeError, KeyError, IndexError) as error:
         print(f"Receipt orientation prediction failed: {type(error).__name__}", file=sys.stderr)
         return 0

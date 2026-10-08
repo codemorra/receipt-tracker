@@ -76,6 +76,98 @@ def test_missing_or_failed_model_preserves_orientation(monkeypatch):
     assert orientation.detect_rotation(image) == 0
 
 
+@pytest.mark.parametrize("angle,rotation", [(0, 0), (90, 270), (180, 180), (270, 90)])
+def test_uncertain_full_image_uses_agreeing_confident_crops(monkeypatch, angle, rotation):
+    """Test that an uncertain full image uses agreeing confident crops."""
+    predictions = iter([(90, 0.59), (angle, 0.93), (angle, 0.92)])
+    sizes = []
+
+    def predict(pixels):
+        sizes.append(pixels.shape[:2])
+        predicted_angle, confidence = next(predictions)
+        return [SimpleNamespace(json={"res": {
+            "label_names": [str(predicted_angle)], "scores": [confidence],
+        }})]
+
+    monkeypatch.setattr(orientation, "initialize_orientation", lambda: SimpleNamespace(predict=predict))
+    image = Image.new("RGB", (400, 300), "white")
+    original_pixels = image.tobytes()
+
+    assert orientation.detect_rotation(image) == rotation
+    assert sizes == [(300, 400), (240, 320), (180, 240)]
+    assert image.size == (400, 300)
+    assert image.tobytes() == original_pixels
+
+
+@pytest.mark.parametrize("predictions", [
+    [(270, 0.95), (90, 0.95)],
+    [(270, 0.89)],
+    [(270, 0.95), (270, 0.89)],
+    [(270, 0.95), (270, float("nan"))],
+    [(270, 0.95), (45, 0.99)],
+])
+def test_ambiguous_or_invalid_crops_leave_manual_orientation_available(monkeypatch, predictions):
+    """Test that ambiguous or invalid crop predictions leave manual orientation available."""
+    responses = iter([(90, 0.59), *predictions])
+
+    def predict(pixels):
+        angle, confidence = next(responses)
+        return [SimpleNamespace(json={"res": {
+            "label_names": [str(angle)], "scores": [confidence],
+        }})]
+
+    monkeypatch.setattr(orientation, "initialize_orientation", lambda: SimpleNamespace(predict=predict))
+
+    assert orientation.detect_rotation(Image.new("RGB", (400, 300), "white")) == 0
+
+
+def test_confident_full_image_does_not_request_crops(monkeypatch):
+    """Test that a confident full image does not request additional crops."""
+    calls = []
+
+    def predict(pixels):
+        calls.append(pixels.shape)
+        assert len(calls) == 1
+        return [SimpleNamespace(json={"res": {"label_names": ["270"], "scores": [0.8]}})]
+
+    monkeypatch.setattr(orientation, "initialize_orientation", lambda: SimpleNamespace(predict=predict))
+
+    assert orientation.detect_rotation(Image.new("RGB", (400, 300), "white")) == 90
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("error_type", [OSError, RuntimeError, ValueError, TypeError, KeyError, IndexError])
+def test_expected_crop_prediction_failure_preserves_orientation(monkeypatch, error_type):
+    """Test that an expected crop prediction failure preserves the original orientation."""
+    calls = []
+
+    def predict(pixels):
+        calls.append(pixels.shape)
+        if len(calls) > 1:
+            raise error_type("Crop prediction failed")
+        return [SimpleNamespace(json={"res": {"label_names": ["270"], "scores": [0.7]}})]
+
+    monkeypatch.setattr(orientation, "initialize_orientation", lambda: SimpleNamespace(predict=predict))
+
+    assert orientation.detect_rotation(Image.new("RGB", (400, 300), "white")) == 0
+
+
+def test_unexpected_crop_prediction_failure_is_not_silently_ignored(monkeypatch):
+    """Test that an unexpected crop prediction failure is not silently ignored."""
+    calls = []
+
+    def predict(pixels):
+        calls.append(pixels.shape)
+        if len(calls) > 1:
+            raise AssertionError("Unexpected model bug")
+        return [SimpleNamespace(json={"res": {"label_names": ["270"], "scores": [0.7]}})]
+
+    monkeypatch.setattr(orientation, "initialize_orientation", lambda: SimpleNamespace(predict=predict))
+
+    with pytest.raises(AssertionError, match="Unexpected model bug"):
+        orientation.detect_rotation(Image.new("RGB", (400, 300), "white"))
+
+
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 def test_preview_and_final_images_use_the_same_selected_orientation(tmp_path, rotation):
     """Test that the preview and final images use the same selected orientation."""
