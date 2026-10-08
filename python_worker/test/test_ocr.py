@@ -298,3 +298,96 @@ def test_local_tilt_preserves_short_prices_on_a_consistently_tilted_receipt(slop
         "rec_scores": [0.99] * 4, "rec_boxes": boxes, "rec_polys": polygons,
     }, 1000, 400)
     assert [row["lineIndexes"] for row in result["rows"]] == [[0, 1], [2, 3]]
+
+
+def test_isolated_total_and_cash_amounts_join_labels_without_merging_change():
+    """Test that isolated total and cash amounts join labels without merging changes."""
+    raw = {
+        "rec_texts": ["€18,40", "Summe", "€25,00", "Bar", "€6,60", "Rückgeld Bar"],
+        "rec_scores": [0.99] * 6,
+        "rec_boxes": [
+            [1003, 1356, 1404, 1441], [38, 1393, 363, 1462],
+            [1145, 1693, 1303, 1755], [37, 1723, 115, 1782],
+            [1165, 1745, 1300, 1806], [37, 1769, 329, 1833],
+        ],
+        "rec_polys": [
+            [[1003, 1361], [1402, 1356], [1404, 1436], [1004, 1441]],
+            [[38, 1393], [363, 1393], [363, 1462], [38, 1462]],
+            [[1145, 1693], [1303, 1693], [1303, 1755], [1145, 1755]],
+            [[37, 1723], [115, 1723], [115, 1782], [37, 1782]],
+            [[1165, 1747], [1299, 1745], [1300, 1804], [1166, 1806]],
+            [[37, 1773], [328, 1769], [329, 1829], [37, 1833]],
+        ],
+    }
+    original = deepcopy(raw)
+    result = shape_ocr_result(raw, 1466, 3456)
+
+    assert [[s["text"] for s in row["segments"]] for row in result["rows"]] == [
+        ["Summe", "€18,40"], ["Bar", "€25,00"], ["Rückgeld Bar", "€6,60"],
+    ]
+    assert [row["lineIndexes"] for row in result["rows"]] == [[0, 1], [2, 3], [4, 5]]
+    assert sorted((line["text"], line["confidence"]) for line in result["lines"]) == sorted(zip(raw["rec_texts"], raw["rec_scores"]))
+    assert raw == original
+
+
+@pytest.mark.parametrize("amount", ["18,40", "€18,40", "18.40 €", "-18,40", "€−18,40"])
+@pytest.mark.parametrize("label_offset", [-28, 28])
+def test_isolated_amount_pair_handles_both_vertical_orders_and_amount_formats(amount, label_offset):
+    """Test that isolated amount pairs are correctly handled regardless of vertical order and amount formats."""
+    result = shape_ocr_result({
+        "rec_texts": ["Total", amount], "rec_scores": [0.99, 0.99],
+        "rec_boxes": [[40, 100 + label_offset, 200, 160 + label_offset], [800, 100, 900, 160]],
+    }, 1000, 300)
+
+    assert [[s["text"] for s in row["segments"]] for row in result["rows"]] == [["Total", amount]]
+
+
+@pytest.mark.parametrize("case", ["header", "identifier", "tax_code", "numeric_label", "same_side", "too_far", "no_vertical_overlap"])
+def test_isolated_row_join_preserves_unrelated_or_insufficiently_supported_segments(case):
+    """Test that isolated row join preserves unrelated or insufficiently supported segments."""
+    texts = ["Total", "€18,40"]
+    boxes = [[40, 128, 200, 188], [800, 100, 900, 160]]
+    if case == "header":
+        texts[1] = "Exampletown"
+    elif case == "identifier":
+        texts[1] = "455600220978"
+    elif case == "tax_code":
+        texts[1] = "18,401"
+    elif case == "numeric_label":
+        texts[0] = "42"
+    elif case == "same_side":
+        boxes[1] = [300, 100, 400, 160]
+    elif case == "too_far":
+        boxes[0] = [40, 135, 200, 195]
+    elif case == "no_vertical_overlap":
+        boxes[0] = [40, 170, 200, 230]
+    result = shape_ocr_result({"rec_texts": texts, "rec_scores": [0.99, 0.99], "rec_boxes": boxes}, 1000, 300)
+
+    assert len(result["rows"]) == 2
+
+
+@pytest.mark.parametrize("boxes", [
+    [[40, 100, 200, 160], [800, 125, 900, 185], [40, 150, 200, 210]],
+    [[40, 129, 200, 139], [800, 100, 900, 160], [40, 128, 200, 148]],
+])
+def test_competing_labels_prevent_an_amount_from_being_assigned_arbitrarily(boxes):
+    """Test that competing labels prevent an amount from being assigned arbitrarily."""
+    result = shape_ocr_result({
+        "rec_texts": ["First label", "€18,40", "Second label"],
+        "rec_scores": [0.99] * 3, "rec_boxes": boxes,
+    }, 1000, 300)
+
+    assert len(result["rows"]) == 3
+
+
+def test_isolated_amount_is_not_joined_to_a_row_already_containing_multiple_segments():
+    """Test that an isolated amount is not joined to a row already containing multiple segments."""
+    result = shape_ocr_result({
+        "rec_texts": ["First label", "Other label", "€18,40"],
+        "rec_scores": [0.99] * 3,
+        "rec_boxes": [[40, 128, 200, 188], [250, 128, 400, 188], [800, 100, 900, 160]],
+    }, 1000, 300)
+
+    assert [[s["text"] for s in row["segments"]] for row in result["rows"]] == [
+        ["€18,40"], ["First label", "Other label"],
+    ]

@@ -1,5 +1,6 @@
 import math
 import os
+import re
 import sys
 from contextlib import redirect_stdout
 from functools import cache
@@ -169,6 +170,7 @@ def shape_ocr_result(result, width, height):
         else:
             rows.append({"center": center, "height": line_height, "lines": [line]})
 
+    rows = join_isolated_amount_rows(rows)
     ordered = []
 
     # Order lines within each row from left to right and assign indices.
@@ -199,6 +201,55 @@ def shape_ocr_result(result, width, height):
         "lines": ordered,
         "rows": visual_rows,
     }
+
+
+def join_isolated_amount_rows(rows):
+    """Join unambiguous, vertically overlapping label/amount singleton rows.
+
+    Args:
+        rows (list): A list of row dictionaries, each containing "center", "height", and "lines".
+
+    Returns:
+        list: A list of merged row dictionaries.
+    """
+    candidates = []
+    counts = [0] * len(rows)
+    for index, first in enumerate(rows):
+        for next_index in range(index + 1, len(rows)):
+            second = rows[next_index]
+            if second["center"] - first["center"] > first["height"] / 2:
+                break
+            if len(first["lines"]) != 1 or len(second["lines"]) != 1:
+                continue
+            left, right = sorted(first["lines"] + second["lines"], key=lambda line: line["box"][0])
+            if not any(character.isalpha() for character in left["text"]):
+                continue
+            if re.fullmatch(r"(?:€\s*)?[-−]?\d+[,.]\d{2}(?:\s*€)?", right["text"]) is None:
+                continue
+            a, b = left["box"], right["box"]
+            if not a[2] <= 0.5 <= b[0]:
+                continue
+            minimum_height = min(a[3] - a[1], b[3] - b[1])
+            overlap = min(a[3], b[3]) - max(a[1], b[1])
+            if overlap < minimum_height / 2 or second["center"] - first["center"] > minimum_height / 2:
+                continue
+            candidates.append((index, next_index))
+            counts[index] += 1
+            counts[next_index] += 1
+
+    # An amount between two plausible labels must remain unassigned.
+    accepted = {
+        index for index, next_index in candidates
+        if next_index == index + 1 and counts[index] == counts[next_index] == 1
+    }
+    merged = []
+    for index, row in enumerate(rows):
+        if index - 1 in accepted:
+            continue
+        if index in accepted:
+            row = {**row, "lines": row["lines"] + rows[index + 1]["lines"]}
+        merged.append(row)
+    return merged
 
 
 def recognize_image(ocr, image_path):
