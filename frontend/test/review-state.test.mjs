@@ -151,12 +151,86 @@ test("review issues flag invalid receipt values and discount amounts", () => {
   );
 });
 
+// Tests for merchant name confirmation and canonical name replacement.
+test("only confirmed merchant matches replace the extracted name with the canonical name", () => {
+  const extracted = {
+    ...review,
+    merchant: {
+      rawName: "LDL",
+      normalizedName: "LDL",
+      match: {
+        status: "MATCHED",
+        merchantId: 4,
+        candidates: [
+          { merchantId: 9, name: "Other merchant" },
+          { merchantId: 4, name: "Lidl" },
+        ],
+      },
+    },
+  };
+  const before = structuredClone(extracted);
+  const draft = createReviewDraft(extracted);
+  assert.equal(draft.merchantName, "Lidl");
+  assert.equal(draft.merchantRawName, "LDL");
+  assert.equal(draft.merchantId, 4);
+  assert.equal(buildFinalSaveDto(draft).merchant.name, "Lidl");
+  assert.deepEqual(extracted, before);
+  for (const status of ["SUGGESTED", "NEW"]) {
+    const unconfirmed = createReviewDraft({
+      ...extracted,
+      merchant: {
+        ...extracted.merchant,
+        match: { ...extracted.merchant.match, status, merchantId: null },
+      },
+    });
+    assert.equal(unconfirmed.merchantName, "LDL");
+    assert.equal(unconfirmed.merchantId, null);
+  }
+});
+
+// Tests for review API requiring stored category on product candidates.
+test("review API requires the stored category on product candidates", () => {
+  const candidate = {
+    productId: 8,
+    name: "Canonical product",
+    brand: null,
+    productGroup: "Canonical group",
+    category: "food",
+    packageAmount: null,
+    packageUnit: null,
+    score: 1,
+  };
+  const withCandidate = (value) => ({
+    ...review,
+    duplicateCandidates: [],
+    items: [
+      {
+        ...review.items[0],
+        match: {
+          status: "MATCHED",
+          productId: 8,
+          candidates: [value],
+        },
+      },
+    ],
+  });
+  assert.equal(isReviewDto(withCandidate(candidate)), true);
+  const missingCategory = { ...candidate };
+  delete missingCategory.category;
+  assert.equal(isReviewDto(withCandidate(missingCategory)), false);
+  assert.equal(
+    isReviewDto(withCandidate({ ...candidate, category: null })),
+    false,
+  );
+});
+
 // Tests for choosing products for item drafts.
-test("matched products show canonical names while clearing restores the new-product draft", () => {
+test("matched products show canonical names and categories while clearing restores the new-product draft", () => {
   const extractedItem = {
     ...review.items[0],
     rawName: "Wellenschnitt Pommes",
     normalizedName: "Pommes",
+    category: "other",
     match: {
       status: "MATCHED",
       productId: 8,
@@ -166,6 +240,7 @@ test("matched products show canonical names while clearing restores the new-prod
           name: "Gubuhubu!",
           brand: null,
           productGroup: "fries",
+          category: "food",
           packageAmount: null,
           packageUnit: null,
           score: 1,
@@ -182,6 +257,8 @@ test("matched products show canonical names while clearing restores the new-prod
   assert.equal(matched.productId, 8);
   assert.equal(matched.selectedProductName, "Gubuhubu!");
   assert.equal(matched.matchStatus, "MATCHED");
+  assert.equal(matched.selectedProductDetails.categoryName, "food");
+  assert.equal(matched.category, "other");
 
   const manuallySelected = chooseProduct(matched, {
     id: 9,
@@ -209,6 +286,7 @@ test("matched products show canonical names while clearing restores the new-prod
   assert.equal(cleared.selectedProductDetails, null);
   assert.equal(cleared.normalizedName, "Pommes");
   assert.equal(cleared.brand, matched.brand);
+  assert.equal(cleared.category, "other");
 
   const suggested = createReviewDraft({
     ...review,

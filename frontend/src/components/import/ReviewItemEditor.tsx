@@ -47,6 +47,7 @@ export default function ReviewItemEditor({
       name: candidate.name,
       brandName: candidate.brand,
       productGroupName: candidate.productGroup,
+      categoryName: candidate.category,
       packageAmount: candidate.packageAmount,
       packageUnit: candidate.packageUnit,
     })) ?? [];
