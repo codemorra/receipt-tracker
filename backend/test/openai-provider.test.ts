@@ -37,7 +37,7 @@ const completion = (output: unknown[] = [finalMessage]) => ({
 });
 
 // Test for the OpenAiProvider extracting a receipt with diagnostics
-test("sends a stateless Luna request with no reasoning and returns final structured JSON with diagnostics", async () => {
+test("sends a stateless Luna request with no reasoning and temperature zero and returns final structured JSON with diagnostics", async () => {
   let calls = 0;
   const provider = new OpenAiProvider(
     "gpt-6-luna",
@@ -53,6 +53,7 @@ test("sends a stateless Luna request with no reasoning and returns final structu
       assert.deepEqual(JSON.parse(String(init?.body)), {
         model: "gpt-6-luna",
         reasoning: { effort: "none" },
+        temperature: 0,
         input: createReceiptExtractionPrompt(input),
         store: false,
         stream: false,
