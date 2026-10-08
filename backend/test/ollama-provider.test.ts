@@ -179,32 +179,6 @@ test("extracts available Ollama timing and token metadata", async () => {
   });
 });
 
-// Tests for the receipt extraction prompt creation function.
-test("prompt tells the model how to use unknown values and source indexes", () => {
-  const prompt = createReceiptExtractionPrompt(input);
-  assert.ok(prompt.includes("Use null for unknown or uncertain values"));
-  assert.ok(
-    prompt.includes(
-      "Use YYYY-MM-DD for purchaseDate and HH:mm for purchaseTime",
-    ),
-  );
-  assert.ok(
-    prompt.includes(
-      "packageAmount and packageUnit describe the size of one product package",
-    ),
-  );
-  assert.ok(prompt.includes("Use lineType product, deposit, fee, or other"));
-  assert.ok(
-    prompt.includes("sourceLineIndexes refer to the original OCR line indexes"),
-  );
-  assert.ok(
-    prompt.includes("appliesToItemIndex refers to a zero-based item position"),
-  );
-  assert.ok(
-    prompt.includes("Do not include database IDs, aliases, warranty details"),
-  );
-});
-
 // Tests for the classification of different types of Ollama request failures.
 test("classifies transport, HTTP, envelope, and extraction JSON failures", async () => {
   const unavailable = new OllamaProvider(

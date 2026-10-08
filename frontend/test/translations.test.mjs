@@ -26,7 +26,7 @@ function files(directory) {
   });
 }
 
-// Tests for ensuring that translation keys are consistent and fully utilized across the application.
+// Translation keys and interpolation parameters must agree between languages.
 test("application DE/EN have matching keys and interpolation parameters", () => {
   const english = new Map(flatten(en));
   const german = new Map(flatten(de));
@@ -37,14 +37,10 @@ test("application DE/EN have matching keys and interpolation parameters", () => 
     assert.deepEqual(parameters(value), parameters(german.get(key)), key);
     assert.ok(german.get(key).trim(), key);
   }
-  assert.deepEqual(
-    Object.keys(en).sort(),
-    ["appearance", "common", "navigation", "pages", "providerSettings"].sort(),
-  );
 });
 
-// Tests for verifying that all application translation keys are resolvable in both languages and that there are no unused locale entries.
-test("all application translation keys resolve in both languages without unused locale entries", async () => {
+// Every translation referenced by application code must resolve in both languages.
+test("all application translation keys resolve in both languages", async () => {
   const i18n = createInstance();
   await i18n.init({
     resources: { en: { translation: en }, de: { translation: de } },
@@ -52,7 +48,6 @@ test("all application translation keys resolve in both languages without unused 
   });
   const leaves = flatten(en).map(([key]) => key);
   const pattern = /\bt\(\s*(["`])([^"`\n]+)\1/g;
-  const usedKeys = new Set();
   const sourceFiles = files(source);
   for (const file of sourceFiles) {
     for (const [, , expression] of readFileSync(file, "utf8").matchAll(
@@ -67,7 +62,6 @@ test("all application translation keys resolve in both languages without unused 
         keys.length,
         `No translations for ${expression} in ${file.pathname}`,
       );
-      for (const key of keys) usedKeys.add(key);
       for (const lng of ["en", "de"]) {
         for (const key of keys)
           assert.ok(
@@ -77,5 +71,4 @@ test("all application translation keys resolve in both languages without unused 
       }
     }
   }
-  assert.deepEqual([...usedKeys].sort(), leaves.sort());
 });

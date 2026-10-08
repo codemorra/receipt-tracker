@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createDatabase } from "../src/db/database.js";
 import type { ReceiptExtraction } from "../src/extraction/receipt-extraction.js";
 import { matchMerchant } from "../src/matching/merchant-matcher.js";
@@ -36,7 +35,6 @@ const item: ReceiptExtraction["items"][number] = {
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), "receipt-matching-"));
   const { sqlite, db } = createDatabase(join(directory, "test.sqlite"));
-  migrate(db, { migrationsFolder: "./drizzle" });
   const cleanup = () => {
     sqlite.close();
     rmSync(directory, { recursive: true, force: true });

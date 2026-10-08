@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createDatabase } from "../src/db/database.js";
 import { findDuplicateCandidates } from "../src/receipts/duplicate-detection.js";
 
@@ -17,7 +16,6 @@ test("duplicate search uses merchant, date, and total while ranking by purchase 
     sqlite.close();
     rmSync(directory, { recursive: true, force: true });
   });
-  migrate(db, { migrationsFolder: "./drizzle" });
 
   const addMerchant = (name: string) =>
     Number(
@@ -104,7 +102,6 @@ test("duplicate search skips incomplete identity and keeps candidates as warning
     sqlite.close();
     rmSync(directory, { recursive: true, force: true });
   });
-  migrate(db, { migrationsFolder: "./drizzle" });
   assert.deepEqual(
     findDuplicateCandidates(db, {
       merchantId: null,

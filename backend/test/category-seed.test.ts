@@ -11,10 +11,7 @@ test("default categories are seeded once and remain editable", () => {
   const directory = mkdtempSync(join(tmpdir(), "receipt-tracker-seed-"));
   const { sqlite, db } = createDatabase(join(directory, "test.sqlite"));
 
-  // Create a temporary database and apply migrations to seed default categories.
   try {
-    migrate(db, { migrationsFolder: "./drizzle" });
-
     // Function to retrieve the list of category names from the database.
     const categoryNames = () =>
       (

@@ -3,7 +3,6 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createApp } from "../src/app.js";
 import { createDatabase } from "../src/db/database.js";
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
@@ -15,7 +14,6 @@ test("review lookups return selectable entities and filter by name", async (t) =
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { sqlite, db } = createDatabase(":memory:");
   t.after(() => sqlite.close());
-  migrate(db, { migrationsFolder: "./drizzle" });
 
   const now = "2026-09-29T00:00:00.000Z";
   const categoryId = (
