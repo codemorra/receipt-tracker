@@ -6,6 +6,7 @@ import type {
   ReceiptExtractionProvider,
 } from "./receipt-extraction-provider.js";
 import { createReceiptExtractionPrompt } from "./receipt-extraction-prompt.js";
+import { createQwenReceiptExtractionPrompt } from "./qwen-extraction-prompt.js";
 import { ollamaExtractionProfile } from "./extraction-profile.js";
 import {
   OllamaUnavailableError,
@@ -40,7 +41,14 @@ export class OllamaProvider implements ReceiptExtractionProvider {
         body: JSON.stringify({
           model: this.model,
           messages: [
-            { role: "user", content: createReceiptExtractionPrompt(input) },
+            {
+              role: "user",
+              content:
+                // Use the Qwen-specific extraction prompt if the model is Qwen 3.8, otherwise use the default prompt.
+                this.model.split(":")[0] === "qwen3.8"
+                  ? createQwenReceiptExtractionPrompt(input)
+                  : createReceiptExtractionPrompt(input),
+            },
           ],
           format: z.toJSONSchema(
             createReceiptExtractionSchema(input.categoryNames),
