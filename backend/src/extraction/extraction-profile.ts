@@ -8,6 +8,7 @@ export const ollamaExtractionProfile = {
 // OpenAI extraction profile tuned for Luna
 export const openaiExtractionProfile = {
   reasoningEffort: "none",
+  temperature: 0,
   timeoutMs: 240_000,
 } as const;
 

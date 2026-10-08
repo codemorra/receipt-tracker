@@ -66,6 +66,7 @@ export class OpenAiProvider implements ReceiptExtractionProvider {
     const body = JSON.stringify({
       model: this.model,
       reasoning: { effort: openaiExtractionProfile.reasoningEffort },
+      temperature: openaiExtractionProfile.temperature,
       input: createReceiptExtractionPrompt(input),
       store: false,
       stream: false,
