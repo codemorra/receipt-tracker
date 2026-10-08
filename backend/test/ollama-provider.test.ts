@@ -8,6 +8,7 @@ import {
   OllamaUnavailableError,
 } from "../src/extraction/ollama-provider.js";
 import { createReceiptExtractionPrompt } from "../src/extraction/receipt-extraction-prompt.js";
+import { createQwenReceiptExtractionPrompt } from "../src/extraction/qwen-extraction-prompt.js";
 import type { ReceiptExtractionDiagnostics } from "../src/extraction/receipt-extraction-provider.js";
 import { createReceiptExtractionSchema } from "../src/extraction/receipt-extraction.js";
 
@@ -82,6 +83,55 @@ test("sends only OCR data and categories with the extraction JSON schema", async
   assert.ok(
     messages[0].content.includes('[0; x=0] "EDEKA"\n[1; x=0.1] "MILCH 1L"'),
   );
+});
+
+// Qwen-specific instructions must not change other models or the shared prompt.
+test("extends only Qwen3.8 requests while preserving the base prompt and extraction settings", async () => {
+  const originalInput = structuredClone(input);
+  const basePrompt = createReceiptExtractionPrompt(input);
+  const qwenPrompt = createQwenReceiptExtractionPrompt(input);
+  assert.ok(qwenPrompt.startsWith(basePrompt + "\n\n"));
+  assert.notEqual(qwenPrompt, basePrompt);
+
+  for (const model of [
+    "qwen3.8:27b",
+    "qwen3.8",
+    "qwen3:8b",
+    "qwen3.8-other:27b",
+  ]) {
+    let requestBody: Record<string, unknown> | undefined;
+    const provider = new OllamaProvider(
+      "http://localhost/api/chat",
+      model,
+      async (_url, init) => {
+        requestBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({ message: { content: '{"items":[]}' } }),
+        );
+      },
+    );
+    await provider.extractReceipt(input);
+    assert.deepEqual(requestBody, {
+      model,
+      messages: [
+        {
+          role: "user",
+          content:
+            model === "qwen3.8:27b" || model === "qwen3.8"
+              ? qwenPrompt
+              : basePrompt,
+        },
+      ],
+      format: z.toJSONSchema(
+        createReceiptExtractionSchema(input.categoryNames),
+      ),
+      stream: false,
+      think: true,
+      options: { temperature: 0 },
+    });
+  }
+  assert.equal(createReceiptExtractionPrompt(input), basePrompt);
+  assert.deepEqual(input, originalInput);
 });
 
 // Tests for the extraction of Ollama timing and token metadata.
