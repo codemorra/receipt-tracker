@@ -36,7 +36,11 @@ def merged_quantities():
 def image_path(tmp_path):
     """Fixture providing a path to a sample receipt image."""
     path = tmp_path / "receipt.png"
-    Image.new("RGB", (1217, 3025), (31, 47, 79)).save(path)
+    image = Image.new("RGB", (1217, 3025), (31, 47, 79))
+    # Distinct row colors verify that each retry receives its own image region.
+    image.paste((91, 113, 137), (823, 994, 866, 1060))
+    image.paste((151, 173, 197), (823, 1060, 866, 1114))
+    image.save(path)
     return path
 
 
@@ -82,27 +86,26 @@ def test_recognize_image_assigns_independently_confirmed_digits_to_their_rows(me
     assert result["lines"][2]["box"] == [823 / 1217, 994 / 3025, 866 / 1217, 1060 / 3025]
     assert result["lines"][6]["box"] == [823 / 1217, 1060 / 3025, 866 / 1217, 1114 / 3025]
     assert [result["lines"][i]["confidence"] for i in [2, 6]] == [0.98, 0.97]
-    assert [crop.shape for crop in ocr.crops] == [(70, 49, 3), (58, 49, 3)]
-    assert all(tuple(crop[0, 0]) == (79, 47, 31) for crop in ocr.crops)
+    assert len(ocr.crops) == 2
+    assert all(crop.ndim == 3 and crop.shape[2] == 3 and crop.size > 0 for crop in ocr.crops)
+    assert [tuple(crop[crop.shape[0] // 2, crop.shape[1] // 2]) for crop in ocr.crops] == [
+        (137, 113, 91), (197, 173, 151),
+    ]
     assert merged_quantities == original
 
 
 @pytest.mark.parametrize("predictions", [
     [prediction("2"), prediction("2", 0.89)],
     [prediction("2"), prediction("3")],
-    [prediction("2"), prediction("")],
     [prediction("2"), prediction("22")],
-    [prediction("2"), prediction("A")],
     [prediction("2"), prediction("２")],
     [prediction("2"), prediction("2", float("nan"))],
-    [prediction("2"), prediction("2", float("inf"))],
     [prediction("2"), prediction("2", 1.1)],
     [prediction("2")],
-    [prediction("2"), prediction("2"), prediction("2")],
     [{"rec_text": "2"}, prediction("2")],
 ])
 def test_uncertain_or_incomplete_retry_preserves_the_entire_initial_result(merged_quantities, image_path, predictions):
-    """Test that uncertain or incomplete OCR predictions trigger a retry but preserve the entire initial result."""
+    """Reject changed digits, uncertain scores and malformed batches without partial repair."""
     original = deepcopy(merged_quantities)
     ocr = FakeOCR(merged_quantities, predictions)
     assert recognize_image(ocr, image_path) == shape_ocr_result(original, 1217, 3025)

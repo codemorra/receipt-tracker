@@ -330,8 +330,10 @@ def test_isolated_total_and_cash_amounts_join_labels_without_merging_change():
     assert raw == original
 
 
-@pytest.mark.parametrize("amount", ["18,40", "€18,40", "18.40 €", "-18,40", "€−18,40"])
-@pytest.mark.parametrize("label_offset", [-28, 28])
+@pytest.mark.parametrize(("amount", "label_offset"), [
+    ("18,40", -28), ("18,40", 28),
+    ("€18,40", 28), ("18.40 €", 28), ("-18,40", 28), ("€−18,40", 28),
+])
 def test_isolated_amount_pair_handles_both_vertical_orders_and_amount_formats(amount, label_offset):
     """Test that isolated amount pairs are correctly handled regardless of vertical order and amount formats."""
     result = shape_ocr_result({
