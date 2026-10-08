@@ -79,14 +79,12 @@ The application keeps the user involved in the import process by allowing uncert
 ### AI
 
 - Local LLM integration via Ollama
-- Mistral API
 - OpenAI Responses API
 - Shared receipt extraction prompt and structured JSON output
 
 The currently tested model configurations are:
 
 - Ollama / `qwen3.8:27b`
-- Mistral / `mistral-medium-latest`
 - OpenAI / `gpt-6-luna`
 
 ### Storage
@@ -147,7 +145,7 @@ cp backend/.env.example backend/.env
 | `LOG_FILE`          | Backend log, `data/logs/backend.log` in the repository                                      |
 | `SECRETS_KEY_DIR`   | Absolute directory for the local master key, outside the repository                         |
 
-Provider settings are stored in SQLite. Previous `LLM_PROVIDER`, `OLLAMA_*`, `MISTRAL_*`, and `OPENAI_*` environment variables are ignored and are not migrated automatically. Configure existing installations through Settings after starting the application.
+Provider settings are stored in SQLite. Previous `LLM_PROVIDER`, `OLLAMA_*`, and `OPENAI_*` environment variables are ignored and are not migrated automatically. Configure existing installations through Settings after starting the application.
 
 ### Start the backend
 
@@ -173,7 +171,6 @@ If you change `PORT`, update the API proxy in `frontend/vite.config.ts` accordin
 Open **Settings** in the frontend and choose **Add provider**. The model field is prefilled with the recommended model for that provider:
 
 - Ollama: model and base URL, initially `http://127.0.0.1:11434`. Start Ollama and pull the model before processing, for example `ollama pull qwen3.8:27b`.
-- Mistral: model and API key; the official Mistral endpoint is fixed in the backend.
 - OpenAI: model and API key; the official OpenAI Responses endpoint is fixed in the backend.
 
 Providers start unconfigured and disabled, with no default. You can configure multiple providers, enable or disable them, and set a default. Only enabled, fully configured providers are selectable during import. Each processing request uses the selected provider; there is no automatic fallback. The API also accepts an omitted `provider` field and then uses the saved default.
@@ -190,17 +187,16 @@ Receipt extraction currently uses the same core receipt prompt and schema across
 
 The following measurements are single example runs using the same receipt with 17 positions, 18 discounts, a deposit charge, and a deposit return.
 
-| Model                   | Provider | LLM / API |    Total |
-| ----------------------- | -------- | --------: | -------: |
-| `qwen3.8:27b`           | Ollama   |   95.52 s |  97.34 s |
-| `mistral-medium-latest` | Mistral  |  102.02 s | 103.77 s |
-| `gpt-6-luna`            | OpenAI   |   13.20 s |  14.94 s |
+| Model         | Provider | LLM / API |
+| ------------- | -------- | --------: |
+| `qwen3.8:27b` | Ollama   |  139.95 s |
+| `gpt-6-luna`  | OpenAI   |   16.17 s |
 
-All three models produced correct core extraction results for this example receipt.
+Both models extracted all 17 positions and 18 discounts with correct amounts and discount assignments.
 
 The Qwen run was executed locally on an AMD Radeon RX 7900 XTX. Cloud timings depend on provider and network load. These values are example measurements from one receipt and one run per model, not general model benchmarks.
 
-The three configurations are currently used as practical reference points for receipt extraction.
+The two configurations are currently used as practical reference points for receipt extraction.
 
 ## Import Workflow
 
