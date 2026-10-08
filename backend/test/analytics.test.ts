@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { createDatabase } from "../src/db/database.js";
 import { createApp } from "../src/app.js";
+import {
+  spendingQuerySchema,
+  priceHistoryQuerySchema,
+} from "../src/analytics/analytics-query.js";
 import { loadSpending, SpendingError } from "../src/analytics/spending.js";
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
 import {
@@ -308,6 +312,58 @@ test("price statistics preserve zero and negative unit prices and reject only mi
   );
 });
 
+// Shared filter rules belong at the schema boundary; routes retain HTTP wiring checks.
+test("analytics queries validate calendar ranges and positive safe identifiers", () => {
+  assert.deepEqual(spendingQuerySchema.parse({}), {});
+  assert.deepEqual(
+    spendingQuerySchema.parse({
+      from: "2024-02-29",
+      to: "2024-02-29",
+      merchantId: "7",
+    }),
+    { from: "2024-02-29", to: "2024-02-29", merchantId: 7 },
+  );
+  for (const query of [
+    { from: "" },
+    { to: "" },
+    { from: "2026-02-30" },
+    { from: "2025-02-29" },
+    { to: "2026-13-01" },
+    { from: "2026-1-01" },
+    { from: "2026-01-01T00:00:00Z" },
+    { from: "2026-01-02", to: "2026-01-01" },
+    { from: ["2026-01-01", "2026-01-02"] },
+    { from: { x: "2026-01-01" } },
+  ]) {
+    assert.equal(
+      spendingQuerySchema.safeParse(query).success,
+      false,
+      JSON.stringify(query),
+    );
+  }
+  // Both ID fields use the same identifier schema.
+  for (const value of [
+    "",
+    "0",
+    "1.5",
+    "1e0",
+    "9007199254740992",
+    "abc",
+    ["1", "2"],
+    { x: "1" },
+  ]) {
+    assert.equal(
+      spendingQuerySchema.safeParse({ merchantId: value }).success,
+      false,
+      JSON.stringify(value),
+    );
+  }
+  assert.deepEqual(priceHistoryQuerySchema.parse({ productId: "17" }), {
+    productId: 17,
+  });
+  assert.equal(priceHistoryQuerySchema.safeParse({}).success, false);
+});
+
 // Test for verifying the HTTP contract of the price history analytics endpoint, including validation of IDs and dates, and handling of missing products, merchants, and currencies.
 test("price history HTTP contract validates IDs and dates and distinguishes missing products, merchants and currencies", async (t) => {
   const data = priceFixture(t);
@@ -355,24 +411,13 @@ test("price history HTTP contract validates IDs and dates and distinguishes miss
     }),
   );
   for (const query of [
-    "",
-    "productId=",
-    "productId=0",
-    "productId=-1",
-    "productId=1.5",
-    "productId=1e0",
-    "productId=9007199254740992",
-    "productId=abc",
-    "productId=1&productId=2",
-    "productId[x]=1",
-    `productId=${data.productId}&merchantId=`,
-    `productId=${data.productId}&merchantId=0`,
-    `productId=${data.productId}&merchantId=1&merchantId=2`,
+    "", // Required product ID.
+    "productId=0", // The product ID uses the shared identifier validator.
+    "productId=1&productId=2", // Express query arrays.
+    "productId[x]=1", // Express query objects.
+    `productId=${data.productId}&merchantId=0`, // Shared optional filters.
     `productId=${data.productId}&from=2026-02-30`,
-    `productId=${data.productId}&from=2026-1-01`,
-    `productId=${data.productId}&to=2026-01-01T00:00:00Z`,
     `productId=${data.productId}&from=2026-01-02&to=2026-01-01`,
-    `productId=${data.productId}&from[x]=2026-01-01`,
   ]) {
     const response = await get(query);
     assert.equal(response.status, 400, query);
@@ -673,25 +718,11 @@ test("spending HTTP contract validates filters and handles unknown merchants, cu
     }),
   );
   for (const query of [
-    "from=",
-    "to=",
-    "from=2026-02-30",
-    "from=2025-02-29",
-    "to=2026-13-01",
-    "from=2026-1-01",
-    "from=2026-01-01T00:00:00Z",
-    "from=2026-01-02&to=2026-01-01",
-    "merchantId=",
-    "merchantId=0",
-    "merchantId=-1",
-    "merchantId=1.5",
-    "merchantId=1e0",
-    "merchantId=9007199254740992",
-    "merchantId=abc",
-    "merchantId=1&merchantId=2",
-    "from=2026-01-01&from=2026-01-02",
-    "from[x]=2026-01-01",
-    "merchantId[x]=1",
+    "from=2026-02-30", // Shared date validation reaches this route.
+    "from=2026-01-02&to=2026-01-01", // Range ordering.
+    "merchantId=0", // Shared identifier validation.
+    "merchantId=1&merchantId=2", // Express query arrays.
+    "from[x]=2026-01-01", // Express query objects.
   ]) {
     const response = await get(`?${query}`);
     assert.equal(response.status, 400, query);

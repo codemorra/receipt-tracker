@@ -58,7 +58,14 @@ test("spending API rejects malformed aggregate contracts and exposes safe error 
     { ...data, range: { from: "2026-02-30", to: "2026-03-01" } },
     { ...data, timeline: data.timeline.toReversed() },
     { ...data, timeline: [] },
-    { ...data, merchants: [...data.merchants, ...data.merchants] },
+    {
+      ...data,
+      // Keep aggregate sums valid so only the duplicate merchant ID is rejected.
+      merchants: [
+        data.merchants[0],
+        { ...data.merchants[0], totalCents: 0, receiptCount: 0 },
+      ],
+    },
   ]) {
     t.mock.method(globalThis, "fetch", async () => Response.json(invalid));
     await assert.rejects(getSpending(""), { code: "unexpected_response" });
