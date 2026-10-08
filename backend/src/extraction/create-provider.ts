@@ -1,4 +1,3 @@
-import { MistralProvider } from "./mistral-provider.js";
 import { OllamaProvider } from "./ollama-provider.js";
 import { OpenAiProvider } from "./openai-provider.js";
 import {
@@ -33,8 +32,6 @@ export function createReceiptExtractionProvider(
   }
   if (!configuration.apiKey.trim())
     throw new ProviderSettingsError("provider_configuration_incomplete");
-  if (configuration.provider === "mistral")
-    return new MistralProvider(model, configuration.apiKey, request);
   if (configuration.provider === "openai")
     return new OpenAiProvider(model, configuration.apiKey, request);
   throw new ProviderSettingsError("invalid_provider");

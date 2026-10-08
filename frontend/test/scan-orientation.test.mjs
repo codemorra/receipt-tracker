@@ -196,20 +196,31 @@ test("import preselects only a selectable default, preserves explicit choices, a
     defaultProvider: "ollama",
     providers: [
       { provider: "ollama", selectable: true },
-      { provider: "mistral", selectable: true },
-      { provider: "openai", selectable: false },
+      { provider: "openai", selectable: true },
     ],
   };
   assert.equal(resolveImportProvider(settings, undefined), "ollama");
-  assert.equal(resolveImportProvider(settings, "mistral"), "mistral");
+  assert.equal(resolveImportProvider(settings, "openai"), "openai");
   assert.equal(resolveImportProvider(settings, null), null);
-  assert.equal(resolveImportProvider(settings, "openai"), null);
-  assert.equal(resolveImportProvider(null, "mistral"), null);
+  assert.equal(
+    resolveImportProvider(
+      {
+        ...settings,
+        providers: settings.providers.map((provider) => ({
+          ...provider,
+          selectable: provider.provider === "ollama",
+        })),
+      },
+      "openai",
+    ),
+    null,
+  );
+  assert.equal(resolveImportProvider(null, "openai"), null);
   const unavailable = {
     ...settings,
     providers: settings.providers.map((provider) => ({
       ...provider,
-      selectable: provider.provider === "mistral",
+      selectable: provider.provider === "openai",
     })),
   };
   assert.equal(resolveImportProvider(unavailable, undefined), null);

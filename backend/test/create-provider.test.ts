@@ -14,22 +14,18 @@ import { SecretStorage } from "../src/settings/secret-storage.js";
 const input = { plainText: "", lines: [], rows: [], categoryNames: ["food"] };
 
 // Simulates the cloud provider responses for testing purposes.
-function cloudResponse(provider: "mistral" | "openai") {
-  return provider === "mistral"
-    ? Response.json({
-        choices: [{ finish_reason: "stop", message: { content: "{}" } }],
-      })
-    : Response.json({
+function cloudResponse() {
+  return Response.json({
+    status: "completed",
+    output: [
+      {
+        type: "message",
+        role: "assistant",
         status: "completed",
-        output: [
-          {
-            type: "message",
-            role: "assistant",
-            status: "completed",
-            content: [{ type: "output_text", text: "{}" }],
-          },
-        ],
-      });
+        content: [{ type: "output_text", text: "{}" }],
+      },
+    ],
+  });
 }
 
 // Tests for the receipt extraction provider factory functions.
@@ -51,32 +47,26 @@ test("Ollama preserves configured hosts, ports, and base URL paths", async () =>
   }
 });
 
-// Tests for the Ollama provider's handling of base URLs, ports, and paths.
-test("cloud providers use fixed official endpoints and the configured model and key", async () => {
-  for (const providerId of ["mistral", "openai"] as const) {
-    const endpoint =
-      providerId === "mistral"
-        ? "https://api.mistral.ai/v1/chat/completions"
-        : "https://api.openai.com/v1/responses";
-    const provider = createReceiptExtractionProvider(
-      {
-        provider: providerId,
-        model: "configured-model",
-        apiKey: " test-only-key ",
-      },
-      async (url, init) => {
-        assert.equal(url, endpoint);
-        assert.equal(
-          new Headers(init?.headers).get("authorization"),
-          "Bearer test-only-key",
-        );
-        assert.equal(JSON.parse(String(init?.body)).model, "configured-model");
-        assert.equal(init?.redirect, "error");
-        return cloudResponse(providerId);
-      },
-    );
-    assert.deepEqual(await provider.extractReceipt(input), {});
-  }
+// Verify that cloud credentials are sent only to the official endpoint.
+test("OpenAI uses its official endpoint and the configured model and key", async () => {
+  const provider = createReceiptExtractionProvider(
+    {
+      provider: "openai",
+      model: "configured-model",
+      apiKey: " test-only-key ",
+    },
+    async (url, init) => {
+      assert.equal(url, "https://api.openai.com/v1/responses");
+      assert.equal(
+        new Headers(init?.headers).get("authorization"),
+        "Bearer test-only-key",
+      );
+      assert.equal(JSON.parse(String(init?.body)).model, "configured-model");
+      assert.equal(init?.redirect, "error");
+      return cloudResponse();
+    },
+  );
+  assert.deepEqual(await provider.extractReceipt(input), {});
 });
 
 // Tests for the factory's handling of incomplete configurations and unsafe Ollama URLs.
@@ -90,17 +80,15 @@ test("factory rejects incomplete configuration and unsafe Ollama URLs without ex
       }),
     { code: "provider_configuration_incomplete" },
   );
-  for (const provider of ["mistral", "openai"] as const) {
-    assert.throws(
-      () =>
-        createReceiptExtractionProvider({
-          provider,
-          model: "model",
-          apiKey: " ",
-        }),
-      { code: "provider_configuration_incomplete" },
-    );
-  }
+  assert.throws(
+    () =>
+      createReceiptExtractionProvider({
+        provider: "openai",
+        model: "model",
+        apiKey: " ",
+      }),
+    { code: "provider_configuration_incomplete" },
+  );
   for (const baseUrl of [
     "file:///tmp/test-only-secret",
     "https://user:test-only-secret@example.com",
@@ -148,26 +136,26 @@ test("resolver uses the persisted default, rejects explicit invalid selections, 
       });
       return configuration.provider === "ollama"
         ? Response.json({ message: { content: "{}" } })
-        : cloudResponse(configuration.provider);
+        : cloudResponse();
     }),
   );
   assert.throws(() => resolver(undefined), {
     code: "default_provider_missing",
   });
   settings.updateProvider("ollama", { enabled: true, model: "local-model" });
-  settings.updateProvider("mistral", {
+  settings.updateProvider("openai", {
     enabled: true,
     model: "old-model",
     apiKey: { action: "set", value: "old-key" },
   });
   settings.setDefaultProvider("ollama");
-  const pending = resolver("mistral");
-  settings.updateProvider("mistral", {
+  const pending = resolver("openai");
+  settings.updateProvider("openai", {
     model: "new-model",
     apiKey: { action: "set", value: "new-key" },
   });
   await pending.extractReceipt(input);
-  await resolver("mistral").extractReceipt(input);
+  await resolver("openai").extractReceipt(input);
   await resolver(undefined).extractReceipt(input);
   assert.deepEqual(
     requests.map(({ model, authorization }) => ({ model, authorization })),
@@ -179,6 +167,7 @@ test("resolver uses the persisted default, rejects explicit invalid selections, 
   );
   for (const selection of ["unknown", null, "", 123])
     assert.throws(() => resolver(selection), { code: "invalid_provider" });
+  settings.updateProvider("openai", { enabled: false });
   assert.throws(() => resolver("openai"), { code: "provider_disabled" });
   assert.equal(requests.length, 3);
 });
@@ -202,8 +191,6 @@ test("startup ignores obsolete provider ENV and initializes settings without imp
         ...process.env,
         LLM_PROVIDER: "unsupported",
         OLLAMA_MODEL: "",
-        MISTRAL_API_KEY: "test-only-secret",
-        MISTRAL_BASE_URL: "https://test-only-secret@example.com",
         OPENAI_API_KEY: "test-only-secret",
         DATABASE_FILE: databaseFile,
         LOG_FILE: logFile,

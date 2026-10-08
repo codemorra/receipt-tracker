@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createDatabase } from "../src/db/database.js";
 
 // Test for database schema and indexes.
@@ -144,7 +153,7 @@ test("database initialization skips migrations already applied", () => {
       const categoryCount = second.sqlite
         .prepare("SELECT COUNT(*) AS count FROM category")
         .get() as { count: number };
-      assert.equal(migrationCount.count, 3);
+      assert.equal(migrationCount.count, 4);
       assert.equal(categoryCount.count, 13);
     } finally {
       second.sqlite.close();
@@ -213,6 +222,113 @@ test("migration failure prevents backend startup", () => {
           event.errorType === "DrizzleError",
       ),
     );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+// Upgrade real legacy schemas without losing remaining settings or breaking foreign keys.
+test("provider migration removes obsolete settings and preserves supported defaults", () => {
+  const directory = mkdtempSync(join(tmpdir(), "receipt-provider-migration-"));
+  const migrationsFolder = join(directory, "migrations");
+  const source = fileURLToPath(new URL("../drizzle", import.meta.url));
+  mkdirSync(join(migrationsFolder, "meta"), { recursive: true });
+  const journal = JSON.parse(
+    readFileSync(join(source, "meta", "_journal.json"), "utf8"),
+  );
+  journal.entries = journal.entries.slice(0, 3);
+  writeFileSync(
+    join(migrationsFolder, "meta", "_journal.json"),
+    JSON.stringify(journal),
+  );
+  for (const entry of journal.entries) {
+    copyFileSync(
+      join(source, `${entry.tag}.sql`),
+      join(migrationsFolder, `${entry.tag}.sql`),
+    );
+  }
+  try {
+    for (const defaultProvider of ["mistral", "ollama", "openai", null]) {
+      const filename = join(directory, `${defaultProvider}.sqlite`);
+      const legacy = new Database(filename);
+      try {
+        legacy.pragma("foreign_keys = ON");
+        migrate(drizzle(legacy), { migrationsFolder });
+        legacy
+          .prepare(
+            "INSERT INTO ai_provider_settings (provider, enabled, model, ollama_base_url, api_key_encrypted) VALUES (?, 1, ?, ?, ?)",
+          )
+          .run("ollama", "local-model", "http://localhost:11434/proxy", null);
+        for (const provider of ["mistral", "openai"]) {
+          legacy
+            .prepare(
+              "INSERT INTO ai_provider_settings (provider, enabled, model, api_key_encrypted) VALUES (?, 1, ?, ?)",
+            )
+            .run(provider, `${provider}-model`, `${provider}-ciphertext`);
+        }
+        legacy
+          .prepare(
+            "INSERT INTO receipt_processing_settings (id, default_provider) VALUES (1, ?)",
+          )
+          .run(defaultProvider);
+      } finally {
+        legacy.close();
+      }
+      const { sqlite } = createDatabase(filename);
+      try {
+        assert.deepEqual(
+          sqlite
+            .prepare("SELECT * FROM ai_provider_settings ORDER BY provider")
+            .all(),
+          [
+            {
+              provider: "ollama",
+              enabled: 1,
+              model: "local-model",
+              ollama_base_url: "http://localhost:11434/proxy",
+              api_key_encrypted: null,
+            },
+            {
+              provider: "openai",
+              enabled: 1,
+              model: "openai-model",
+              ollama_base_url: null,
+              api_key_encrypted: "openai-ciphertext",
+            },
+          ],
+        );
+        assert.deepEqual(
+          sqlite.prepare("SELECT * FROM receipt_processing_settings").get(),
+          {
+            id: 1,
+            default_provider:
+              defaultProvider === "mistral" ? null : defaultProvider,
+          },
+        );
+        assert.equal(sqlite.pragma("foreign_keys", { simple: true }), 1);
+        assert.deepEqual(sqlite.pragma("foreign_key_check"), []);
+        assert.throws(
+          () =>
+            sqlite
+              .prepare(
+                "INSERT INTO ai_provider_settings (provider) VALUES ('mistral')",
+              )
+              .run(),
+          { code: "SQLITE_CONSTRAINT_CHECK" },
+        );
+        assert.throws(
+          () =>
+            sqlite
+              .prepare(
+                "UPDATE receipt_processing_settings SET default_provider = 'missing'",
+              )
+              .run(),
+          { code: "SQLITE_CONSTRAINT_FOREIGNKEY" },
+        );
+      } finally {
+        sqlite.close();
+      }
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

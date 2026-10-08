@@ -52,10 +52,10 @@ function fixture() {
 
 // Initialize settings without provider ENV, keys, models, or an implicit default and survive reopen.
 test("settings initialize without provider ENV, keys, models, or an implicit default and survive reopen", () => {
-  const originalKey = process.env.MISTRAL_API_KEY;
+  const originalKey = process.env.OPENAI_API_KEY;
   const originalProvider = process.env.LLM_PROVIDER;
-  process.env.MISTRAL_API_KEY = "unused-env-key";
-  process.env.LLM_PROVIDER = "mistral";
+  process.env.OPENAI_API_KEY = "unused-env-key";
+  process.env.LLM_PROVIDER = "openai";
   const f = fixture();
   try {
     assert.deepEqual(f.service.getSettings(), {
@@ -69,14 +69,6 @@ test("settings initialize without provider ENV, keys, models, or an implicit def
           hasApiKey: false,
           selectable: false,
           configurationIssues: ["missing_model"],
-        },
-        {
-          provider: "mistral",
-          enabled: false,
-          model: "",
-          hasApiKey: false,
-          selectable: false,
-          configurationIssues: ["missing_model", "missing_api_key"],
         },
         {
           provider: "openai",
@@ -107,8 +99,8 @@ test("settings initialize without provider ENV, keys, models, or an implicit def
       reopened.sqlite.close();
     }
   } finally {
-    if (originalKey === undefined) delete process.env.MISTRAL_API_KEY;
-    else process.env.MISTRAL_API_KEY = originalKey;
+    if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalKey;
     if (originalProvider === undefined) delete process.env.LLM_PROVIDER;
     else process.env.LLM_PROVIDER = originalProvider;
     f.close();
@@ -122,18 +114,18 @@ test("provider validation rejects invalid settings without echoing submitted val
     const before = f.service.getSettings();
     const invalid: [unknown, unknown][] = [
       ["unknown", { model: "model" }],
+      ["mistral", { model: "model" }],
       ["ollama", { enabled: true }],
       ["ollama", { apiKey: { action: "set", value: "submitted-secret" } }],
       ["ollama", { baseUrl: "https://user:submitted-secret@example.com" }],
       ["ollama", { baseUrl: "http://localhost:11434/?key=submitted-secret" }],
       ["ollama", { baseUrl: "http://localhost:11434/#fragment" }],
       ["ollama", { baseUrl: "file:///tmp/model" }],
-      ["mistral", { baseUrl: "https://foreign.example/v1" }],
       ["openai", { baseUrl: "https://foreign.example/v1" }],
-      ["mistral", { model: "model", enabled: true }],
+      ["openai", { model: "model", enabled: true }],
       ["openai", { apiKey: { action: "set", value: " " } }],
-      ["mistral", { unknown: "submitted-secret" }],
-      ["mistral", {}],
+      ["openai", { unknown: "submitted-secret" }],
+      ["openai", {}],
     ];
     for (const [provider, input] of invalid) {
       assert.throws(
@@ -161,7 +153,7 @@ test("API keys persist encrypted and set/replace/delete responses expose only pr
   try {
     const firstKey = "test-first-private-api-key";
     const replacementKey = "test-replacement-private-api-key";
-    const first = f.service.updateProvider("mistral", {
+    const first = f.service.updateProvider("openai", {
       model: "cloud-model",
       enabled: true,
       apiKey: { action: "set", value: firstKey },
@@ -172,19 +164,19 @@ test("API keys persist encrypted and set/replace/delete responses expose only pr
       f.db
         .select()
         .from(aiProviderSettings)
-        .where(eq(aiProviderSettings.provider, "mistral"))
+        .where(eq(aiProviderSettings.provider, "openai"))
         .get()!.apiKeyEncrypted!;
     const initialEncrypted = readEncrypted();
-    assert.equal(f.secrets.decrypt("mistral", initialEncrypted), firstKey);
+    assert.equal(f.secrets.decrypt("openai", initialEncrypted), firstKey);
     assert.ok(!initialEncrypted.includes(firstKey));
-    f.service.setDefaultProvider("mistral");
-    f.service.updateProvider("mistral", { model: "updated-model" });
+    f.service.setDefaultProvider("openai");
+    f.service.updateProvider("openai", { model: "updated-model" });
     assert.equal(readEncrypted(), initialEncrypted);
-    const replaced = f.service.updateProvider("mistral", {
+    const replaced = f.service.updateProvider("openai", {
       apiKey: { action: "set", value: replacementKey },
     });
     assert.notEqual(readEncrypted(), initialEncrypted);
-    assert.equal(f.secrets.decrypt("mistral", readEncrypted()), replacementKey);
+    assert.equal(f.secrets.decrypt("openai", readEncrypted()), replacementKey);
     const serialized = JSON.stringify([
       first,
       replaced,
@@ -212,7 +204,7 @@ test("API keys persist encrypted and set/replace/delete responses expose only pr
     } finally {
       reopened.sqlite.close();
     }
-    const removed = f.service.updateProvider("mistral", {
+    const removed = f.service.updateProvider("openai", {
       apiKey: { action: "remove" },
     });
     assert.equal(removed.hasApiKey, false);
@@ -229,13 +221,11 @@ test("multiple providers remain independent and default removal never falls back
   const f = fixture();
   try {
     f.service.updateProvider("ollama", { enabled: true, model: "local-model" });
-    for (const provider of ["mistral", "openai"] as const) {
-      f.service.updateProvider(provider, {
-        enabled: true,
-        model: "cloud-model",
-        apiKey: { action: "set", value: `fake-${provider}-key` },
-      });
-    }
+    f.service.updateProvider("openai", {
+      enabled: true,
+      model: "cloud-model",
+      apiKey: { action: "set", value: "fake-openai-key" },
+    });
     assert.ok(
       f.service
         .getSettings()
@@ -243,8 +233,9 @@ test("multiple providers remain independent and default removal never falls back
     );
     assert.equal(f.service.getSettings().defaultProvider, null);
     f.service.setDefaultProvider("openai");
-    f.service.updateProvider("mistral", { enabled: false });
+    f.service.updateProvider("ollama", { enabled: false });
     assert.equal(f.service.getSettings().defaultProvider, "openai");
+    f.service.updateProvider("ollama", { enabled: true });
     f.service.updateProvider("openai", { enabled: false });
     assert.equal(f.service.getSettings().defaultProvider, null);
     assert.equal(f.service.getSettings().providers[0].selectable, true);
@@ -260,21 +251,21 @@ test("multiple providers remain independent and default removal never falls back
 test("invalid combined updates roll back key, configuration, and default together", () => {
   const f = fixture();
   try {
-    f.service.updateProvider("mistral", {
+    f.service.updateProvider("openai", {
       enabled: true,
       model: "model",
       apiKey: { action: "set", value: "original-key" },
     });
-    f.service.setDefaultProvider("mistral");
+    f.service.setDefaultProvider("openai");
     const before = f.service.getSettings();
     const ciphertext = f.db
       .select()
       .from(aiProviderSettings)
-      .where(eq(aiProviderSettings.provider, "mistral"))
+      .where(eq(aiProviderSettings.provider, "openai"))
       .get()!.apiKeyEncrypted;
     assert.throws(
       () =>
-        f.service.updateProvider("mistral", {
+        f.service.updateProvider("openai", {
           model: "",
           apiKey: { action: "set", value: "replacement-key" },
         }),
@@ -282,7 +273,7 @@ test("invalid combined updates roll back key, configuration, and default togethe
     );
     assert.throws(
       () =>
-        f.service.updateProvider("mistral", {
+        f.service.updateProvider("openai", {
           enabled: true,
           apiKey: { action: "remove" },
         }),
@@ -293,7 +284,7 @@ test("invalid combined updates roll back key, configuration, and default togethe
       f.db
         .select()
         .from(aiProviderSettings)
-        .where(eq(aiProviderSettings.provider, "mistral"))
+        .where(eq(aiProviderSettings.provider, "openai"))
         .get()!.apiKeyEncrypted,
       ciphertext,
     );
@@ -306,7 +297,7 @@ test("invalid combined updates roll back key, configuration, and default togethe
 test("missing or wrong master key marks secrets unavailable without generating a replacement", () => {
   const f = fixture();
   try {
-    f.service.updateProvider("mistral", {
+    f.service.updateProvider("openai", {
       model: "model",
       enabled: true,
       apiKey: { action: "set", value: "private-key" },
@@ -326,13 +317,12 @@ test("missing or wrong master key marks secrets unavailable without generating a
     );
     assert.equal(existsSync(f.keyPath), false);
     writeFileSync(f.keyPath, randomBytes(32), { mode: 0o600 });
-    assert.throws(
-      () => f.service.updateProvider("mistral", { enabled: true }),
-      { code: "secret_decryption_failed" },
-    );
+    assert.throws(() => f.service.updateProvider("openai", { enabled: true }), {
+      code: "secret_decryption_failed",
+    });
     assert.throws(
       () =>
-        f.service.updateProvider("mistral", {
+        f.service.updateProvider("openai", {
           apiKey: { action: "set", value: "new-key" },
         }),
       { code: "secret_decryption_failed" },
@@ -340,8 +330,8 @@ test("missing or wrong master key marks secrets unavailable without generating a
     writeFileSync(f.keyPath, originalKey);
     assert.equal(f.service.getSettings().providers[1].selectable, true);
     rmSync(f.keyPath);
-    f.service.updateProvider("mistral", { apiKey: { action: "remove" } });
-    f.service.updateProvider("mistral", {
+    f.service.updateProvider("openai", { apiKey: { action: "remove" } });
+    f.service.updateProvider("openai", {
       enabled: true,
       apiKey: { action: "set", value: "reentered-key" },
     });
@@ -355,10 +345,10 @@ test("missing or wrong master key marks secrets unavailable without generating a
 test("authenticated encryption uses fresh nonces and rejects tampering, other providers, and versions", () => {
   const f = fixture();
   try {
-    const first = f.secrets.encrypt("mistral", "private-key", false);
-    const second = f.secrets.encrypt("mistral", "private-key", true);
+    const first = f.secrets.encrypt("openai", "private-key", false);
+    const second = f.secrets.encrypt("openai", "private-key", true);
     assert.notEqual(JSON.parse(first).nonce, JSON.parse(second).nonce);
-    assert.equal(f.secrets.decrypt("mistral", first), "private-key");
+    assert.equal(f.secrets.decrypt("openai", first), "private-key");
     for (const encrypted of [
       JSON.stringify({
         ...JSON.parse(first),
@@ -368,7 +358,7 @@ test("authenticated encryption uses fresh nonces and rejects tampering, other pr
       "invalid-json-private-key",
     ]) {
       assert.throws(
-        () => f.secrets.decrypt("mistral", encrypted),
+        () => f.secrets.decrypt("openai", encrypted),
         (error) => {
           assert.ok(error instanceof SecretStorageError);
           assert.equal(error.code, "secret_decryption_failed");
@@ -377,11 +367,11 @@ test("authenticated encryption uses fresh nonces and rejects tampering, other pr
         },
       );
     }
-    assert.throws(() => f.secrets.decrypt("openai", first), {
+    assert.throws(() => f.secrets.decrypt("ollama", first), {
       code: "secret_decryption_failed",
     });
     writeFileSync(f.keyPath, Buffer.alloc(31));
-    assert.throws(() => f.secrets.decrypt("mistral", first), {
+    assert.throws(() => f.secrets.decrypt("openai", first), {
       code: "secret_key_unavailable",
     });
   } finally {
@@ -405,18 +395,18 @@ test("master key defaults live outside the repository and creation enforces priv
   );
   const f = fixture();
   try {
-    f.secrets.encrypt("mistral", "private-key", false);
+    f.secrets.encrypt("openai", "private-key", false);
     assert.equal(readFileSync(f.keyPath).length, 32);
     if (process.platform !== "win32") {
       assert.equal(statSync(f.keyDirectory).mode & 0o777, 0o700);
       assert.equal(statSync(f.keyPath).mode & 0o777, 0o600);
       chmodSync(f.keyPath, 0o644);
-      assert.throws(() => f.secrets.encrypt("mistral", "private-key", true), {
+      assert.throws(() => f.secrets.encrypt("openai", "private-key", true), {
         code: "secret_key_unavailable",
       });
       chmodSync(f.keyPath, 0o600);
       chmodSync(f.keyDirectory, 0o755);
-      assert.throws(() => f.secrets.encrypt("mistral", "private-key", true), {
+      assert.throws(() => f.secrets.encrypt("openai", "private-key", true), {
         code: "secret_key_unavailable",
       });
       chmodSync(f.keyDirectory, 0o700);
@@ -424,7 +414,7 @@ test("master key defaults live outside the repository and creation enforces priv
       const target = join(f.directory, "external-key");
       writeFileSync(target, randomBytes(32), { mode: 0o600 });
       symlinkSync(target, f.keyPath);
-      assert.throws(() => f.secrets.encrypt("mistral", "private-key", false), {
+      assert.throws(() => f.secrets.encrypt("openai", "private-key", false), {
         code: "secret_key_unavailable",
       });
     }
@@ -487,7 +477,7 @@ test("settings API persists edits and defaults without exposing keys or encrypte
   assert.equal(initial.headers.get("cache-control"), "no-store");
   assert.equal((await initial.json()).defaultProvider, null);
   const key = "api-integration-private-key";
-  const configured = await patch("/providers/mistral", {
+  const configured = await patch("/providers/openai", {
     enabled: true,
     model: "model",
     apiKey: { action: "set", value: key },
@@ -495,23 +485,23 @@ test("settings API persists edits and defaults without exposing keys or encrypte
   assert.equal(configured.status, 200);
   assert.equal(configured.body.hasApiKey, true);
   assert.equal(configured.body.selectable, true);
-  assert.deepEqual(await patch("/default-provider", { provider: "mistral" }), {
+  assert.deepEqual(await patch("/default-provider", { provider: "openai" }), {
     status: 200,
-    body: { defaultProvider: "mistral" },
+    body: { defaultProvider: "openai" },
   });
   assert.equal(
     (
-      await patch("/providers/mistral", {
+      await patch("/providers/openai", {
         apiKey: { action: "set", value: "api-replacement-private-key" },
       })
     ).status,
     200,
   );
   assert.deepEqual(
-    await patch("/providers/mistral", { baseUrl: "https://foreign.example" }),
+    await patch("/providers/openai", { baseUrl: "https://foreign.example" }),
     { status: 400, body: { error: "invalid_provider_settings" } },
   );
-  assert.deepEqual(await patch("/default-provider", { provider: "openai" }), {
+  assert.deepEqual(await patch("/default-provider", { provider: "ollama" }), {
     status: 409,
     body: { error: "provider_not_selectable" },
   });
@@ -521,12 +511,12 @@ test("settings API persists edits and defaults without exposing keys or encrypte
   responses.push(unreadableText);
   assert.equal(JSON.parse(unreadableText).providers[1].hasApiKey, true);
   assert.equal(JSON.parse(unreadableText).providers[1].selectable, false);
-  assert.deepEqual(await patch("/providers/mistral", { enabled: true }), {
+  assert.deepEqual(await patch("/providers/openai", { enabled: true }), {
     status: 503,
     body: { error: "secret_key_unavailable" },
   });
   assert.equal(
-    (await patch("/providers/mistral", { apiKey: { action: "remove" } })).body
+    (await patch("/providers/openai", { apiKey: { action: "remove" } })).body
       .hasApiKey,
     false,
   );

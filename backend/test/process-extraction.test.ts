@@ -119,13 +119,9 @@ test("process endpoint returns a review DTO using current categories and databas
     new SecretStorage(join(directory, "keys")),
   );
   settings.updateProvider("ollama", { enabled: true, model: "test-model" });
-  settings.updateProvider("mistral", {
+  settings.updateProvider("openai", {
     enabled: true,
     model: "cloud-model",
-    apiKey: { action: "set", value: "secret-external-key" },
-  });
-  settings.updateProvider("openai", {
-    model: "openai-model",
     apiKey: { action: "set", value: "secret-external-key" },
   });
   settings.setDefaultProvider("ollama");
@@ -311,6 +307,7 @@ test("process endpoint returns a review DTO using current categories and databas
       error: "invalid_provider",
     });
   }
+  settings.updateProvider("openai", { enabled: false });
   const disabledProvider = await processScan(scan.scanId, "openai");
   assert.equal(disabledProvider.status, 409);
   assert.deepEqual(await disabledProvider.json(), {
@@ -323,10 +320,11 @@ test("process endpoint returns a review DTO using current categories and databas
     error: "default_provider_missing",
   });
   assert.equal(workerCalls, callsBeforeInvalidSelection);
-  const explicit = await processScan(scan.scanId, "mistral");
+  settings.updateProvider("openai", { enabled: true });
+  const explicit = await processScan(scan.scanId, "openai");
   assert.equal(explicit.status, 200);
-  assert.equal(selectedProviders.at(-1), "mistral");
-  assert.equal((await explicit.json()).timings.llm.provider, "mistral");
+  assert.equal(selectedProviders.at(-1), "openai");
+  assert.equal((await explicit.json()).timings.llm.provider, "openai");
   settings.setDefaultProvider("ollama");
 
   nextExtraction = { ...validExtraction, totalCents: 130 };
@@ -380,15 +378,15 @@ test("process endpoint returns a review DTO using current categories and databas
   assert.equal(malformed.status, 502);
   assert.deepEqual(await malformed.json(), { error: "invalid_llm_response" });
 
-  nextError = new LlmUnavailableError("mistral", "secret-external-key");
-  const externalUnavailable = await processScan(scan.scanId, "mistral");
+  nextError = new LlmUnavailableError("openai", "secret-external-key");
+  const externalUnavailable = await processScan(scan.scanId, "openai");
   assert.equal(externalUnavailable.status, 503);
   assert.deepEqual(await externalUnavailable.json(), {
     error: "llm_unavailable",
   });
 
-  nextError = new LlmRequestError("mistral", "secret-external-key", 401);
-  const externalFailed = await processScan(scan.scanId, "mistral");
+  nextError = new LlmRequestError("openai", "secret-external-key", 401);
+  const externalFailed = await processScan(scan.scanId, "openai");
   assert.equal(externalFailed.status, 502);
   assert.deepEqual(await externalFailed.json(), {
     error: "provider_authentication_failed",
@@ -417,7 +415,7 @@ test("process endpoint returns a review DTO using current categories and databas
       const entry = JSON.parse(event);
       return (
         entry.operation === "scan.llm.failed" &&
-        entry.fields.provider === "mistral" &&
+        entry.fields.provider === "openai" &&
         entry.fields.httpStatus === 401
       );
     }),

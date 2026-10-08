@@ -41,7 +41,6 @@ export default function ProviderSettingsForm({
       provider.model ||
       {
         ollama: "qwen3.8:27b",
-        mistral: "mistral-medium-latest",
         openai: "gpt-6-luna",
       }[provider.provider],
     baseUrl: provider.baseUrl ?? "",

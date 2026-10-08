@@ -20,7 +20,7 @@ export interface OllamaDiagnostics {
 }
 
 // Defines the names of the supported receipt extraction providers.
-export const providerIds = ["ollama", "mistral", "openai"] as const;
+export const providerIds = ["ollama", "openai"] as const;
 export type ProviderId = (typeof providerIds)[number];
 
 /** Internal request configuration. Cloud API keys must never enter public DTOs. */
@@ -31,7 +31,7 @@ export type ProviderRuntimeConfiguration =
       readonly baseUrl: string;
     }
   | {
-      readonly provider: "mistral" | "openai";
+      readonly provider: "openai";
       readonly model: string;
       readonly apiKey: string;
     };

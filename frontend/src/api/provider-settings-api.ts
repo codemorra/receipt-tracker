@@ -1,4 +1,4 @@
-export const providerIds = ["ollama", "mistral", "openai"] as const;
+export const providerIds = ["ollama", "openai"] as const;
 export type ProviderId = (typeof providerIds)[number];
 
 // List of supported provider IDs and their corresponding type.
