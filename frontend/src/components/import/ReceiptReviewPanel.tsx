@@ -19,6 +19,7 @@ import ReceiptArchiveImage from "../receipts/ReceiptArchiveImage";
  * @param onSaved Callback invoked when the receipt review is successfully saved.
  * @param onDiscard Callback invoked when the review process is cancelled.
  * @param onBusyChange Callback invoked when the busy state changes.
+ * @param locked Indicates whether the review panel is locked and should be non-interactive.
  */
 export default function ReceiptReviewPanel({
   review,
@@ -118,14 +119,6 @@ export default function ReceiptReviewPanel({
         <button
           type="button"
           disabled={busy}
-          className={`${secondary} mr-auto`}
-          onClick={onDiscard}
-        >
-          {t("pages.import.discard.action")}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
           className={secondary}
           onClick={() => setModal("advanced")}
         >
@@ -158,17 +151,17 @@ export default function ReceiptReviewPanel({
         onClose={() => setModal(null)}
       >
         <div
-          className="mt-5 grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:grid-rows-1"
+          className="mt-5 grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:grid-rows-1 lg:overflow-hidden"
           inert={busy}
         >
-          <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain">
+          <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
             <ReceiptArchiveImage
               url={review.archiveUrl}
               alt={t("pages.import.scan.archiveAlt")}
               className="h-auto"
             />
           </div>
-          <div className="min-h-0 min-w-0 space-y-6 overflow-y-auto overscroll-contain pr-3 scrollbar-gutter-stable">
+          <div className="min-w-0 space-y-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-3 lg:scrollbar-gutter-stable">
             <p className="text-sm leading-relaxed text-muted">
               {t("pages.import.advanced.hint")}
             </p>
@@ -176,24 +169,17 @@ export default function ReceiptReviewPanel({
               controller={controller}
               active={modal === "advanced"}
             />
-            <div className="flex flex-wrap justify-between gap-3 border-t border-shell pt-5 pb-1">
-              <button
-                type="button"
-                disabled={busy}
-                className={secondary}
-                onClick={onDiscard}
-              >
-                {t("pages.import.discard.action")}
-              </button>
-              <button
-                type="button"
-                className={secondary}
-                onClick={() => setModal(null)}
-              >
-                {t("pages.import.advanced.done")}
-              </button>
-            </div>
           </div>
+        </div>
+        <div className="mt-5 flex shrink-0 flex-wrap justify-end gap-3 border-t border-shell pt-4">
+          <button
+            type="button"
+            disabled={busy}
+            className={primary}
+            onClick={() => setModal(null)}
+          >
+            {t("pages.import.advanced.done")}
+          </button>
         </div>
       </Modal>
       <Modal

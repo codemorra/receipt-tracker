@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
+import {
+  selectedItemId,
+  toggleItemSelection,
+  selectionAfterRemoval,
+} from "../src/review/item-selection.ts";
 import test from "node:test";
 import {
+  addItemWarranty,
   buildFinalSaveDto,
   chooseProduct,
   changeLineType,
@@ -937,4 +943,86 @@ test("saved receipts reload with associations and reject foreign images, broken 
     throw new Error("private details");
   };
   await assert.rejects(getSavedReceipt(7), { code: "network_error" });
+});
+
+// Tests for item selection behavior in the review draft.
+test("item selection follows draft IDs through edits, addition, removal and empty lists", () => {
+  const draft = createReviewDraft(review);
+  const first = draft.items[0];
+  const second = {
+    ...first,
+    id: "second",
+    normalizedName: "Edited product",
+    warranties: [],
+  };
+  const third = { ...first, id: "third", warranties: [] };
+  draft.items.push(second, third);
+  assert.equal(selectedItemId(draft.items, null), null);
+  assert.equal(selectedItemId(draft.items.toReversed(), second.id), second.id);
+  assert.equal(selectedItemId(draft.items, "missing"), null);
+  let selection = toggleItemSelection(null, second.id);
+  assert.equal(selectedItemId(draft.items, selection), second.id);
+  selection = toggleItemSelection(selection, second.id);
+  assert.equal(selectedItemId(draft.items, selection), null);
+  assert.equal(selectionAfterRemoval(draft.items, selection, first.id), null);
+  selection = toggleItemSelection(selection, third.id);
+  assert.equal(selectedItemId(draft.items, selection), third.id);
+  assert.equal(toggleItemSelection(selection, second.id), second.id);
+  const added = createEmptyItem();
+  draft.items.push(added);
+  assert.equal(selectedItemId(draft.items, added.id), added.id);
+  assert.equal(
+    selectionAfterRemoval(draft.items, second.id, second.id),
+    third.id,
+  );
+  assert.equal(
+    selectionAfterRemoval(draft.items, added.id, added.id),
+    third.id,
+  );
+  assert.equal(
+    selectionAfterRemoval(draft.items, second.id, first.id),
+    second.id,
+  );
+  const before = structuredClone(draft);
+  selectedItemId(draft.items, first.id);
+  selectedItemId(draft.items, second.id);
+  assert.deepEqual(draft, before);
+  assert.equal(selectionAfterRemoval([first], first.id, first.id), null);
+  assert.equal(selectedItemId([], added.id), null);
+});
+
+// Tests for warranty handling in the review draft.
+test("incomplete warranty inputs stay in the item draft across selection and block final save until corrected", () => {
+  const draft = createReviewDraft(review);
+  const target = draft.items[0];
+  const original = structuredClone(target);
+  const warranty = {
+    id: "warranty-draft",
+    type: "statutory",
+    startDate: draft.purchaseDate,
+    endDate: "",
+    notes: "Keep these notes",
+  };
+  draft.items[0] = addItemWarranty(draft.items[0], warranty);
+  const firstId = draft.items[0].id;
+  draft.items.push({ ...original, id: "another-item" });
+  const deselected = toggleItemSelection(firstId, firstId);
+  assert.equal(selectedItemId(draft.items, deselected), null);
+  selectedItemId(draft.items, "another-item");
+  selectedItemId(draft.items, firstId);
+  assert.equal(draft.items[0].warranties[0].notes, "Keep these notes");
+  assert.ok(reviewIssues(draft).some((issue) => issue.code === "warranty"));
+  assert.equal(buildFinalSaveDto(draft), null);
+  draft.items[0].warranties[0] = {
+    ...warranty,
+    type: "manufacturer",
+    endDate: "2028-09-29",
+  };
+  const payload = buildFinalSaveDto(draft);
+  assert.ok(payload);
+  assert.equal(payload.items[0].warranties[0].notes, "Keep these notes");
+  assert.equal(payload.items[0].warranties[0].type, "manufacturer");
+  assert.deepEqual(target, original);
+  const fee = changeLineType(original, "fee");
+  assert.equal(addItemWarranty(fee, warranty), fee);
 });

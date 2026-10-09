@@ -153,7 +153,7 @@
         },
         "unitPrice": "Einzelpreis",
         "itemTotal": "Positionsbetrag",
-        "addWarranty": "Zeitraum hinzufügen",
+        "addWarranty": "Garantie hinzufügen",
         "removeWarranty": "Zeitraum entfernen",
         "warrantyType": "Art",
         "warrantyTypes": {
@@ -249,7 +249,27 @@
         "editWarranty": "Bearbeiten",
         "saveWarranty": "Änderungen übernehmen",
         "removeDiscountConfirmation": "„{{name}}“ wirklich aus dem Beleg entfernen?",
-        "correctionsRequired": "Korrigiere die aufgeführten Felder unter „Daten bearbeiten“, bevor du den Beleg speicherst."
+        "correctionsRequired": "Korrigiere die aufgeführten Felder unter „Daten bearbeiten“, bevor du den Beleg speicherst.",
+        "basicData": "Basisdaten",
+        "quantityAndPrice": "Menge und Preis",
+        "productAssignment": "Produktzuordnung",
+        "productDetails": "Produktdetails",
+        "package": "Packung",
+        "noProductAssigned": "Kein gespeichertes Produkt zugeordnet",
+        "changeAssignment": "Zuordnung ändern",
+        "newProductAction": "Keine Zuordnung / Neues Produkt",
+        "editReceiptText": "Belegtext bearbeiten",
+        "finishReceiptText": "Belegtext übernehmen",
+        "finishAssignment": "Fertig",
+        "renameUnlinks": "Wenn du den Produktnamen änderst, wird die bestehende Zuordnung gelöst.",
+        "deletePosition": "Position löschen",
+        "warrantyHeading": "Garantie",
+        "noWarranty": "Keine Garantie hinterlegt",
+        "finishWarranty": "Fertig",
+        "unnamedItem": "Neue Position",
+        "checkItem": "Angaben prüfen",
+        "noItems": "Noch keine Positionen. Füge eine Position hinzu.",
+        "editHeader": "Bearbeiten"
       },
       "duplicates": {
         "title": "Möglicherweise bereits importiert",
@@ -289,8 +309,8 @@
       },
       "advanced": {
         "title": "Daten bearbeiten",
-        "hint": "Änderungen erscheinen direkt in der Übersicht. Speichere den Beleg dort, wenn du fertig bist.",
-        "done": "Zurück zur Übersicht"
+        "hint": "Noch nicht gespeichert. Speichere den Beleg anschließend in der Übersicht.",
+        "done": "Zur Übersicht"
       },
       "discard": {
         "title": "Import verwerfen?",

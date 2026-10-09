@@ -153,7 +153,7 @@
         },
         "unitPrice": "Unit price",
         "itemTotal": "Item total",
-        "addWarranty": "Add warranty period",
+        "addWarranty": "Add warranty",
         "removeWarranty": "Remove warranty period",
         "warrantyType": "Type",
         "warrantyTypes": {
@@ -249,7 +249,27 @@
         "editWarranty": "Edit",
         "saveWarranty": "Apply changes",
         "removeDiscountConfirmation": "Remove “{{name}}” from the receipt?",
-        "correctionsRequired": "Correct the listed fields in “Edit data” before saving."
+        "correctionsRequired": "Correct the listed fields in “Edit data” before saving.",
+        "basicData": "Basic details",
+        "quantityAndPrice": "Quantity and price",
+        "productAssignment": "Product assignment",
+        "productDetails": "Product details",
+        "package": "Package",
+        "noProductAssigned": "No saved product assigned",
+        "changeAssignment": "Change assignment",
+        "newProductAction": "No assignment / New product",
+        "editReceiptText": "Edit receipt text",
+        "finishReceiptText": "Done editing receipt text",
+        "finishAssignment": "Done",
+        "renameUnlinks": "Changing the product name removes the current assignment.",
+        "deletePosition": "Delete item",
+        "warrantyHeading": "Warranty",
+        "noWarranty": "No warranty recorded",
+        "finishWarranty": "Done",
+        "unnamedItem": "New item",
+        "checkItem": "Check details",
+        "noItems": "No items yet. Add an item.",
+        "editHeader": "Edit"
       },
       "duplicates": {
         "title": "Possibly already imported",
@@ -289,7 +309,7 @@
       },
       "advanced": {
         "title": "Edit data",
-        "hint": "Changes appear immediately in the overview. Use Save receipt there when you are ready.",
+        "hint": "Not saved yet. Save the receipt afterwards in the overview.",
         "done": "Back to overview"
       },
       "discard": {
