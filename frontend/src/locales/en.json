@@ -38,6 +38,11 @@
     }
   },
   "pages": {
+    "home": {
+      "description": "Digitize, review and analyze your receipts.",
+      "import": "Import receipt",
+      "receipts": "View saved receipts"
+    },
     "import": {
       "title": "Import",
       "description": "Digitize your receipts and review their details.",
@@ -68,7 +73,8 @@
           "bottomLeft": "Bottom left corner"
         },
         "receiptOnly": "Receipt only",
-        "edit": "Edit again"
+        "edit": "Edit scan",
+        "selection": "Selection"
       },
       "errors": {
         "invalid_upload": "The image is empty or invalid. Choose another file.",

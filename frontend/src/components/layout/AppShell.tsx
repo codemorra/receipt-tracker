@@ -1,13 +1,13 @@
 import { useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { Route, Section } from "../../routes/routing";
+import type { Route, NavigationTarget } from "../../routes/routing";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 
 // Props for the AppShell component.
 interface Props {
   route: Route;
-  navigate: (section: Section) => void;
+  navigate: (section: NavigationTarget) => void;
   children: ReactNode;
 }
 

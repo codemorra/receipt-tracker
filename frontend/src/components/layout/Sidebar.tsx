@@ -1,12 +1,12 @@
 import { useEffect, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import type { Route, Section } from "../../routes/routing";
+import type { Route, NavigationTarget } from "../../routes/routing";
 import Navigation from "./Navigation";
 
 // Props for the Sidebar component.
 interface Props {
   route: Route;
-  navigate: (section: Section) => void;
+  navigate: (section: NavigationTarget) => void;
   drawer: RefObject<HTMLDialogElement | null>;
 }
 
@@ -27,7 +27,7 @@ export default function Sidebar({ route, navigate, drawer }: Props) {
     return () => desktop.removeEventListener("change", closeOnDesktop);
   }, [drawer]);
 
-  function navigateFromDrawer(section: Section) {
+  function navigateFromDrawer(section: NavigationTarget) {
     drawer.current?.close();
     navigate(section);
   }

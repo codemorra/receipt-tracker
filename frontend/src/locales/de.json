@@ -38,6 +38,11 @@
     }
   },
   "pages": {
+    "home": {
+      "description": "Belege digitalisieren, prüfen und auswerten.",
+      "import": "Beleg importieren",
+      "receipts": "Gespeicherte Belege ansehen"
+    },
     "import": {
       "title": "Import",
       "description": "Digitalisiere deine Belege und prüfe ihre Angaben.",
@@ -68,7 +73,8 @@
           "bottomLeft": "Ecke unten links"
         },
         "receiptOnly": "Nur Bon",
-        "edit": "Erneut bearbeiten"
+        "edit": "Scan bearbeiten",
+        "selection": "Auswahl"
       },
       "errors": {
         "invalid_upload": "Das Bild ist leer oder ungültig. Wähle eine andere Datei.",
