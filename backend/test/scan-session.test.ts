@@ -12,6 +12,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { request } from "node:http";
 import { join } from "node:path";
 import test from "node:test";
 import { createDatabase } from "../src/db/database.js";
@@ -32,6 +33,14 @@ import {
 import type { Rotation } from "../src/worker/worker-protocol.js";
 
 // Sample PNG image buffer for testing.
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
 const suggestedCorners = {
   topLeft: [0.04, 0.04] as [number, number],
@@ -480,4 +489,102 @@ test("stale cleanup continues when removing one session fails", async (t) => {
         event.scanId === blocked,
     ),
   );
+});
+
+// DELETE waits only for outstanding file writes, and rejects new processing meanwhile.
+test("cancel during processing waits for writes and removes the session even after worker failure", async (t) => {
+  for (const fails of [false, true]) {
+    await t.test(fails ? "worker fails" : "worker completes", async (t) => {
+      const directory = await mkdtemp(join(tmpdir(), "receipt-cancel-"));
+      t.after(() => rm(directory, { recursive: true, force: true }));
+      const base = previewWorker();
+      const entered = deferred();
+      const release = deferred();
+      const service = new ScanSessionService(directory, {
+        ...base,
+        async requestProcess(...args) {
+          entered.resolve();
+          await release.promise;
+          if (fails) throw new WorkerUnavailableError("stopped");
+          return base.requestProcess(...args);
+        },
+      });
+      const scan = await service.create("image/png", png);
+      const processing = service.process(scan.scanId, suggestedCorners);
+      await entered.promise;
+      const cancelled = service.cancel(scan.scanId);
+      assert.equal(service.cancel(scan.scanId), cancelled);
+      assert.ok(await service.previewPath(scan.scanId));
+      assert.equal(
+        await service.process(scan.scanId, suggestedCorners),
+        undefined,
+      );
+      const result = fails
+        ? assert.rejects(processing, WorkerUnavailableError)
+        : processing.then((value) => assert.equal(value, undefined));
+      release.resolve();
+      await result;
+      assert.equal(await cancelled, true);
+      assert.deepEqual(await readdir(directory), []);
+      assert.equal(await service.cancel(scan.scanId), false);
+      assert.equal(
+        await service.process(scan.scanId, suggestedCorners),
+        undefined,
+      );
+    });
+  }
+});
+
+// Test for handling an upload that is disconnected during the preview phase.
+test("an upload disconnected during preview cleans up its unreachable session", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "receipt-upload-cancel-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { sqlite, db } = createDatabase(":memory:");
+  t.after(() => sqlite.close());
+  const base = previewWorker();
+  const entered = deferred();
+  const release = deferred();
+  const removed = deferred();
+  const scans = new ScanSessionService(directory, {
+    ...base,
+    async requestPreview(...args) {
+      entered.resolve();
+      await release.promise;
+      return base.requestPreview(...args);
+    },
+  });
+  const cancel = scans.cancel.bind(scans);
+  t.mock.method(scans, "cancel", async (id: string) => {
+    const result = await cancel(id);
+    removed.resolve();
+    return result;
+  });
+  const app = createApp(scans, db, () => ({
+    async extractReceipt() {
+      throw new Error("unused");
+    },
+  }));
+  const server = app.listen(0);
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const disconnected = deferred();
+  server.once("connection", (socket) =>
+    socket.once("close", () => disconnected.resolve()),
+  );
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const upload = request({
+    port: address.port,
+    host: "127.0.0.1",
+    path: "/api/scans",
+    method: "POST",
+    headers: { "content-type": "image/png" },
+  });
+  upload.on("error", () => {});
+  upload.end(png);
+  await entered.promise;
+  upload.destroy();
+  await disconnected.promise;
+  release.resolve();
+  await removed.promise;
+  assert.deepEqual(await readdir(directory), []);
 });

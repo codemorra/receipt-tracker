@@ -291,6 +291,13 @@
         "title": "Edit data",
         "hint": "Changes appear immediately in the overview. Use Save receipt there when you are ready.",
         "done": "Back to overview"
+      },
+      "discard": {
+        "title": "Discard import?",
+        "message": "The current import and your unsaved changes will be discarded.",
+        "action": "Discard import",
+        "discarding": "Discarding import …",
+        "back": "Back"
       }
     },
     "receipts": {

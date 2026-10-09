@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useImportNavigation } from "./hooks/useImportNavigation";
+import ConfirmDialog from "./components/ui/ConfirmDialog";
 import AppShell from "./components/layout/AppShell";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -17,32 +19,18 @@ import "./App.css";
 
 // Main application component.
 function App() {
-  const [location, setLocation] = useState(() => ({
-    pathname: window.location.pathname,
-    search: window.location.search,
-  }));
+  const { t } = useTranslation();
+  const workflow = useImportNavigation();
+  const { location } = workflow;
   const route = resolveRoute(location.pathname, location.search);
   const receiptId = receiptIdFromSearch(location.search);
-  useEffect(() => {
-    const onPopState = () =>
-      setLocation({
-        pathname: window.location.pathname,
-        search: window.location.search,
-      });
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
 
   /**
    * Navigates to the specified URL within the application.
    * @param url - The target URL to navigate to.
    */
   function navigateTo(url: string) {
-    window.history.pushState(null, "", url);
-    setLocation({
-      pathname: window.location.pathname,
-      search: window.location.search,
-    });
+    workflow.navigation.navigate(url);
   }
 
   /**
@@ -54,31 +42,52 @@ function App() {
   }
 
   return (
-    <AppShell route={route} navigate={navigate}>
-      {route === "home" ? (
-        <HomePage navigate={navigate} />
-      ) : route === "settings" ? (
-        <SettingsPage />
-      ) : route === "import" ? (
-        receiptId !== null ? (
-          <SavedReceiptPage
-            key={receiptId}
-            receiptId={receiptId}
-            onNewImport={() => navigateTo("/import")}
-          />
+    <>
+      <AppShell route={route} navigate={navigate}>
+        {route === "home" ? (
+          <HomePage navigate={navigate} />
+        ) : route === "settings" ? (
+          <SettingsPage />
+        ) : route === "import" ? (
+          receiptId !== null ? (
+            <SavedReceiptPage
+              key={receiptId}
+              receiptId={receiptId}
+              onNewImport={() => navigateTo("/import")}
+            />
+          ) : (
+            <ImportPage
+              onSaved={workflow.saved}
+              registerGuard={workflow.registerGuard}
+              onDiscard={() => workflow.navigation.requestDiscard()}
+            />
+          )
+        ) : route === "receipts" ? (
+          <ReceiptsPage />
+        ) : route === "analytics" ? (
+          <AnalyticsPage search={location.search} navigate={navigateTo} />
+        ) : route === "warranties" ? (
+          <WarrantiesPage />
         ) : (
-          <ImportPage onSaved={(id) => navigateTo(`/import?receiptId=${id}`)} />
-        )
-      ) : route === "receipts" ? (
-        <ReceiptsPage />
-      ) : route === "analytics" ? (
-        <AnalyticsPage search={location.search} navigate={navigateTo} />
-      ) : route === "warranties" ? (
-        <WarrantiesPage />
-      ) : (
-        <PlaceholderPage route={route} />
+          <PlaceholderPage route={route} />
+        )}
+      </AppShell>
+      {workflow.confirming && (
+        <ConfirmDialog
+          title={t("pages.import.discard.title")}
+          message={t("pages.import.discard.message")}
+          confirmLabel={t(
+            workflow.discarding
+              ? "pages.import.discard.discarding"
+              : "pages.import.discard.action",
+          )}
+          cancelLabel={t("pages.import.discard.back")}
+          busy={workflow.discarding}
+          onConfirm={() => void workflow.confirm()}
+          onCancel={workflow.stay}
+        />
       )}
-    </AppShell>
+    </>
   );
 }
 

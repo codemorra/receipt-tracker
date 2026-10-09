@@ -66,6 +66,22 @@ export function registerScanRoutes(
           request.headers["content-type"],
           request.body,
         );
+        if (response.destroyed) {
+          await scans.cancel(scan.scanId);
+          return;
+        }
+        // If the connection closes before the upload response is delivered,
+        // remove the otherwise unreachable session.
+        response.once("close", () => {
+          if (!response.writableFinished) {
+            void scans.cancel(scan.scanId).catch((error) => {
+              logger("error", "scan.cancel.failed", {
+                scanId: scan.scanId,
+                errorType: errorType(error),
+              });
+            });
+          }
+        });
         logger("info", "scan.create.complete", {
           scanId: scan.scanId,
           durationMs: performance.now() - started,
