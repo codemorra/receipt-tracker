@@ -17,7 +17,18 @@ import type { ReceiptExtractionDiagnostics } from "../src/extraction/receipt-ext
 import { createProviderResolver } from "../src/extraction/provider-resolver.js";
 import { ProviderSettingsService } from "../src/settings/provider-settings-service.js";
 import { SecretStorage } from "../src/settings/secret-storage.js";
+import { ReceiptProcessingService } from "../src/scans/receipt-processing-service.js";
+import { silentLogger } from "../src/logger.js";
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
+
+// Utility function for creating a deferred promise.
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 const corners = {
   topLeft: [0, 0] as [number, number],
@@ -440,4 +451,59 @@ test("process endpoint returns a review DTO using current categories and databas
   ]) {
     assert.equal(events.join("\n").includes(sensitive), false);
   }
+});
+
+// Test for handling an AI response after a scan has been deleted.
+test("an AI response after DELETE does not return a review or recreate scan files", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "receipt-llm-cancel-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { sqlite, db } = createDatabase(":memory:");
+  t.after(() => sqlite.close());
+  const scans = new ScanSessionService(directory, {
+    async requestPreview(_original, preview) {
+      await writeFile(preview, "preview");
+      return {
+        width: 100,
+        height: 200,
+        suggestedCorners: corners,
+        rotation: 0,
+      };
+    },
+    async requestProcess(_original, _corners, archive, ocr) {
+      await writeFile(archive, "archive");
+      await writeFile(ocr, "ocr");
+      return {
+        width: 100,
+        height: 200,
+        plainText: ocrLine.text,
+        ocrDurationMs: 1,
+        rows: [],
+        lines: [ocrLine],
+      };
+    },
+  });
+  const scan = await scans.create(
+    "image/png",
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  );
+  const entered = deferred();
+  const release = deferred();
+  const processing = new ReceiptProcessingService(
+    scans,
+    db,
+    () => ({
+      async extractReceipt() {
+        entered.resolve();
+        await release.promise;
+        return validExtraction;
+      },
+    }),
+    silentLogger,
+  );
+  const result = processing.process(scan.scanId, { corners });
+  await entered.promise;
+  assert.equal(await scans.cancel(scan.scanId), true);
+  release.resolve();
+  assert.equal(await result, undefined);
+  assert.equal(await scans.archivePath(scan.scanId), undefined);
 });

@@ -43,6 +43,12 @@ export interface ProcessedScan extends ProcessResult {
 
 // Service class for managing scan sessions, including creation and preview retrieval.
 export class ScanSessionService {
+  // Only file-producing work is tracked; no worker/provider cancellation protocol.
+  private readonly cancellations = new Map<string, Promise<boolean>>();
+  private readonly processing = new Map<
+    string,
+    { cancelled: boolean; done: Promise<void> }
+  >();
   constructor(
     private readonly root: string,
     private readonly worker: Pick<
@@ -144,55 +150,95 @@ export class ScanSessionService {
       throw new InvalidRotationError("Invalid rotation");
     }
 
-    const directory = join(this.root, scanId);
-    let session: { originalName: string; rotation?: Rotation };
+    // Check if the scan has been cancelled or is already processing.
+    if (this.cancellations.has(scanId)) return undefined;
+    if (this.processing.has(scanId))
+      throw new Error("Scan is already processing");
+    let finish!: () => void;
+    const work = {
+      cancelled: false,
+      done: new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+    };
+    this.processing.set(scanId, work);
     try {
-      session = JSON.parse(
-        await readFile(join(directory, "session.json"), "utf8"),
-      ) as { originalName: string; rotation?: Rotation };
-    } catch (error) {
-      if (isMissingFile(error)) return undefined;
-      throw error;
-    }
-    if (typeof session.originalName !== "string") {
-      throw new Error("Invalid scan session metadata");
-    }
-    const selectedRotation = rotation ?? session.rotation ?? 0;
-    if (!isRotation(selectedRotation)) {
-      throw new Error("Invalid scan session rotation");
-    }
+      // Determine the directory for the scan session.
+      const directory = join(this.root, scanId);
+      let session: { originalName: string; rotation?: Rotation };
+      try {
+        // Read the scan session metadata from the session.json file.
+        session = JSON.parse(
+          await readFile(join(directory, "session.json"), "utf8"),
+        ) as { originalName: string; rotation?: Rotation };
+      } catch (error) {
+        if (isMissingFile(error)) return undefined;
+        throw error;
+      }
+      // Validate the scan session metadata.
+      if (typeof session.originalName !== "string") {
+        throw new Error("Invalid scan session metadata");
+      }
+      const selectedRotation = rotation ?? session.rotation ?? 0;
+      // Determine the selected rotation for the scan session.
+      if (!isRotation(selectedRotation)) {
+        throw new Error("Invalid scan session rotation");
+      }
 
-    const archivePath = join(directory, "archive.webp");
-    const ocrPath = join(directory, "ocr.webp");
-    const processingId = randomUUID();
-    const temporaryArchive = join(directory, `archive-${processingId}.webp`);
-    const temporaryOcr = join(directory, `ocr-${processingId}.webp`);
-    try {
-      const result = await this.worker.requestProcess(
-        join(directory, session.originalName),
-        corners,
-        temporaryArchive,
-        temporaryOcr,
-        selectedRotation,
-      );
-      await rename(temporaryOcr, ocrPath);
-      await rename(temporaryArchive, archivePath);
-      return {
-        scanId,
-        archiveUrl: `/api/scans/${scanId}/archive`,
-        ...result,
-      };
+      const archivePath = join(directory, "archive.webp");
+      const ocrPath = join(directory, "ocr.webp");
+      const processingId = randomUUID();
+      const temporaryArchive = join(directory, `archive-${processingId}.webp`);
+      const temporaryOcr = join(directory, `ocr-${processingId}.webp`);
+      try {
+        // Request the worker to process the scan with the specified parameters.
+        const result = await this.worker.requestProcess(
+          join(directory, session.originalName),
+          corners,
+          temporaryArchive,
+          temporaryOcr,
+          selectedRotation,
+        );
+        if (work.cancelled) return undefined;
+        await rename(temporaryOcr, ocrPath);
+        await rename(temporaryArchive, archivePath);
+        if (work.cancelled) return undefined;
+        return {
+          scanId,
+          archiveUrl: `/api/scans/${scanId}/archive`,
+          ...result,
+        };
+      } finally {
+        // Clean up the temporary files for the scan session.
+        await Promise.all([
+          rm(temporaryArchive, { force: true }),
+          rm(temporaryOcr, { force: true }),
+        ]);
+      }
     } finally {
-      await Promise.all([
-        rm(temporaryArchive, { force: true }),
-        rm(temporaryOcr, { force: true }),
-      ]);
+      this.processing.delete(scanId);
+      finish();
     }
   }
 
   // Service method for cancelling a scan session and removing its temporary files.
-  async cancel(scanId: string): Promise<boolean> {
-    if (!isScanId(scanId)) return false;
+  cancel(scanId: string): Promise<boolean> {
+    if (!isScanId(scanId)) return Promise.resolve(false);
+    const existing = this.cancellations.get(scanId);
+    if (existing) return existing;
+    const operation = this.removeSession(scanId).finally(() => {
+      this.cancellations.delete(scanId);
+    });
+    this.cancellations.set(scanId, operation);
+    return operation;
+  }
+
+  private async removeSession(scanId: string): Promise<boolean> {
+    const work = this.processing.get(scanId);
+    if (work) {
+      work.cancelled = true;
+      await work.done;
+    }
     const directory = join(this.root, scanId);
     try {
       await access(join(directory, "session.json"));
@@ -200,7 +246,7 @@ export class ScanSessionService {
       if (isMissingFile(error)) return false;
       throw error;
     }
-    await rm(directory, { recursive: true });
+    await rm(directory, { recursive: true, force: true });
     return true;
   }
 

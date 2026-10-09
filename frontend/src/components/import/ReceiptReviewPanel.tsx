@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ReviewDto } from "../../review/review-state";
 import { reviewDraftToSummary } from "../../receipts/receipt-summary";
@@ -17,18 +17,20 @@ import ReceiptArchiveImage from "../receipts/ReceiptArchiveImage";
  * Panel component for reviewing a receipt, including summary, feedback, and duplicate handling.
  * @param review The review data transfer object containing the receipt and its review state.
  * @param onSaved Callback invoked when the receipt review is successfully saved.
- * @param onCancelled Callback invoked when the review process is cancelled.
+ * @param onDiscard Callback invoked when the review process is cancelled.
  * @param onBusyChange Callback invoked when the busy state changes.
  */
 export default function ReceiptReviewPanel({
   review,
   onSaved,
-  onCancelled,
+  onDiscard,
   onBusyChange,
+  locked = false,
 }: {
   review: ReviewDto;
   onSaved: (id: number) => void;
-  onCancelled: () => void;
+  onDiscard: () => void;
+  locked?: boolean;
   onBusyChange: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();
@@ -37,16 +39,12 @@ export default function ReceiptReviewPanel({
     review,
     controller.draft,
     onSaved,
-    onCancelled,
+    onBusyChange,
   );
   const [modal, setModal] = useState<"advanced" | "duplicates" | null>(null);
-  const busy = confirmation.busy !== null;
+  const busy = confirmation.busy !== null || locked;
   const invalid = controller.issues.length > 0;
   const duplicateCount = confirmation.candidates.length;
-  useEffect(() => {
-    onBusyChange(busy);
-    return () => onBusyChange(false);
-  }, [busy, onBusyChange]);
   async function save() {
     if ((await confirmation.save()) === "duplicates") setModal("duplicates");
   }
@@ -58,6 +56,7 @@ export default function ReceiptReviewPanel({
     <section
       aria-label={t("pages.import.review.title")}
       className="min-w-0 space-y-4"
+      inert={locked}
     >
       {(confirmation.notice || controller.notice) && (
         <Toast
@@ -119,6 +118,14 @@ export default function ReceiptReviewPanel({
         <button
           type="button"
           disabled={busy}
+          className={`${secondary} mr-auto`}
+          onClick={onDiscard}
+        >
+          {t("pages.import.discard.action")}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
           className={secondary}
           onClick={() => setModal("advanced")}
         >
@@ -169,7 +176,15 @@ export default function ReceiptReviewPanel({
               controller={controller}
               active={modal === "advanced"}
             />
-            <div className="flex justify-end border-t border-shell pt-5 pb-1">
+            <div className="flex flex-wrap justify-between gap-3 border-t border-shell pt-5 pb-1">
+              <button
+                type="button"
+                disabled={busy}
+                className={secondary}
+                onClick={onDiscard}
+              >
+                {t("pages.import.discard.action")}
+              </button>
               <button
                 type="button"
                 className={secondary}
@@ -209,13 +224,9 @@ export default function ReceiptReviewPanel({
               type="button"
               disabled={busy}
               className={secondary}
-              onClick={() => void confirmation.cancel()}
+              onClick={onDiscard}
             >
-              {t(
-                confirmation.busy === "cancel"
-                  ? "pages.import.save.cancelling"
-                  : "pages.import.save.cancelImport",
-              )}
+              {t("pages.import.discard.action")}
             </button>
             <button
               type="button"

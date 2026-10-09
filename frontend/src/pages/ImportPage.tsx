@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { ImportGuard } from "../routes/navigation-guard";
 import type { ProviderId } from "../api/provider-settings-api";
 import ScanPanel from "../components/import/ScanPanel";
 import ReceiptReviewPanel from "../components/import/ReceiptReviewPanel";
@@ -16,13 +17,35 @@ import { resolveImportProvider } from "../scans/import-state";
  */
 export default function ImportPage({
   onSaved,
+  registerGuard,
+  onDiscard,
 }: {
   onSaved: (id: number) => void;
+  registerGuard: (guard: ImportGuard | null) => void;
+  onDiscard: () => void;
 }) {
   const { t } = useTranslation();
   const heading = useRef<HTMLHeadingElement>(null);
   const workflow = useReceiptImport();
   const [confirming, setConfirming] = useState(false);
+  const saving = useRef(false);
+  const current = useRef(workflow);
+  useLayoutEffect(() => {
+    current.current = workflow;
+  });
+  useLayoutEffect(() => {
+    registerGuard({
+      active: () =>
+        Boolean(current.current.state.file || current.current.state.scan),
+      busy: () => saving.current || current.current.discarding,
+      discard: () => current.current.discard(),
+    });
+    return () => registerGuard(null);
+  }, [registerGuard]);
+  function onBusyChange(busy: boolean) {
+    saving.current = busy;
+    setConfirming(busy);
+  }
   const providers = useProviderSettings();
   const [selection, setSelection] = useState<ProviderId | null | undefined>(
     undefined,
@@ -47,11 +70,27 @@ export default function ImportPage({
   }, [t]);
   return (
     <>
-      <PageHeader
-        title={t("pages.import.title")}
-        description={t("pages.import.description")}
-        headingRef={heading}
-      />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <PageHeader
+          title={t("pages.import.title")}
+          description={t("pages.import.description")}
+          headingRef={heading}
+        />
+        {(workflow.state.file || workflow.state.scan) && (
+          <button
+            type="button"
+            disabled={confirming || workflow.discarding}
+            onClick={onDiscard}
+            className="rounded-xl border border-shell px-4 py-2.5 text-sm text-muted hover:bg-surface-hover disabled:opacity-50"
+          >
+            {t(
+              workflow.discarding
+                ? "pages.import.discard.discarding"
+                : "pages.import.discard.action",
+            )}
+          </button>
+        )}
+      </div>
       {notice && (
         <Toast
           key={notice.id}
@@ -66,7 +105,7 @@ export default function ImportPage({
         <ScanPanel
           key={workflow.state.scan?.scanId ?? "upload"}
           state={workflow.state}
-          locked={confirming}
+          locked={confirming || workflow.discarding}
           settings={providers.settings}
           provider={provider}
           loadingProviders={providers.loading}
@@ -86,8 +125,9 @@ export default function ImportPage({
             key={`${workflow.state.scan?.scanId}-${workflow.state.generation}`}
             review={workflow.state.processed.review}
             onSaved={onSaved}
-            onCancelled={() => workflow.dispatch({ type: "reset" })}
-            onBusyChange={setConfirming}
+            onDiscard={onDiscard}
+            locked={workflow.discarding}
+            onBusyChange={onBusyChange}
           />
         ) : (
           <Card aria-labelledby="import-review-heading" className="min-w-0">

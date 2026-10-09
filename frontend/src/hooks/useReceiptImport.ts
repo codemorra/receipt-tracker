@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   uploadScan,
+  deleteScan,
   processScan,
   validateScanFile,
   ScanApiError,
   type ScanErrorCode,
 } from "../api/scan-api";
+import { ImportRequestScope } from "../scans/import-lifecycle";
 import type { ProviderId } from "../api/provider-settings-api";
 import {
   importReducer,
@@ -24,8 +26,13 @@ export function useReceiptImport() {
     code: ScanErrorCode;
   } | null>(null);
   const noticeId = useRef(0);
-  const pending = useRef<AbortController | null>(null);
-  useEffect(() => () => pending.current?.abort(), []);
+  const requests = useRef(new ImportRequestScope());
+  const cancelling = useRef(false);
+  const [discarding, setDiscarding] = useState(false);
+  useEffect(() => {
+    const scope = requests.current;
+    return () => scope.abort();
+  }, []);
   const reportError = useCallback(
     (code: ScanErrorCode) => setNotice({ id: ++noticeId.current, code }),
     [],
@@ -37,7 +44,7 @@ export function useReceiptImport() {
    * @param file - The file selected by the user.
    */
   function selectFile(file: File) {
-    if (pending.current || state.scan) return;
+    if (cancelling.current || state.scan) return;
     try {
       validateScanFile(file);
       setNotice(null);
@@ -59,21 +66,20 @@ export function useReceiptImport() {
     operation: NonNullable<ImportState["busy"]>,
     action: (signal: AbortSignal) => Promise<void>,
   ) {
-    if (pending.current) return;
-    const controller = new AbortController();
-    pending.current = controller;
+    if (cancelling.current) return;
+    const controller = requests.current.begin();
+    if (!controller) return;
     setNotice(null);
     dispatch({ type: "start", operation });
     try {
       await action(controller.signal);
     } catch (error) {
-      if (!controller.signal.aborted)
+      if (requests.current.current(controller))
         reportError(
           error instanceof ScanApiError ? error.code : "unexpected_response",
         );
     } finally {
-      if (!controller.signal.aborted) {
-        pending.current = null;
+      if (requests.current.finish(controller)) {
         dispatch({ type: "settled" });
       }
     }
@@ -88,6 +94,7 @@ export function useReceiptImport() {
     return run("upload", async (signal) => {
       const scan = await uploadScan(file, signal);
       if (!signal.aborted) dispatch({ type: "uploaded", scan });
+      else await deleteScan(scan.scanId);
     });
   }
 
@@ -120,8 +127,32 @@ export function useReceiptImport() {
     });
   }
 
+  // Function for discarding the current scan and resetting the state.
+  async function discard(): Promise<boolean> {
+    if (cancelling.current) return false;
+    cancelling.current = true;
+    setDiscarding(true);
+    setNotice(null);
+    try {
+      await requests.current.discard(state.scan?.scanId ?? null, deleteScan);
+      dispatch({ type: "reset" });
+      return true;
+    } catch (error) {
+      reportError(
+        error instanceof ScanApiError ? error.code : "scan_cancel_failed",
+      );
+      dispatch({ type: "settled" });
+      return false;
+    } finally {
+      cancelling.current = false;
+      setDiscarding(false);
+    }
+  }
+
   return {
     state,
+    discarding,
+    discard,
     dispatch,
     notice,
     dismissNotice,

@@ -291,6 +291,13 @@
         "title": "Daten bearbeiten",
         "hint": "Änderungen erscheinen direkt in der Übersicht. Speichere den Beleg dort, wenn du fertig bist.",
         "done": "Zurück zur Übersicht"
+      },
+      "discard": {
+        "title": "Import verwerfen?",
+        "message": "Der aktuelle Import und deine noch nicht gespeicherten Änderungen werden verworfen.",
+        "action": "Import verwerfen",
+        "discarding": "Import wird verworfen …",
+        "back": "Zurück"
       }
     },
     "receipts": {

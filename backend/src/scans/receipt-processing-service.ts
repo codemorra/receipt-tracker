@@ -54,6 +54,7 @@ export class ReceiptProcessingService {
         ocrDurationMs: result.ocrDurationMs,
         workerDurationMs,
       });
+      if (!(await this.scans.archivePath(scanId))) return undefined;
       stage = "reference_data";
       const { categoryNames } = loadExtractionReferenceData(this.db);
       stage = "llm";
@@ -87,6 +88,8 @@ export class ReceiptProcessingService {
         evalCount: llm?.ollama?.evalCount,
         evalDurationMs: llm?.ollama?.evalDurationMs,
       });
+      // The AI call may finish after DELETE; never return a review for that session.
+      if (!(await this.scans.archivePath(scanId))) return undefined;
       stage = "review";
       const extraction = createReceiptExtractionSchema(
         categoryNames,

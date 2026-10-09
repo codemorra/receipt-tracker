@@ -18,8 +18,10 @@ interface Props {
 // Session information for managing modal focus and body overflow.
 interface ModalSession {
   previousFocus: Element | null;
-  overflow: string;
 }
+
+let openDialogs = 0;
+let previousOverflow = "";
 
 /**
  * Closes the modal dialog and restores the previous focus and body overflow.
@@ -32,7 +34,7 @@ function closeDialog(
 ) {
   element?.close();
   if (!session) return;
-  document.body.style.overflow = session.overflow;
+  if (--openDialogs === 0) document.body.style.overflow = previousOverflow;
   if (
     session.previousFocus instanceof HTMLElement &&
     session.previousFocus.isConnected
@@ -75,8 +77,9 @@ export default function Modal({
       if (!element.open) {
         session.current = {
           previousFocus: document.activeElement,
-          overflow: document.body.style.overflow,
         };
+        if (openDialogs++ === 0)
+          previousOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
         element.showModal();
       }
