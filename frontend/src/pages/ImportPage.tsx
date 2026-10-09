@@ -6,6 +6,9 @@ import ScanPanel from "../components/import/ScanPanel";
 import ReceiptReviewPanel from "../components/import/ReceiptReviewPanel";
 import Card from "../components/ui/Card";
 import PageHeader from "../components/ui/PageHeader";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
+import { requiresReviewConfirmation } from "../review/review-changes";
+import type { ImportAction } from "../scans/import-state";
 import Toast from "../components/ui/Toast";
 import { useProviderSettings } from "../hooks/useProviderSettings";
 import { useReceiptImport } from "../hooks/useReceiptImport";
@@ -29,6 +32,24 @@ export default function ImportPage({
   const workflow = useReceiptImport();
   const [confirming, setConfirming] = useState(false);
   const saving = useRef(false);
+  const [draftChanged, setDraftChanged] = useState(false);
+  const [pendingChange, setPendingChange] = useState<(() => void) | null>(null);
+  const pending = useRef<(() => void) | null>(null);
+  function requestChange(action: ImportAction, apply: () => void) {
+    if (pending.current) return;
+    if (requiresReviewConfirmation(workflow.state, draftChanged, action)) {
+      pending.current = apply;
+      setPendingChange(() => apply);
+    } else {
+      apply();
+    }
+  }
+  function finishChange(confirmed: boolean) {
+    const apply = pending.current;
+    pending.current = null;
+    setPendingChange(null);
+    if (confirmed) apply?.();
+  }
   const current = useRef(workflow);
   useLayoutEffect(() => {
     current.current = workflow;
@@ -37,7 +58,8 @@ export default function ImportPage({
     registerGuard({
       active: () =>
         Boolean(current.current.state.file || current.current.state.scan),
-      busy: () => saving.current || current.current.discarding,
+      busy: () =>
+        saving.current || current.current.discarding || !!pending.current,
       discard: () => current.current.discard(),
     });
     return () => registerGuard(null);
@@ -79,7 +101,7 @@ export default function ImportPage({
         {(workflow.state.file || workflow.state.scan) && (
           <button
             type="button"
-            disabled={confirming || workflow.discarding}
+            disabled={confirming || workflow.discarding || !!pendingChange}
             onClick={onDiscard}
             className="rounded-xl border border-shell px-4 py-2.5 text-sm text-muted hover:bg-surface-hover disabled:opacity-50"
           >
@@ -105,18 +127,22 @@ export default function ImportPage({
         <ScanPanel
           key={workflow.state.scan?.scanId ?? "upload"}
           state={workflow.state}
-          locked={confirming || workflow.discarding}
+          locked={confirming || workflow.discarding || !!pendingChange}
           settings={providers.settings}
           provider={provider}
           loadingProviders={providers.loading}
           onProvider={setSelection}
-          dispatch={workflow.dispatch}
+          dispatch={(action) =>
+            requestChange(action, () => workflow.dispatch(action))
+          }
           onSelectFile={workflow.selectFile}
           onUpload={() => {
             void workflow.upload();
           }}
           onProcess={(provider) => {
-            void workflow.process(provider);
+            requestChange({ type: "start", operation: "process" }, () => {
+              void workflow.process(provider);
+            });
           }}
           onError={workflow.reportError}
         />
@@ -126,8 +152,9 @@ export default function ImportPage({
             review={workflow.state.processed.review}
             onSaved={onSaved}
             onDiscard={onDiscard}
-            locked={workflow.discarding}
+            locked={workflow.discarding || !!pendingChange}
             onBusyChange={onBusyChange}
+            onDraftChange={setDraftChanged}
           />
         ) : (
           <Card aria-labelledby="import-review-heading" className="min-w-0">
@@ -150,6 +177,16 @@ export default function ImportPage({
           </Card>
         )}
       </div>
+      {pendingChange && (
+        <ConfirmDialog
+          title={t("pages.import.replaceReview.title")}
+          message={t("pages.import.replaceReview.message")}
+          confirmLabel={t("pages.import.replaceReview.confirm")}
+          cancelLabel={t("pages.import.replaceReview.cancel")}
+          onConfirm={() => finishChange(true)}
+          onCancel={() => finishChange(false)}
+        />
+      )}
     </>
   );
 }

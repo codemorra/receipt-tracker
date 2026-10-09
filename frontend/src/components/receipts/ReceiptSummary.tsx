@@ -53,14 +53,14 @@ export default function ReceiptSummary({
       value,
     );
   return (
-    <Card className="min-w-0 space-y-6 p-5 sm:p-6">
+    <Card className="@container min-w-0 space-y-6 p-4 sm:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold wrap-break-word">
             {receipt.merchantName ?? t("pages.receiptSummary.unknown")}
           </h2>
           {receipt.merchantRawName && (
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-xs wrap-break-word text-muted">
               {t("pages.receiptSummary.merchantRawName")}:{" "}
               {receipt.merchantRawName}
             </p>
@@ -125,11 +125,11 @@ export default function ReceiptSummary({
             </span>
           )}
         </div>
-        <ul id={itemsId} className="pl-3">
+        <ul id={itemsId} className="pl-1 @min-[30rem]:pl-3">
           {receipt.items.map((item, index) => (
             <li
               key={item.key}
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 py-1.5 text-sm"
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 py-1.5 text-sm @min-[30rem]:gap-x-4"
             >
               <span className="flex min-w-0 flex-wrap items-baseline gap-x-1 gap-y-1 wrap-break-word">
                 <strong className="font-semibold">
@@ -207,13 +207,13 @@ export default function ReceiptSummary({
                       row.some((field) => field.value) ? (
                         <dl
                           key={rowIndex}
-                          className="grid gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))]"
+                          className="grid grid-cols-2 gap-x-4 gap-y-2 @min-[40rem]:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))]"
                         >
                           {row.map((field, column) =>
                             field.value ? (
                               <div
                                 key={field.label}
-                                className={`min-w-0 ${["sm:col-start-1", "sm:col-start-2", "sm:col-start-3", "sm:col-start-4", "sm:col-start-5"][column]}`}
+                                className={`min-w-0 ${["@min-[40rem]:col-start-1", "@min-[40rem]:col-start-2", "@min-[40rem]:col-start-3", "@min-[40rem]:col-start-4", "@min-[40rem]:col-start-5"][column]}`}
                               >
                                 <dt className="text-muted">{field.label}</dt>
                                 <dd className="mt-0.5 wrap-break-word">
@@ -251,7 +251,7 @@ export default function ReceiptSummary({
               return (
                 <li
                   key={discount.key}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 py-1.5 text-sm"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 py-1.5 text-sm @min-[30rem]:gap-x-4"
                 >
                   <span className="min-w-0 wrap-break-word">
                     <strong className="font-semibold">

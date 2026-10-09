@@ -1,3 +1,11 @@
+import {
+  hasReviewChanges,
+  requiresReviewConfirmation,
+} from "../src/review/review-changes.ts";
+import {
+  initialImportState,
+  importReducer,
+} from "../src/scans/import-state.ts";
 import assert from "node:assert/strict";
 import {
   selectedItemId,
@@ -1025,4 +1033,86 @@ test("incomplete warranty inputs stay in the item draft across selection and blo
   assert.deepEqual(target, original);
   const fee = changeLineType(original, "fee");
   assert.equal(addItemWarranty(fee, warranty), fee);
+});
+
+// Tests for detecting changes in the review draft.
+test("review change detection includes header, assignment, discounts and unfinished warranties", () => {
+  const original = createReviewDraft(review);
+  assert.equal(hasReviewChanges(original, original), false);
+  assert.equal(hasReviewChanges(original, structuredClone(original)), false);
+  const edits = [
+    { ...original, merchantName: "Edited merchant" },
+    {
+      ...original,
+      items: original.items.map((item) => ({ ...item, productId: null })),
+    },
+    {
+      ...original,
+      discounts: original.discounts.map((discount) => ({
+        ...discount,
+        amount: "0.40",
+      })),
+    },
+    {
+      ...original,
+      items: original.items.map((item) =>
+        addItemWarranty(item, {
+          id: "pending",
+          type: "statutory",
+          startDate: original.purchaseDate,
+          endDate: "",
+          notes: "In progress",
+        }),
+      ),
+    },
+  ];
+  for (const draft of edits)
+    assert.equal(hasReviewChanges(original, draft), true);
+  const restored = { ...edits[0], merchantName: original.merchantName };
+  assert.equal(hasReviewChanges(original, restored), false);
+});
+
+// Tests for scan changes and reprocessing requiring approval.
+test("scan changes and reprocessing need approval only when replacing an edited review", () => {
+  const state = {
+    ...initialImportState,
+    scan: {
+      scanId: "scan",
+      suggestedCorners: {
+        topLeft: [0, 0],
+        topRight: [1, 0],
+        bottomRight: [1, 1],
+        bottomLeft: [0, 1],
+      },
+      rotation: 0,
+    },
+    corners: {
+      topLeft: [0, 0],
+      topRight: [1, 0],
+      bottomRight: [1, 1],
+      bottomLeft: [0, 1],
+    },
+    processed: { review },
+  };
+  for (const action of [
+    { type: "corners", corners: state.corners },
+    { type: "rotate", turn: 90 },
+    { type: "receipt-frame" },
+    { type: "start", operation: "process" },
+  ]) {
+    assert.equal(requiresReviewConfirmation(state, true, action), true);
+    assert.equal(requiresReviewConfirmation(state, false, action), false);
+    assert.equal(
+      requiresReviewConfirmation({ ...state, processed: null }, true, action),
+      false,
+    );
+    assert.equal(importReducer(state, action).processed, null);
+    assert.deepEqual(state.processed.review, review);
+  }
+  for (const action of [
+    { type: "settled" },
+    { type: "start", operation: "upload" },
+    { type: "processed", result: state.processed },
+  ])
+    assert.equal(requiresReviewConfirmation(state, true, action), false);
 });

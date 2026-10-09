@@ -125,7 +125,7 @@
         "items": "Positionen",
         "addItem": "Position hinzufügen",
         "itemNumber": "Position {{number}}",
-        "rawName": "Bezeichnung auf dem Beleg",
+        "rawName": "Belegtext",
         "lineType": "Positionsart",
         "lineTypes": {
           "product": "Produkt",
@@ -172,7 +172,7 @@
         "discounts": "Rabatte",
         "addDiscount": "Rabatt hinzufügen",
         "removeDiscount": "Rabatt entfernen",
-        "discountRawName": "Rabatttext auf dem Beleg",
+        "discountRawName": "Belegtext",
         "discountDescription": "Beschreibung",
         "discountAmount": "Rabattbetrag",
         "appliesTo": "Gilt für",
@@ -318,6 +318,12 @@
         "action": "Import verwerfen",
         "discarding": "Import wird verworfen …",
         "back": "Zurück"
+      },
+      "replaceReview": {
+        "title": "Belegdaten ersetzen?",
+        "message": "Deine manuellen Änderungen gehen beim Ändern des Scans oder bei erneuter Verarbeitung verloren. Möchtest du fortfahren?",
+        "confirm": "Änderungen verwerfen",
+        "cancel": "Änderungen behalten"
       }
     },
     "receipts": {
@@ -509,7 +515,7 @@
       "total": "Gesamtbetrag",
       "items": "Positionen",
       "unitPrice": "Einzelpreis",
-      "rawName": "Bezeichnung auf dem Beleg",
+      "rawName": "Belegtext",
       "brandName": "Marke",
       "productGroupName": "Produktgruppe",
       "packageAmount": "Packungsgröße",

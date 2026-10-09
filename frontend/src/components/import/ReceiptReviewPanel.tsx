@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ReviewDto } from "../../review/review-state";
 import { reviewDraftToSummary } from "../../receipts/receipt-summary";
@@ -19,6 +19,7 @@ import ReceiptArchiveImage from "../receipts/ReceiptArchiveImage";
  * @param onSaved Callback invoked when the receipt review is successfully saved.
  * @param onDiscard Callback invoked when the review process is cancelled.
  * @param onBusyChange Callback invoked when the busy state changes.
+ * @param onDraftChange Callback invoked when the draft changes, indicating whether there are unsaved changes.
  * @param locked Indicates whether the review panel is locked and should be non-interactive.
  */
 export default function ReceiptReviewPanel({
@@ -26,6 +27,7 @@ export default function ReceiptReviewPanel({
   onSaved,
   onDiscard,
   onBusyChange,
+  onDraftChange,
   locked = false,
 }: {
   review: ReviewDto;
@@ -33,9 +35,14 @@ export default function ReceiptReviewPanel({
   onDiscard: () => void;
   locked?: boolean;
   onBusyChange: (busy: boolean) => void;
+  onDraftChange: (changed: boolean) => void;
 }) {
   const { t } = useTranslation();
   const controller = useReceiptReview(review);
+  useLayoutEffect(() => {
+    onDraftChange(controller.changed);
+  }, [controller.changed, onDraftChange]);
+  useLayoutEffect(() => () => onDraftChange(false), [onDraftChange]);
   const confirmation = useReceiptConfirmation(
     review,
     controller.draft,
@@ -161,7 +168,7 @@ export default function ReceiptReviewPanel({
               className="h-auto"
             />
           </div>
-          <div className="min-w-0 space-y-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-3 lg:scrollbar-gutter-stable">
+          <div className="@container min-w-0 space-y-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-3 lg:scrollbar-gutter-stable">
             <p className="text-sm leading-relaxed text-muted">
               {t("pages.import.advanced.hint")}
             </p>

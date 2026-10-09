@@ -125,7 +125,7 @@
         "items": "Items",
         "addItem": "Add item",
         "itemNumber": "Item {{number}}",
-        "rawName": "Name on receipt",
+        "rawName": "Receipt text",
         "lineType": "Line type",
         "lineTypes": {
           "product": "Product",
@@ -172,7 +172,7 @@
         "discounts": "Discounts",
         "addDiscount": "Add discount",
         "removeDiscount": "Remove discount",
-        "discountRawName": "Discount text on receipt",
+        "discountRawName": "Receipt text",
         "discountDescription": "Description",
         "discountAmount": "Discount amount",
         "appliesTo": "Applies to",
@@ -318,6 +318,12 @@
         "action": "Discard import",
         "discarding": "Discarding import …",
         "back": "Back"
+      },
+      "replaceReview": {
+        "title": "Replace receipt data?",
+        "message": "Changing the scan or processing it again will discard your manual edits. Do you want to continue?",
+        "confirm": "Discard changes",
+        "cancel": "Keep changes"
       }
     },
     "receipts": {
@@ -509,7 +515,7 @@
       "total": "Total",
       "items": "Items",
       "unitPrice": "Unit price",
-      "rawName": "Name on receipt",
+      "rawName": "Receipt text",
       "brandName": "Brand",
       "productGroupName": "Product group",
       "packageAmount": "Package amount",
