@@ -56,14 +56,14 @@ export default function ReviewItemEditor({
     })),
   ];
   return (
-    <article className="min-w-0 space-y-3 rounded-xl border border-shell bg-canvas/25 p-4">
+    <article className="min-w-0 space-y-3 rounded-xl border border-shell bg-canvas/25 p-3 @min-[30rem]:p-4">
       <h4 tabIndex={-1} ref={heading} className="text-sm font-semibold">
         {t("pages.import.review.itemNumber", { number: index + 1 })}
       </h4>
       <h5 className="text-xs font-semibold text-muted">
         {t("pages.import.review.basicData")}
       </h5>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.6fr)]">
+      <div className="grid gap-3 @min-[30rem]:grid-cols-[minmax(0,1fr)_minmax(0,0.6fr)]">
         <TextField
           ref={name}
           label={t(
@@ -111,7 +111,7 @@ export default function ReviewItemEditor({
       <h5 className="text-xs font-semibold text-muted">
         {t("pages.import.review.quantityAndPrice")}
       </h5>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 @min-[30rem]:grid-cols-4">
         <TextField
           label={t("pages.import.review.quantity")}
           inputMode="decimal"

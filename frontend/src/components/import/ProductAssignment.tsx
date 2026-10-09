@@ -176,7 +176,7 @@ export default function ProductAssignment({
             ))}
           </dl>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 @min-[30rem]:grid-cols-2">
             <TextField
               label={t("pages.import.review.brandName")}
               value={item.brand}

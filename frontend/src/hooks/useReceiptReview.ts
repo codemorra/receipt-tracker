@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { hasReviewChanges } from "../review/review-changes";
 import type { LookupOption, ReviewErrorCode } from "../api/review-api";
 import {
   createReviewDraft,
@@ -23,7 +24,8 @@ import {
  * @returns An object containing the draft, issues, sum status, notice, and various action functions.
  */
 export function useReceiptReview(review: ReviewDto) {
-  const [draft, setDraft] = useState(() => createReviewDraft(review));
+  const [original] = useState(() => createReviewDraft(review));
+  const [draft, setDraft] = useState(original);
   const [notice, setNotice] = useState<{
     id: number;
     code: ReviewErrorCode;
@@ -199,6 +201,7 @@ export function useReceiptReview(review: ReviewDto) {
   }
   return {
     draft,
+    changed: hasReviewChanges(original, draft),
     issues: reviewIssues(draft),
     sumStatus: reviewSumStatus(draft),
     notice,
