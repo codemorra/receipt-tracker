@@ -46,7 +46,8 @@ export function createReviewDto(
 ): ReviewDto {
   const merchantMatch = matchMerchant(
     db,
-    extraction.merchant.rawName ?? extraction.merchant.normalizedName,
+    extraction.merchant.rawName,
+    extraction.merchant.normalizedName,
   );
   const items = extraction.items.map((item) => ({
     ...item,

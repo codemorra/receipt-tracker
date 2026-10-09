@@ -48,13 +48,20 @@ export default function ReceiptReviewPanel({
     controller.draft,
     onSaved,
     onBusyChange,
+    (candidates) =>
+      controller.updateReceipt({
+        merchantCandidates: candidates,
+        merchantMatchStatus: "SUGGESTED",
+      }),
   );
   const [modal, setModal] = useState<"advanced" | "duplicates" | null>(null);
   const busy = confirmation.busy !== null || locked;
   const invalid = controller.issues.length > 0;
   const duplicateCount = confirmation.candidates.length;
   async function save() {
-    if ((await confirmation.save()) === "duplicates") setModal("duplicates");
+    const result = await confirmation.save();
+    if (result === "duplicates") setModal("duplicates");
+    if (result === "merchant_selection_required") setModal("advanced");
   }
   const secondary =
     "cursor-pointer rounded-xl border border-shell px-4 py-2.5 text-sm hover:bg-surface-hover disabled:cursor-default disabled:opacity-50";

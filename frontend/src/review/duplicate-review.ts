@@ -17,6 +17,9 @@ export interface DuplicateReview {
 export function duplicateIdentity(draft: ReviewDraft): string {
   return JSON.stringify([
     draft.merchantId,
+    ...(draft.merchantId === null
+      ? [draft.merchantName, draft.merchantRawName]
+      : []),
     draft.purchaseDate,
     draft.purchaseTime || null,
     parseCents(draft.total),

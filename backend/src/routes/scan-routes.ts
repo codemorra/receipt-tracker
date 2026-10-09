@@ -15,6 +15,7 @@ import {
   ConfirmedEntityNotFoundError,
   DuplicateConfirmationRequiredError,
   ScanArchiveNotFoundError,
+  MerchantSelectionRequiredError,
 } from "../receipts/receipt-errors.js";
 import {
   WorkerRequestError,
@@ -215,6 +216,11 @@ export function registerScanRoutes(
           response.status(404).json({ error: "scan_archive_not_found" });
         } else if (error instanceof ConfirmedEntityNotFoundError) {
           response.status(409).json({ error: "confirmed_entity_not_found" });
+        } else if (error instanceof MerchantSelectionRequiredError) {
+          response.status(409).json({
+            error: "merchant_selection_required",
+            candidates: error.candidates,
+          });
         } else if (error instanceof DuplicateConfirmationRequiredError) {
           response.status(409).json({
             error: "duplicate_confirmation_required",

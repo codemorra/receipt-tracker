@@ -290,6 +290,7 @@
           "invalid_final_save": "Die Angaben konnten nicht gespeichert werden. Prüfe die Belegdaten.",
           "scan_archive_not_found": "Das Archivbild fehlt. Verarbeite den Beleg erneut.",
           "confirmed_entity_not_found": "Ein ausgewählter Eintrag ist nicht mehr vorhanden. Prüfe die Zuordnungen.",
+          "merchant_selection_required": "Die Händlerzuordnung ist mehrdeutig oder widersprüchlich. Wähle einen bestehenden Händler aus.",
           "receipt_save_failed": "Der Beleg konnte nicht gespeichert werden. Versuche es erneut.",
           "receipt_not_found": "Der gespeicherte Beleg wurde nicht gefunden.",
           "receipt_detail_failed": "Der gespeicherte Beleg konnte nicht geladen werden. Versuche es erneut.",

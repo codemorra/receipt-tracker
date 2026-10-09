@@ -821,7 +821,68 @@ test("duplicate review requires an explicit decision, invalidates stale candidat
   assert.deepEqual(draft, original);
 });
 
+// Tests for merchant name and alias edits affecting duplicate approval.
+test("merchant name and alias edits invalidate duplicate approval before an ID is selected", () => {
+  const draft = { ...createReviewDraft(review), merchantId: null };
+  const approved = confirmDuplicateReview(draft, {
+    identity: duplicateIdentity(draft),
+    candidates: [duplicate],
+  });
+  assert.equal(duplicateReviewDecision(draft, approved).action, "override");
+  for (const changes of [
+    { merchantName: "Demo Store" },
+    { merchantRawName: "T+ST MARKET" },
+    { merchantId: 9 },
+  ]) {
+    assert.deepEqual(
+      duplicateReviewDecision({ ...draft, ...changes }, approved),
+      {
+        action: "save",
+        candidates: [],
+      },
+    );
+  }
+  const selected = { ...draft, merchantId: 9 };
+  assert.equal(
+    duplicateIdentity(selected),
+    duplicateIdentity({
+      ...selected,
+      merchantName: "Demo Store",
+      merchantRawName: "T+ST MARKET",
+    }),
+  );
+});
+
 // Tests for classification of save errors and handling of broken duplicate payloads.
+test("confirmation returns merchant selection conflicts and rejects malformed candidates", async (t) => {
+  const candidates = [
+    { merchantId: 1, name: "Test Market" },
+    { merchantId: 2, name: "Demo Store" },
+  ];
+  let value = { error: "merchant_selection_required", candidates };
+  t.mock.method(globalThis, "fetch", async () =>
+    Response.json(value, { status: 409 }),
+  );
+  const payload = buildFinalSaveDto(createReviewDraft(review));
+  assert.deepEqual(await confirmReceipt(scanId, payload), {
+    kind: "merchant_selection_required",
+    candidates,
+  });
+  for (const invalid of [
+    [],
+    null,
+    [{ merchantId: -1, name: "Test Market" }],
+    [{ merchantId: 1, name: "" }],
+    [{ merchantId: 1 }],
+    [null],
+  ]) {
+    value = { error: "merchant_selection_required", candidates: invalid };
+    await assert.rejects(confirmReceipt(scanId, payload), {
+      code: "unexpected_response",
+    });
+  }
+});
+
 test("confirmation classifies save errors and rejects broken duplicate payloads without leaking server details", async (t) => {
   let response = () => Response.json({ receiptId: 7 }, { status: 201 });
   t.mock.method(globalThis, "fetch", async () => response());

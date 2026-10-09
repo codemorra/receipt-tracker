@@ -22,8 +22,10 @@ export function persistReceipt(
   imagePath: string,
 ): number {
   return db.transaction((tx) => {
-    const candidates = findDuplicateCandidates(db, {
-      merchantId: receipt.merchant.id,
+    const now = new Date().toISOString();
+    const merchantId = resolveMerchant(tx, receipt.merchant, now);
+    const candidates = findDuplicateCandidates(tx, {
+      merchantId,
       purchaseDate: receipt.purchaseDate,
       purchaseTime: receipt.purchaseTime,
       totalCents: receipt.totalCents,
@@ -31,8 +33,6 @@ export function persistReceipt(
     if (candidates.length > 0 && receipt.duplicateOverride !== true) {
       throw new DuplicateConfirmationRequiredError(candidates);
     }
-    const now = new Date().toISOString();
-    const merchantId = resolveMerchant(tx, receipt.merchant, now);
     learnMerchantAlias(tx, merchantId, receipt.merchant.rawName, now);
     const receiptId = tx
       .insert(receipts)

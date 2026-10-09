@@ -290,6 +290,7 @@
           "invalid_final_save": "The data could not be saved. Check the receipt details.",
           "scan_archive_not_found": "The archive image is missing. Process the receipt again.",
           "confirmed_entity_not_found": "A selected entry no longer exists. Check the associations.",
+          "merchant_selection_required": "The merchant evidence is ambiguous or conflicting. Select an existing merchant.",
           "receipt_save_failed": "The receipt could not be saved. Try again.",
           "receipt_not_found": "The saved receipt was not found.",
           "receipt_detail_failed": "The saved receipt could not be loaded. Try again.",
