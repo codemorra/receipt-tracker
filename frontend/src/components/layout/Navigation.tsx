@@ -1,11 +1,16 @@
 import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { sections, type Route, type Section } from "../../routes/routing";
+import {
+  sections,
+  type Route,
+  type Section,
+  type NavigationTarget,
+} from "../../routes/routing";
 
 // Props for the Navigation component.
 interface Props {
   route: Route;
-  navigate: (section: Section) => void;
+  navigate: (section: NavigationTarget) => void;
 }
 
 /**
@@ -47,7 +52,7 @@ export default function Navigation({ route, navigate }: Props) {
     <>
       <a
         className="flex items-center gap-3 px-3 text-base font-semibold no-underline"
-        href="/import"
+        href="/"
         onClick={(event) => {
           if (
             event.button !== 0 ||
@@ -58,7 +63,7 @@ export default function Navigation({ route, navigate }: Props) {
           )
             return;
           event.preventDefault();
-          navigate("import");
+          navigate("home");
         }}
       >
         <span

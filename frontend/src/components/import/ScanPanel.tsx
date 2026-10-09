@@ -5,6 +5,7 @@ import type { AiSettings, ProviderId } from "../../api/provider-settings-api";
 import type { ScanErrorCode } from "../../api/scan-api";
 import Card from "../ui/Card";
 import Select from "../ui/Select";
+import Dropdown from "../ui/Dropdown";
 import UploadDropzone from "./UploadDropzone";
 import ScanFrame from "./ScanFrame";
 
@@ -72,97 +73,175 @@ export default function ScanPanel({
       aria-busy={busy !== null || locked}
       inert={locked}
     >
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 id={`${id}-heading`} className="text-lg font-semibold">
           {t("pages.import.scan.title")}
         </h2>
-        {scan && corners && !archive && (
-          <div className="ml-auto flex flex-wrap justify-end gap-2">
-            <>
-              <button
-                type="button"
-                disabled={busy !== null || failed}
-                onClick={() =>
-                  dispatch({
-                    type: "corners",
-                    corners: {
-                      topLeft: [0, 0],
-                      topRight: [1, 0],
-                      bottomRight: [1, 1],
-                      bottomLeft: [0, 1],
-                    },
-                  })
-                }
-                className={secondary}
-              >
-                {t("pages.import.scan.fullImage")}
-              </button>
-              <button
-                type="button"
-                disabled={busy !== null || failed}
-                onClick={() => dispatch({ type: "receipt-frame" })}
-                className={secondary}
-              >
-                {t("pages.import.scan.receiptOnly")}
-              </button>
-              <button
-                type="button"
-                disabled={busy !== null || failed}
-                onClick={() => dispatch({ type: "rotate", turn: 270 })}
-                aria-label={t("pages.import.scan.rotateLeft")}
-                title={t("pages.import.scan.rotateLeft")}
-                className={`${secondary} flex items-center justify-center`}
-              >
-                <svg
-                  aria-hidden="true"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                disabled={busy !== null || failed}
-                onClick={() => dispatch({ type: "rotate", turn: 90 })}
-                aria-label={t("pages.import.scan.rotateRight")}
-                title={t("pages.import.scan.rotateRight")}
-                className={`${secondary} flex items-center justify-center`}
-              >
-                <svg
-                  aria-hidden="true"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="-scale-x-100"
-                >
-                  <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
-                </svg>
-              </button>
-            </>
-            {processed && editing && (
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                className={secondary}
-              >
-                {t("pages.import.scan.showArchive")}
-              </button>
-            )}
-          </div>
+        {archive && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => setEditing(true)}
+            className={secondary}
+          >
+            {t("pages.import.scan.edit")}
+          </button>
         )}
       </div>
+      {scan && corners && !archive && (
+        <div className="mb-5 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="w-full min-w-0 sm:w-52 sm:grow sm:basis-52 sm:max-w-72">
+              <Select
+                compact
+                label={t("pages.import.scan.provider")}
+                value={provider ?? ""}
+                disabled={busy !== null || loadingProviders}
+                onChange={(value) =>
+                  onProvider(value ? (value as ProviderId) : null)
+                }
+                options={[
+                  ...(!provider
+                    ? [
+                        {
+                          value: "",
+                          label: t("pages.import.scan.chooseProvider"),
+                        },
+                      ]
+                    : []),
+                  ...available.map((entry) => ({
+                    value: entry.provider,
+                    label: `${t(`providerSettings.names.${entry.provider}`)} · ${entry.model}`,
+                  })),
+                ]}
+              />
+            </div>
+            <div className="flex w-full max-w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:flex-nowrap">
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy !== null || failed}
+                  onClick={() => dispatch({ type: "rotate", turn: 270 })}
+                  aria-label={t("pages.import.scan.rotateLeft")}
+                  title={t("pages.import.scan.rotateLeft")}
+                  className={`${secondary} flex items-center justify-center`}
+                >
+                  <svg
+                    aria-hidden="true"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  disabled={busy !== null || failed}
+                  onClick={() => dispatch({ type: "rotate", turn: 90 })}
+                  aria-label={t("pages.import.scan.rotateRight")}
+                  title={t("pages.import.scan.rotateRight")}
+                  className={`${secondary} flex items-center justify-center`}
+                >
+                  <svg
+                    aria-hidden="true"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="-scale-x-100"
+                  >
+                    <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
+                  </svg>
+                </button>
+
+                <Dropdown
+                  label={t("pages.import.scan.selection")}
+                  groupLabel={t("pages.import.scan.selection")}
+                  disabled={busy !== null || failed}
+                  triggerClassName="flex items-center gap-2 px-3 py-2.5 text-sm"
+                  panelClassName="w-max min-w-40 max-w-[calc(100vw-3rem)] p-2"
+                  trigger={
+                    <>
+                      {t("pages.import.scan.selection")}
+                      <span aria-hidden="true">⌄</span>
+                    </>
+                  }
+                >
+                  <button
+                    type="button"
+                    disabled={busy !== null || failed}
+                    onClick={() =>
+                      dispatch({
+                        type: "corners",
+                        corners: {
+                          topLeft: [0, 0],
+                          topRight: [1, 0],
+                          bottomRight: [1, 1],
+                          bottomLeft: [0, 1],
+                        },
+                      })
+                    }
+                    className="block w-full rounded-lg px-3 py-2.5 text-left text-sm hover:bg-surface-hover disabled:opacity-50"
+                  >
+                    {t("pages.import.scan.fullImage")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy !== null || failed}
+                    onClick={() => dispatch({ type: "receipt-frame" })}
+                    className="block w-full rounded-lg px-3 py-2.5 text-left text-sm hover:bg-surface-hover disabled:opacity-50"
+                  >
+                    {t("pages.import.scan.receiptOnly")}
+                  </button>
+                </Dropdown>
+              </div>
+              <button
+                type="button"
+                disabled={
+                  busy !== null || loadingProviders || !canProcess || failed
+                }
+                onClick={() => {
+                  if (provider) {
+                    setEditing(false);
+                    onProcess(provider);
+                  }
+                }}
+                className="inline-flex grow items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-surface hover:bg-accent-hover disabled:opacity-45 sm:grow-0"
+              >
+                {t(
+                  busy === "process"
+                    ? "pages.import.scan.processing"
+                    : "pages.import.scan.process",
+                )}
+              </button>
+            </div>
+          </div>
+          {processed && editing && (
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className={secondary}
+            >
+              {t("pages.import.scan.showArchive")}
+            </button>
+          )}
+          {!loadingProviders && available.length === 0 && (
+            <p className="text-xs leading-relaxed text-muted">
+              {t("pages.import.scan.noProviders")}
+            </p>
+          )}
+        </div>
+      )}
       {!scan ? (
         <>
           <UploadDropzone
@@ -218,83 +297,6 @@ export default function ScanPanel({
                 }}
               />
             )}
-            <div
-              className={archive ? "mt-4" : "mt-6 border-t border-shell pt-5"}
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                {!archive && (
-                  <div className="min-w-0 sm:w-56 sm:max-w-[55%]">
-                    <p className="mb-2 text-sm font-medium">
-                      {t("pages.import.scan.provider")}
-                    </p>
-                    <Select
-                      label={t("pages.import.scan.provider")}
-                      value={provider ?? ""}
-                      disabled={busy !== null || loadingProviders}
-                      onChange={(value) =>
-                        onProvider(value ? (value as ProviderId) : null)
-                      }
-                      options={[
-                        ...(!provider
-                          ? [
-                              {
-                                value: "",
-                                label: t("pages.import.scan.chooseProvider"),
-                              },
-                            ]
-                          : []),
-                        ...available.map((entry) => ({
-                          value: entry.provider,
-                          label: `${t(`providerSettings.names.${entry.provider}`)} · ${entry.model}`,
-                        })),
-                      ]}
-                    />
-                  </div>
-                )}
-                <button
-                  type="button"
-                  disabled={
-                    busy !== null ||
-                    (!archive && (loadingProviders || !canProcess || failed))
-                  }
-                  onClick={() => {
-                    if (archive) {
-                      setEditing(true);
-                    } else if (provider) {
-                      setEditing(false);
-                      onProcess(provider);
-                    }
-                  }}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-surface hover:bg-accent-hover disabled:opacity-45"
-                >
-                  {archive && (
-                    <svg
-                      aria-hidden="true"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="m12 5-7 7 7 7M5 12h14" />
-                    </svg>
-                  )}
-                  {archive
-                    ? t("pages.import.scan.edit")
-                    : busy === "process"
-                      ? t("pages.import.scan.processing")
-                      : t("pages.import.scan.process")}
-                </button>
-              </div>
-              {!archive && !loadingProviders && available.length === 0 && (
-                <p className="mt-3 text-xs leading-relaxed text-muted">
-                  {t("pages.import.scan.noProviders")}
-                </p>
-              )}
-            </div>
           </>
         )
       )}

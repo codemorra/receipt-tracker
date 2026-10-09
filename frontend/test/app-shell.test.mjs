@@ -79,7 +79,9 @@ test("system theme follows OS changes while explicit modes stay fixed", () => {
 
 // Tests for route resolution and handling of direct shell routes, root, and trailing slashes.
 test("direct shell routes, root, and trailing slashes resolve consistently", () => {
-  assert.equal(resolveRoute("/", ""), "import");
+  assert.equal(resolveRoute("/", ""), "home");
+  assert.equal(resolveRoute("/", "?receiptId=invalid"), "home");
+  assert.ok(!sections.includes("home"));
   for (const section of sections) {
     assert.equal(resolveRoute(`/${section}`, ""), section);
     assert.equal(resolveRoute(`/${section}/`, "?unrelated=1"), section);

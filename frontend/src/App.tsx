@@ -2,12 +2,17 @@ import { useEffect, useState } from "react";
 import AppShell from "./components/layout/AppShell";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
+import HomePage from "./pages/HomePage";
 import ImportPage from "./pages/ImportPage";
 import SavedReceiptPage from "./pages/SavedReceiptPage";
 import ReceiptsPage from "./pages/ReceiptsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import WarrantiesPage from "./pages/WarrantiesPage";
-import { receiptIdFromSearch, resolveRoute } from "./routes/routing";
+import {
+  receiptIdFromSearch,
+  resolveRoute,
+  type NavigationTarget,
+} from "./routes/routing";
 import "./App.css";
 
 // Main application component.
@@ -27,6 +32,11 @@ function App() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  /**
+   * Navigates to the specified URL within the application.
+   * @param url - The target URL to navigate to.
+   */
   function navigateTo(url: string) {
     window.history.pushState(null, "", url);
     setLocation({
@@ -34,13 +44,20 @@ function App() {
       search: window.location.search,
     });
   }
-  function navigate(section: string) {
-    navigateTo(`/${section}`);
+
+  /**
+   * Navigates to the specified section within the application.
+   * @param section - The target section to navigate to.
+   */
+  function navigate(section: NavigationTarget) {
+    navigateTo(section === "home" ? "/" : `/${section}`);
   }
 
   return (
     <AppShell route={route} navigate={navigate}>
-      {route === "settings" ? (
+      {route === "home" ? (
+        <HomePage navigate={navigate} />
+      ) : route === "settings" ? (
         <SettingsPage />
       ) : route === "import" ? (
         receiptId !== null ? (
