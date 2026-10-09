@@ -7,6 +7,7 @@ import { createDatabase } from "../src/db/database.js";
 import type { ReceiptExtraction } from "../src/extraction/receipt-extraction.js";
 import { matchMerchant } from "../src/matching/merchant-matcher.js";
 import { matchProduct } from "../src/matching/product-matcher.js";
+import { createReviewDto } from "../src/review/review-dto.js";
 
 // Current timestamp used for created_at and updated_at fields in test fixtures.
 const now = "2026-09-29T00:00:00.000Z";
@@ -131,6 +132,66 @@ test("merchant canonical names are suggestions without a confirmed alias", (t) =
   t.after(data.cleanup);
   data.addMerchant("Testmühle");
   assert.equal(matchMerchant(data.db, "TESTMUEHLE").status, "SUGGESTED");
+});
+
+// Tests for review behavior when correcting OCR-detected merchant names.
+test("review suggests the corrected canonical merchant for an unknown OCR alias", (t) => {
+  const data = fixture();
+  t.after(data.cleanup);
+  const merchantId = data.addMerchant("Test Market", "test market");
+  const review = createReviewDto(
+    data.db,
+    { scanId: "test-scan", archiveUrl: "/test-archive" },
+    {
+      merchant: { rawName: "T+ST MARKET", normalizedName: "Test Market" },
+      purchaseDate: null,
+      purchaseTime: null,
+      currency: null,
+      totalCents: null,
+      items: [],
+      discounts: [],
+    },
+  );
+  assert.deepEqual(review.merchant.match, {
+    status: "SUGGESTED",
+    merchantId: null,
+    candidates: [{ merchantId, name: "Test Market" }],
+  });
+  assert.equal(
+    matchMerchant(data.db, "TEST MARKET", "Test Market").status,
+    "MATCHED",
+  );
+  assert.equal(matchMerchant(data.db, null, "Test Market").status, "MATCHED");
+  assert.equal(
+    matchMerchant(data.db, "T+ST MARKET", "Test Markets").status,
+    "NEW",
+  );
+});
+
+// Tests for review behavior when there is ambiguous or conflicting merchant evidence.
+test("review never confirms ambiguous or conflicting merchant evidence", (t) => {
+  const data = fixture();
+  t.after(data.cleanup);
+  const first = data.addMerchant("Test Market", "t st market");
+  const second = data.addMerchant("Demo Store");
+  assert.deepEqual(matchMerchant(data.db, "T+ST MARKET", "Demo Store"), {
+    status: "SUGGESTED",
+    merchantId: null,
+    candidates: [
+      { merchantId: first, name: "Test Market" },
+      { merchantId: second, name: "Demo Store" },
+    ],
+  });
+  data.addMerchant("TEST-MARKET");
+  assert.equal(
+    matchMerchant(data.db, "T+ST MARKET", "Test Market").merchantId,
+    null,
+  );
+  data.addMerchant("Shared Market", "t st market");
+  assert.equal(
+    matchMerchant(data.db, "T+ST MARKET", "Demo Store").merchantId,
+    null,
+  );
 });
 
 // Tests for product alias matching, including handling of conflicting brands and package information.

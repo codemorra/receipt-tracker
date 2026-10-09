@@ -41,7 +41,7 @@ export default function ReceiptHeaderEditor({
         ).format(cents / 100);
   return (
     <details
-      open={expanded || invalid}
+      open={expanded || invalid || draft.merchantMatchStatus === "SUGGESTED"}
       onToggle={(event) => setExpanded(event.currentTarget.open)}
       className="rounded-xl border border-shell p-4"
     >

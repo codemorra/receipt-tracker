@@ -63,7 +63,7 @@ function minutesFromMidnight(time: string | null): number | null {
  * @returns An array of potential duplicate receipt candidates.
  */
 export function findDuplicateCandidates(
-  db: Database,
+  db: Pick<Database, "select">,
   input: DuplicateSearchInput,
 ): DuplicateCandidate[] {
   if (

@@ -29,6 +29,7 @@ export function useReceiptConfirmation(
   draft: ReviewDraft,
   onSaved: (id: number) => void,
   onBusyChange: (busy: boolean) => void,
+  onMerchantConflict: (candidates: ReviewDraft["merchantCandidates"]) => void,
 ) {
   const [duplicates, setDuplicates] = useState<DuplicateReview>(() => ({
     identity: duplicateIdentity(draft),
@@ -99,6 +100,14 @@ export function useReceiptConfirmation(
         signal,
       );
       if (signal.aborted) return;
+      if (result.kind === "merchant_selection_required") {
+        onMerchantConflict(result.candidates);
+        setNotice({
+          id: ++sequence.current,
+          code: "merchant_selection_required",
+        });
+        return "merchant_selection_required" as const;
+      }
       if (result.kind === "duplicates") {
         setDuplicates({ identity, candidates: result.candidates });
         return "duplicates" as const;

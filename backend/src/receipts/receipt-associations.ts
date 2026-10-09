@@ -7,12 +7,16 @@ import {
   productGroups,
   products,
 } from "../db/schema.js";
-import { ConfirmedEntityNotFoundError } from "./receipt-errors.js";
+import {
+  ConfirmedEntityNotFoundError,
+  MerchantSelectionRequiredError,
+} from "./receipt-errors.js";
+import { findMerchantEvidence } from "../matching/merchant-evidence.js";
 import type { FinalSaveDto } from "./final-save.js";
 import { normalizedPackage } from "../matching/package-normalizer.js";
 
 /**
- * Resolves a merchant by ID or creates a new one if it doesn't exist.
+ * Respects explicit IDs, resolves exact evidence, and creates only unknown merchants.
  * @param tx - The database transaction.
  * @param merchant - The merchant information from the final save DTO.
  * @param now - The current timestamp.
@@ -33,6 +37,11 @@ export function resolveMerchant(
     if (!existing) throw new ConfirmedEntityNotFoundError("Merchant not found");
     return existing.id;
   }
+  const evidence = findMerchantEvidence(tx, merchant.rawName, merchant.name);
+  if (evidence.conflict)
+    throw new MerchantSelectionRequiredError(evidence.candidates);
+  const existing = evidence.aliases[0] ?? evidence.names[0];
+  if (existing) return existing.merchantId;
   return tx
     .insert(merchants)
     .values({ name: merchant.name, createdAt: now, updatedAt: now })

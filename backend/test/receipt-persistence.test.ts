@@ -26,6 +26,7 @@ import {
   ConfirmedEntityNotFoundError,
   DuplicateConfirmationRequiredError,
   ScanArchiveNotFoundError,
+  MerchantSelectionRequiredError,
 } from "../src/receipts/receipt-errors.js";
 import { ScanSessionService } from "../src/scans/scan-session-service.js";
 
@@ -233,6 +234,184 @@ test("save persists confirmed entities, aliases, receipt rows, warranty, and arc
   );
 });
 
+// Tests for merchant identity resolution and handling of OCR variants.
+test("merchant identity reuses OCR variants while keeping different confirmed names separate", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const input = (name: string, rawName: string, purchaseDate: string) => ({
+    ...validReceipt,
+    merchant: { id: null, name, rawName },
+    purchaseDate,
+    items: [
+      {
+        ...validReceipt.items[0],
+        rawName: "Product Alpha",
+        productName: "Product Alpha",
+        productGroupName: "test products",
+        warranties: [],
+      },
+    ],
+  });
+  const first = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    data.scanId,
+    input("Test Market", "TEST MARKET", "2026-10-01"),
+  );
+  const second = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    await data.createScan(),
+    input("TEST-MARKET", "T+ST MARKET", "2026-10-02"),
+  );
+  const firstDetail = loadReceiptDetail(data.db, first)!;
+  assert.equal(
+    loadReceiptDetail(data.db, second)!.merchantId,
+    firstDetail.merchantId,
+  );
+  assert.deepEqual(
+    data.sqlite.prepare("SELECT COUNT(*) AS count FROM merchant").get(),
+    { count: 1 },
+  );
+  assert.deepEqual(
+    data.sqlite
+      .prepare(
+        "SELECT merchant_id AS merchantId, normalized_alias AS alias FROM merchant_alias ORDER BY id",
+      )
+      .all(),
+    [
+      { merchantId: firstDetail.merchantId, alias: "test market" },
+      { merchantId: firstDetail.merchantId, alias: "t st market" },
+    ],
+  );
+  const third = await saveReceipt(
+    data.db,
+    data.scans,
+    data.dataRoot,
+    await data.createScan(),
+    input("Demo Store", "DEMO STORE", "2026-10-03"),
+  );
+  assert.notEqual(
+    loadReceiptDetail(data.db, third)!.merchantId,
+    firstDetail.merchantId,
+  );
+  assert.deepEqual(
+    data.sqlite.prepare("SELECT COUNT(*) AS count FROM merchant").get(),
+    { count: 2 },
+  );
+});
+
+// Tests for handling merchant ambiguity and conflicting evidence during receipt persistence.
+test("merchant ambiguity and conflicting evidence require a selection without persisting changes", async (t) => {
+  for (const scenario of [
+    "canonical ambiguity",
+    "alias ambiguity",
+    "conflicting evidence",
+    "explicit selection",
+    "unique alias",
+  ] as const) {
+    await t.test(scenario, async (t) => {
+      const data = await fixture();
+      t.after(data.cleanup);
+      const insert = (name: string) =>
+        Number(
+          data.sqlite
+            .prepare(
+              "INSERT INTO merchant (name, created_at, updated_at) VALUES (?, 'test', 'test')",
+            )
+            .run(name).lastInsertRowid,
+        );
+      const first = insert("Test Market");
+      const second = insert(
+        scenario === "canonical ambiguity" ? "TEST-MARKET" : "Demo Store",
+      );
+      data.db.transaction((tx) =>
+        learnMerchantAlias(tx, first, "T+ST MARKET", "test"),
+      );
+      if (scenario === "alias ambiguity")
+        data.db.transaction((tx) =>
+          learnMerchantAlias(tx, second, "T+ST MARKET", "test"),
+        );
+      const input = {
+        ...validReceipt,
+        merchant: {
+          id: scenario === "explicit selection" ? second : null,
+          name:
+            scenario === "conflicting evidence"
+              ? "Demo Store"
+              : scenario === "unique alias"
+                ? "Unknown Heading"
+                : "Test Market",
+          rawName: "T+ST MARKET",
+        },
+      };
+      const before = data.sqlite
+        .prepare("SELECT * FROM merchant_alias ORDER BY id")
+        .all();
+      if (scenario === "explicit selection" || scenario === "unique alias") {
+        const id = await saveReceipt(
+          data.db,
+          data.scans,
+          data.dataRoot,
+          data.scanId,
+          input,
+        );
+        assert.equal(
+          loadReceiptDetail(data.db, id)!.merchantId,
+          scenario === "explicit selection" ? second : first,
+        );
+        assert.deepEqual(
+          data.sqlite.prepare("SELECT COUNT(*) AS count FROM merchant").get(),
+          { count: 2 },
+        );
+        assert.deepEqual(
+          data.sqlite
+            .prepare(
+              "SELECT * FROM merchant_alias WHERE merchant_id = ? ORDER BY id",
+            )
+            .all(first),
+          before,
+        );
+        return;
+      }
+      await assert.rejects(
+        saveReceipt(data.db, data.scans, data.dataRoot, data.scanId, input),
+        (error: unknown) => {
+          assert.ok(error instanceof MerchantSelectionRequiredError);
+          assert.deepEqual(
+            new Set(error.candidates.map((row) => row.merchantId)),
+            new Set([first, second]),
+          );
+          return true;
+        },
+      );
+      assert.deepEqual(
+        data.sqlite.prepare("SELECT COUNT(*) AS count FROM merchant").get(),
+        { count: 2 },
+      );
+      assert.deepEqual(
+        data.sqlite.prepare("SELECT * FROM merchant_alias ORDER BY id").all(),
+        before,
+      );
+      for (const table of [
+        "receipt",
+        "product",
+        "receipt_item",
+        "discount",
+        "warranty",
+      ])
+        assert.deepEqual(
+          data.sqlite.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(),
+          { count: 0 },
+        );
+      assert.deepEqual(await readdir(join(data.dataRoot, "receipts")), []);
+      assert.ok(await data.scans.archivePath(data.scanId));
+    });
+  }
+});
+
 // Test for ensuring that identical new products share an ID while retaining receipt items and aliases.
 test("identical new products share an ID while retaining receipt items and aliases", async (t) => {
   for (const rawNames of [
@@ -415,6 +594,7 @@ test("explicit product IDs and new products stay distinct across saves", async (
       finalSaveSchema.parse({
         ...validReceipt,
         items,
+        duplicateOverride: true,
       }),
       "receipts/test.webp",
     );
@@ -602,7 +782,74 @@ test("missing scan archive does not create receipt data", async (t) => {
   );
 });
 
-// Test case for verifying that the confirm API validates requests and returns a saved receipt image
+// Tests for the confirm API, including handling of merchant candidates and explicit selections.
+test("confirm API returns merchant candidates and accepts a subsequent explicit selection", async (t) => {
+  const data = await fixture();
+  t.after(data.cleanup);
+  const insert = (name: string) =>
+    Number(
+      data.sqlite
+        .prepare(
+          "INSERT INTO merchant (name, created_at, updated_at) VALUES (?, 'test', 'test')",
+        )
+        .run(name).lastInsertRowid,
+    );
+  const first = insert("Test Market");
+  const second = insert("Demo Store");
+  data.db.transaction((tx) =>
+    learnMerchantAlias(tx, first, "T+ST MARKET", "test"),
+  );
+  const app = createApp(
+    data.scans,
+    data.db,
+    () => ({
+      async extractReceipt() {
+        throw new Error("unused");
+      },
+    }),
+    data.dataRoot,
+  );
+  const server = app.listen(0);
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const confirm = (id: number | null) =>
+    fetch(`http://127.0.0.1:${address.port}/api/scans/${data.scanId}/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...validReceipt,
+        merchant: { id, name: "Demo Store", rawName: "T+ST MARKET" },
+      }),
+    });
+  const conflict = await confirm(null);
+  assert.equal(conflict.status, 409);
+  assert.deepEqual(await conflict.json(), {
+    error: "merchant_selection_required",
+    candidates: [
+      { merchantId: first, name: "Test Market" },
+      { merchantId: second, name: "Demo Store" },
+    ],
+  });
+  assert.deepEqual(await readdir(join(data.dataRoot, "receipts")), []);
+  const saved = await confirm(second);
+  assert.equal(saved.status, 201);
+  const { receiptId } = (await saved.json()) as { receiptId: number };
+  assert.equal(loadReceiptDetail(data.db, receiptId)!.merchantId, second);
+  assert.deepEqual(
+    data.sqlite.prepare("SELECT COUNT(*) AS count FROM merchant").get(),
+    { count: 2 },
+  );
+  assert.ok(
+    data.sqlite
+      .prepare(
+        "SELECT id FROM merchant_alias WHERE merchant_id = ? AND normalized_alias = ?",
+      )
+      .get(first, "t st market"),
+  );
+});
+
+// Tests for the confirm API, including validation and saving of receipt images.
 test("confirm API validates requests and returns a saved receipt image", async (t) => {
   const data = await fixture();
   t.after(data.cleanup);
@@ -744,24 +991,47 @@ test("final save requires an explicit override for a persisted duplicate", async
   );
 });
 
-// Test case for verifying that a new merchant without a confirmed match skips duplicate comparison
-test("new merchant without a confirmed match skips duplicate comparison", async (t) => {
+test("canonical merchant resolution detects duplicates and rolls back alias learning", async (t) => {
   const data = await fixture();
   t.after(data.cleanup);
-  await saveReceipt(
+  const firstId = await saveReceipt(
     data.db,
     data.scans,
     data.dataRoot,
     data.scanId,
     validReceipt,
   );
-  await saveReceipt(
-    data.db,
-    data.scans,
-    data.dataRoot,
-    await data.createScan(),
-    validReceipt,
+  const scanId = await data.createScan();
+  const duplicate = {
+    ...validReceipt,
+    merchant: { id: null, name: "Test Market", rawName: "T+ST MARKET" },
+  };
+  await assert.rejects(
+    saveReceipt(data.db, data.scans, data.dataRoot, scanId, duplicate),
+    (error: unknown) => {
+      assert.ok(error instanceof DuplicateConfirmationRequiredError);
+      assert.equal(error.candidates[0].receiptId, firstId);
+      return true;
+    },
   );
+  for (const table of ["merchant", "merchant_alias", "receipt", "product"]) {
+    assert.deepEqual(
+      data.sqlite.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(),
+      { count: 1 },
+    );
+  }
+  assert.equal((await readdir(join(data.dataRoot, "receipts"))).length, 1);
+  assert.equal(
+    await readFile(
+      join(data.dataRoot, "scans", scanId, "archive.webp"),
+      "utf8",
+    ),
+    "archive-image",
+  );
+  await saveReceipt(data.db, data.scans, data.dataRoot, scanId, {
+    ...duplicate,
+    duplicateOverride: true,
+  });
   assert.equal(
     (
       data.sqlite.prepare("SELECT COUNT(*) AS count FROM receipt").get() as {

@@ -12,6 +12,7 @@ export type ReceiptErrorCode =
   | "invalid_final_save"
   | "scan_archive_not_found"
   | "confirmed_entity_not_found"
+  | "merchant_selection_required"
   | "receipt_save_failed"
   | "receipt_not_found"
   | "receipt_detail_failed"
@@ -292,6 +293,10 @@ export async function confirmReceipt(
 ): Promise<
   | { kind: "saved"; receiptId: number }
   | { kind: "duplicates"; candidates: DuplicateCandidate[] }
+  | {
+      kind: "merchant_selection_required";
+      candidates: { merchantId: number; name: string }[];
+    }
 > {
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -308,6 +313,28 @@ export async function confirmReceipt(
   const value = await json(response);
   if (response.ok && record(value) && id(value.receiptId))
     return { kind: "saved", receiptId: value.receiptId as number };
+  if (
+    response.status === 409 &&
+    record(value) &&
+    value.error === "merchant_selection_required"
+  ) {
+    if (
+      !Array.isArray(value.candidates) ||
+      value.candidates.length === 0 ||
+      !value.candidates.every(
+        (candidate: unknown) =>
+          record(candidate) &&
+          id(candidate.merchantId) &&
+          typeof candidate.name === "string" &&
+          candidate.name.trim().length > 0,
+      )
+    )
+      throw new ReceiptApiError("unexpected_response");
+    return {
+      kind: "merchant_selection_required",
+      candidates: value.candidates as { merchantId: number; name: string }[],
+    };
+  }
   if (
     response.status === 409 &&
     record(value) &&
