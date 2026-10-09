@@ -1,4 +1,8 @@
-import { useId, type ComponentPropsWithoutRef } from "react";
+import {
+  useId,
+  type ComponentPropsWithoutRef,
+  type ComponentPropsWithRef,
+} from "react";
 import Select from "./Select";
 
 /**
@@ -11,7 +15,7 @@ export function TextField({
   label,
   className = "",
   ...props
-}: ComponentPropsWithoutRef<"input"> & { label: string }) {
+}: ComponentPropsWithRef<"input"> & { label: string }) {
   const id = useId();
   return (
     <div className={`min-w-0 space-y-1.5 ${className}`}>

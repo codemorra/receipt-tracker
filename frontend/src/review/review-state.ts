@@ -138,6 +138,21 @@ export interface DiscountDraft {
   sourceLineIndexes: number[];
 }
 
+/**
+ * Adds a warranty to an item draft if the item is of type "product".
+ * @param item - The item draft to which the warranty should be added.
+ * @param warranty - The warranty draft to add to the item.
+ * @returns The updated item draft with the new warranty added, or the original item if it is not a product.
+ */
+export function addItemWarranty(
+  item: ItemDraft,
+  warranty: WarrantyDraft,
+): ItemDraft {
+  return item.lineType === "product"
+    ? { ...item, warranties: [...item.warranties, warranty] }
+    : item;
+}
+
 // Draft representation of the entire review within the review process.
 export interface ReviewDraft {
   merchantRawName: string;

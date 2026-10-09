@@ -1,3 +1,11 @@
+import { useRef, useState } from "react";
+import {
+  selectedItemId,
+  selectionAfterRemoval,
+  toggleItemSelection,
+} from "../../review/item-selection";
+import { reviewDraftToSummary } from "../../receipts/receipt-summary";
+import ReviewItemList from "./ReviewItemList";
 import { useTranslation } from "react-i18next";
 import type { useReceiptReview } from "../../hooks/useReceiptReview";
 
@@ -67,6 +75,29 @@ export default function ReceiptReviewEditor({
   active: boolean;
 }) {
   const { t } = useTranslation();
+  const [selection, setSelection] = useState<string | null>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const [focusTarget, setFocusTarget] = useState<{
+    id: string;
+    field: "name" | "heading";
+  } | null>(null);
+  const selected = selectedItemId(controller.draft.items, selection);
+  const index = controller.draft.items.findIndex(
+    (item) => item.id === selected,
+  );
+  const item = controller.draft.items[index];
+  function addItem() {
+    const id = controller.addItem();
+    setSelection(id);
+    setFocusTarget({ id, field: "name" });
+  }
+  function removeItem(id: string) {
+    const next = selectionAfterRemoval(controller.draft.items, selected, id);
+    setSelection(next);
+    setFocusTarget(next ? { id: next, field: "heading" } : null);
+    controller.removeItem(id);
+    if (!next) addButton.current?.focus();
+  }
   const categories = useReviewLookup(
     "categories",
     "",
@@ -83,22 +114,48 @@ export default function ReceiptReviewEditor({
             {t("pages.import.review.items")}
           </h3>
           <button
+            ref={addButton}
             type="button"
-            onClick={controller.addItem}
+            onClick={addItem}
             className="rounded-lg border border-shell px-3 py-2 text-xs font-medium hover:bg-surface-hover"
           >
             {t("pages.import.review.addItem")}
           </button>
         </div>
-        {controller.draft.items.map((item, index) => (
-          <ReviewItemEditor
-            key={item.id}
-            item={item}
-            index={index}
-            categories={categories.options}
-            controller={controller}
+        {controller.draft.items.length > 0 ? (
+          <ReviewItemList
+            receipt={reviewDraftToSummary(controller.draft)}
+            selected={selected}
+            issues={controller.issues}
+            editor={
+              item ? (
+                <ReviewItemEditor
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  categories={categories.options}
+                  controller={controller}
+                  onRemove={removeItem}
+                  focusName={
+                    focusTarget?.id === item.id && focusTarget.field === "name"
+                  }
+                  focusHeading={
+                    focusTarget?.id === item.id &&
+                    focusTarget.field === "heading"
+                  }
+                />
+              ) : null
+            }
+            onSelect={(id) => {
+              setSelection((current) => toggleItemSelection(current, id));
+              setFocusTarget(null);
+            }}
           />
-        ))}
+        ) : (
+          <p className="text-sm text-muted">
+            {t("pages.import.review.noItems")}
+          </p>
+        )}
       </section>
       <hr className="border-shell" />
       <ReviewDiscountsEditor controller={controller} />

@@ -12,12 +12,6 @@ import { SelectField, TextField, TextAreaField } from "../ui/FormField";
 // Constants and helper functions for the ItemWarrantyEditor component.
 const warrantyTypes: WarrantyType[] = ["statutory", "manufacturer", "extended"];
 type WarrantyValues = Omit<WarrantyDraft, "id">;
-const emptyPending = () => ({
-  type: "statutory" as WarrantyType,
-  startDate: null as string | null,
-  endDate: "",
-  notes: "",
-});
 
 /**
  * Renders the fields for editing a warranty.
@@ -91,24 +85,18 @@ export default function ItemWarrantyEditor({
   controller: ReturnType<typeof useReceiptReview>;
 }) {
   const { t, i18n } = useTranslation();
-  const [pending, setPending] = useState(emptyPending);
-  const [attempted, setAttempted] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const values: WarrantyValues = {
-    ...pending,
-    startDate: pending.startDate ?? controller.draft.purchaseDate,
-  };
-  function reset() {
-    setPending(emptyPending());
-    setAttempted(false);
-    setEditingId(null);
-  }
-  function save() {
-    setAttempted(true);
-    if (warrantyDateIssue(values)) return;
-    if (editingId) controller.updateWarranty(item.id, editingId, values);
-    else controller.addWarranty(item.id, values);
-    reset();
+  const editing = item.warranties.find((entry) => entry.id === editingId);
+
+  // Function to add a new warranty entry for the item.
+  function add() {
+    const id = controller.addWarranty(item.id, {
+      type: "statutory",
+      startDate: controller.draft.purchaseDate,
+      endDate: "",
+      notes: "",
+    });
+    setEditingId(id);
   }
   const dateLabel = (value: string) => {
     const date = new Date(`${value}T12:00:00`);
@@ -117,91 +105,82 @@ export default function ItemWarrantyEditor({
       : date.toLocaleDateString(i18n.resolvedLanguage);
   };
   return (
-    <details className="border-t border-shell pt-3">
-      <summary className="cursor-pointer text-xs font-medium text-muted">
-        {t("pages.import.review.warrantyCount", {
-          count: item.warranties.length,
-        })}
-      </summary>
-      <div className="mt-4 space-y-4">
-        <WarrantyFields
-          warranty={values}
-          onChange={(changes) =>
-            setPending((current) => ({ ...current, ...changes }))
-          }
-          showIssue={attempted}
-        />
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={save}
-            className="rounded-lg border border-shell px-3 py-2 text-xs font-medium hover:bg-surface-hover"
-          >
-            {t(
-              editingId
-                ? "pages.import.review.saveWarranty"
-                : "pages.import.review.addWarranty",
-            )}
-          </button>
-          {editingId && (
-            <button
-              type="button"
-              onClick={reset}
-              className="rounded-lg px-3 py-2 text-xs text-muted hover:text-accent"
-            >
-              {t("pages.import.review.cancel")}
-            </button>
-          )}
-        </div>
-        {item.warranties.map((warranty) => (
+    <section className="space-y-3 border-t border-shell pt-4">
+      <h5 className="text-sm font-semibold">
+        {t("pages.import.review.warrantyHeading")}
+      </h5>
+      {item.warranties.length === 0 && (
+        <p className="text-xs text-muted">
+          {t("pages.import.review.noWarranty")}
+        </p>
+      )}
+      {item.warranties.map((warranty) => {
+        const open =
+          editing?.id === warranty.id || warrantyDateIssue(warranty) !== null;
+        return (
           <div
             key={warranty.id}
-            className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-shell bg-canvas/30 p-3"
+            className="space-y-3 rounded-xl border border-shell p-3"
           >
-            <div className="min-w-0 space-y-1 text-xs">
-              <p className="font-medium">
-                {t(`pages.import.review.warrantyTypes.${warranty.type}`)}
-              </p>
-              <p className="text-muted">
-                {dateLabel(warranty.startDate)} – {dateLabel(warranty.endDate)}
-              </p>
-              {warranty.notes && (
-                <p className="wrap-break-word whitespace-pre-wrap text-muted">
-                  {warranty.notes}
+            {open ? (
+              <WarrantyFields
+                warranty={warranty}
+                onChange={(changes) => {
+                  setEditingId(warranty.id);
+                  controller.updateWarranty(item.id, warranty.id, changes);
+                }}
+                showIssue
+              />
+            ) : (
+              <div className="space-y-1 text-xs">
+                <p className="font-medium">
+                  {t(`pages.import.review.warrantyTypes.${warranty.type}`)}
                 </p>
-              )}
-            </div>
-            <div className="ml-auto flex gap-3">
+                <p className="text-muted">
+                  {dateLabel(warranty.startDate)} –{" "}
+                  {dateLabel(warranty.endDate)}
+                </p>
+                {warranty.notes && (
+                  <p className="wrap-break-word whitespace-pre-wrap text-muted">
+                    {warranty.notes}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setEditingId(warranty.id);
-                  setPending({
-                    type: warranty.type,
-                    startDate: warranty.startDate,
-                    endDate: warranty.endDate,
-                    notes: warranty.notes,
-                  });
-                  setAttempted(false);
-                }}
-                className="cursor-pointer rounded text-xs text-accent hover:underline"
+                disabled={open && warrantyDateIssue(warranty) !== null}
+                onClick={() => setEditingId(open ? null : warranty.id)}
+                className="rounded text-xs text-accent hover:underline disabled:opacity-50"
               >
-                {t("pages.import.review.editWarranty")}
+                {t(
+                  open
+                    ? "pages.import.review.finishWarranty"
+                    : "pages.import.review.editWarranty",
+                )}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   controller.removeWarranty(item.id, warranty.id);
-                  if (editingId === warranty.id) reset();
+                  if (editingId === warranty.id) setEditingId(null);
                 }}
-                className="cursor-pointer rounded text-xs text-muted hover:text-accent"
+                className="rounded text-xs text-muted hover:text-accent"
               >
                 {t("pages.import.review.removeWarranty")}
               </button>
             </div>
           </div>
-        ))}
-      </div>
-    </details>
+        );
+      })}
+      <button
+        type="button"
+        onClick={add}
+        className="rounded-lg border border-shell px-3 py-2 text-xs font-medium hover:bg-surface-hover"
+      >
+        {t("pages.import.review.addWarranty")}
+      </button>
+    </section>
   );
 }

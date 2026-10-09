@@ -6,9 +6,9 @@ import {
   removeReviewItem,
   chooseProduct,
   changeLineType,
+  addItemWarranty,
   reviewIssues,
   reviewSumStatus,
-  warrantyDateIssue,
   type ReviewDto,
   type ReviewDraft,
   type ItemDraft,
@@ -99,6 +99,7 @@ export function useReceiptReview(review: ReviewDto) {
   function addItem() {
     const item = createEmptyItem();
     setDraft((current) => ({ ...current, items: [...current.items, item] }));
+    return item.id;
   }
 
   /**
@@ -158,16 +159,12 @@ export function useReceiptReview(review: ReviewDto) {
    * @param values - The values for the new warranty, excluding the ID.
    */
   function addWarranty(id: string, values: Omit<WarrantyDraft, "id">) {
-    if (warrantyDateIssue(values)) return;
     const warranty: WarrantyDraft = {
       ...values,
       id: crypto.randomUUID(),
     };
-    changeItem(id, (item) =>
-      item.lineType === "product"
-        ? { ...item, warranties: [...item.warranties, warranty] }
-        : item,
-    );
+    changeItem(id, (item) => addItemWarranty(item, warranty));
+    return warranty.id;
   }
 
   /**
