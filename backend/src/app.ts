@@ -12,6 +12,7 @@ import { registerReceiptRoutes } from "./routes/receipt-routes.js";
 import { registerScanRoutes } from "./routes/scan-routes.js";
 import { registerAnalyticsRoutes } from "./routes/analytics-routes.js";
 import { registerWarrantyRoutes } from "./routes/warranty-routes.js";
+import { registerFrontendServing } from "./frontend-serving.js";
 
 /**
  * Creates and configures an Express application with routes for lookups, receipts, and scans.
@@ -21,6 +22,7 @@ import { registerWarrantyRoutes } from "./routes/warranty-routes.js";
  * @param resolveProvider - Resolves the provider for each process request.
  * @param dataRoot - The root directory for storing scan and receipt data.
  * @param logger - The logger instance for logging application events.
+ * @param frontendRoot - Optional production frontend build directory.
  * @returns The configured Express application.
  */
 export function createApp(
@@ -30,6 +32,7 @@ export function createApp(
   dataRoot = resolve(process.cwd(), "../data"),
   logger: Logger = silentLogger,
   settings = new ProviderSettingsService(db),
+  frontendRoot?: string,
 ) {
   const app = express();
 
@@ -50,6 +53,8 @@ export function createApp(
   );
   registerScanRoutes(app, scans, db, processing, dataRoot, logger);
   registerSettingsRoutes(app, settings, logger);
+
+  if (frontendRoot) registerFrontendServing(app, frontendRoot);
 
   // Global error handler
   const handleError: ErrorRequestHandler = (error, request, response, next) => {

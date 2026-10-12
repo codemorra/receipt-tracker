@@ -20,9 +20,12 @@ export function createBackendLifecycle(
   function stop(): void {
     if (stopped) return;
     stopped = true;
-    worker.stop();
-    if (server) server.close(closeDatabase);
-    else closeDatabase();
+    const closeResources = () => {
+      worker.stop();
+      closeDatabase();
+    };
+    if (server) server.close(closeResources);
+    else closeResources();
   }
 
   // Starts the backend server, including the Python worker and the HTTP server. Returns true if the server started successfully, false if it was stopped before starting.

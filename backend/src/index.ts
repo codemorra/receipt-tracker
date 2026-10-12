@@ -69,6 +69,9 @@ try {
     resolve(projectRoot, "data"),
     logger,
     settings,
+    process.env.NODE_ENV === "production"
+      ? resolve(projectRoot, "frontend/dist")
+      : undefined,
   );
   const port = Number(process.env.PORT ?? 3000);
 
