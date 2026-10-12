@@ -210,13 +210,53 @@ test("worker carries preview orientation and sends the selected process rotation
 
 // Test case for verifying that requests wait for the worker to become ready if it is delayed.
 test("requests wait for delayed worker readiness", async (t) => {
-  const worker = new PythonWorkerClient(process.execPath, [fixture, "50"]);
+  const worker = new PythonWorkerClient(
+    process.execPath,
+    [fixture, "50"],
+    undefined,
+    undefined,
+    5_000,
+  );
   t.after(() => worker.stop());
   const starting = worker.start();
   assert.equal(worker.state, "starting");
   const preview = worker.requestPreview("10", "preview.webp");
   await starting;
   assert.equal((await preview).width, 10);
+});
+
+// Test case for verifying that the worker immediately rejects startup if the process exits before becoming ready.
+test("process exit before ready immediately rejects startup", async (t) => {
+  const worker = new PythonWorkerClient(process.execPath, [
+    "-e",
+    "process.exit(2)",
+  ]);
+  t.after(() => worker.stop());
+  await assert.rejects(worker.start(), {
+    message: "Worker stopped with code 2",
+  });
+  assert.equal(worker.state, "failed");
+});
+
+// Test case for verifying that the worker immediately rejects startup if the spawn fails.
+test("spawn failure immediately rejects startup", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "receipt-worker-spawn-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const worker = new PythonWorkerClient(join(directory, "missing-python"), []);
+  t.after(() => worker.stop());
+  await assert.rejects(worker.start(), /ENOENT/);
+  assert.equal(worker.state, "failed");
+});
+
+// Test case for verifying that the worker immediately rejects startup if the startup protocol is invalid.
+test("invalid startup protocol immediately rejects startup", async (t) => {
+  const worker = new PythonWorkerClient(process.execPath, [
+    "-e",
+    "process.stdout.write('invalid\\n'); process.stdin.resume()",
+  ]);
+  t.after(() => worker.stop());
+  await assert.rejects(worker.start(), { message: "Invalid worker JSON" });
+  assert.equal(worker.state, "failed");
 });
 
 // Test case for verifying that the worker correctly handles failed recovery and rejects subsequent requests without entering a retry loop.
@@ -289,16 +329,19 @@ test("startup timeout fails the worker and rejects waiting requests", async (t) 
   ]);
   t.after(() => worker.stop());
   const starting = assert.rejects(worker.start(), {
-    message: "Worker startup timed out",
+    message: "Worker startup timed out after 180000 ms",
   });
   const preview = assert.rejects(
     worker.requestPreview("10", "preview.webp"),
     WorkerUnavailableError,
   );
   await new Promise<void>((resolve) => setImmediate(resolve));
-  t.mock.timers.tick(30_000);
+  t.mock.timers.tick(179_999);
+  assert.equal(worker.state, "starting");
+  t.mock.timers.tick(1);
   await Promise.all([starting, preview]);
   assert.equal(worker.state, "failed");
+  t.mock.timers.reset();
 });
 
 // Test case for verifying that a request timeout correctly rejects queued work and allows a fresh attempt.
