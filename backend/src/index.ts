@@ -12,6 +12,10 @@ import {
   type Logger,
 } from "./logger.js";
 import { PythonWorkerClient } from "./worker/python-worker-client.js";
+import {
+  parseWorkerStartTimeout,
+  WorkerStartupConfigurationError,
+} from "./worker/startup-timeout.js";
 import { ScanSessionService } from "./scans/scan-session-service.js";
 
 // Determine the project root directory based on the current file location.
@@ -33,10 +37,14 @@ const logFile =
   process.env.LOG_FILE ?? resolve(projectRoot, "data/logs/backend.log");
 
 let logger: Logger = silentLogger;
-let startupPhase = "logging";
+let startupPhase = "worker configuration";
 
 // Initialize the logger and track the startup phase.
 try {
+  const workerStartTimeoutMs = parseWorkerStartTimeout(
+    process.env.PYTHON_WORKER_START_TIMEOUT_MS,
+  );
+  startupPhase = "logging";
   logger = createFileLogger(logFile);
   logger("info", "backend.starting");
   startupPhase = "database migration";
@@ -51,6 +59,7 @@ try {
     ["-m", "python_worker.worker"],
     projectRoot,
     logger,
+    workerStartTimeoutMs,
   );
   const scans = new ScanSessionService(scansRoot, worker, logger);
   const app = createApp(
@@ -90,7 +99,9 @@ try {
   });
   console.error(
     `Backend startup failed during ${startupPhase}`,
-    errorType(error),
+    error instanceof WorkerStartupConfigurationError
+      ? error.message
+      : errorType(error),
   );
   process.exitCode = 1;
 }

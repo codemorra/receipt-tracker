@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { errorType, silentLogger, type Logger } from "../logger.js";
+import { DEFAULT_WORKER_START_TIMEOUT_MS } from "./startup-timeout.js";
 import {
   isPreviewResult,
   isProcessResult,
@@ -42,6 +43,7 @@ export class PythonWorkerClient {
     private readonly args: string[],
     private readonly cwd?: string,
     private readonly logger: Logger = silentLogger,
+    private readonly startupTimeoutMs = DEFAULT_WORKER_START_TIMEOUT_MS,
   ) {}
 
   // Starts the Python worker process and returns a promise that resolves when the worker is ready.
@@ -97,8 +99,15 @@ export class PythonWorkerClient {
             );
           });
           this.startupTimeout = setTimeout(() => {
-            this.fail(new WorkerUnavailableError("Worker startup timed out"));
-          }, 30_000);
+            this.logger("error", "worker.startup.timed_out", {
+              durationMs: this.startupTimeoutMs,
+            });
+            this.fail(
+              new WorkerUnavailableError(
+                `Worker startup timed out after ${this.startupTimeoutMs} ms`,
+              ),
+            );
+          }, this.startupTimeoutMs);
         } catch (error) {
           this.fail(error instanceof Error ? error : new Error(String(error)));
         }
