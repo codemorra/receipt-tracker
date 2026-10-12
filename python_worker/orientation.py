@@ -7,6 +7,18 @@ import numpy
 from PIL import Image
 
 
+def create_orientation_model():
+    """Construct the production orientation model, propagating setup failures."""
+    with redirect_stdout(sys.stderr):
+        from paddleocr import (  # type: ignore[import-untyped]
+            DocImgOrientationClassification,
+        )
+
+        return DocImgOrientationClassification(
+            model_name="PP-LCNet_x1_0_doc_ori", device="cpu", enable_hpi=True
+        )
+
+
 @cache
 def initialize_orientation():
     """Initialize the orientation model.
@@ -15,14 +27,7 @@ def initialize_orientation():
         DocImgOrientationClassification or None: The initialized orientation model, or None if initialization failed.
     """
     try:
-        with redirect_stdout(sys.stderr):
-            from paddleocr import (  # type: ignore[import-untyped]
-                DocImgOrientationClassification,
-            )
-
-            return DocImgOrientationClassification(
-                model_name="PP-LCNet_x1_0_doc_ori", device="cpu", enable_hpi=True
-            )
+        return create_orientation_model()
     except (ImportError, OSError, RuntimeError, ValueError) as error:
         print(
             f"Receipt orientation initialization failed: {type(error).__name__}",

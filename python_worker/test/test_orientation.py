@@ -10,6 +10,27 @@ from python_worker.final_image import create_final_images
 from python_worker.preview import create_preview, default_corners
 
 
+def test_setup_factory_propagates_errors_that_runtime_tolerates(monkeypatch):
+    """Test that the setup factory propagates errors that are tolerated at runtime."""
+    calls = []
+
+    def initialize(**options):
+        calls.append(options)
+        raise RuntimeError("Orientation model unavailable")
+
+    monkeypatch.setitem(sys.modules, "paddleocr", SimpleNamespace(DocImgOrientationClassification=initialize))
+    orientation.initialize_orientation.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="Orientation model unavailable"):
+            orientation.create_orientation_model()
+        assert orientation.initialize_orientation() is None
+        assert calls == [{
+            "model_name": "PP-LCNet_x1_0_doc_ori", "device": "cpu", "enable_hpi": True,
+        }] * 2
+    finally:
+        orientation.initialize_orientation.cache_clear()
+
+
 @pytest.mark.parametrize("error_type", [ImportError, OSError, RuntimeError, ValueError])
 def test_expected_initialization_failures_leave_manual_orientation_available(monkeypatch, error_type):
     """Test that expected initialization failures leave manual orientation available."""
