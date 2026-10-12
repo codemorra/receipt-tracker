@@ -95,3 +95,64 @@ test("shutdown during initialization never opens the HTTP port", async () => {
   assert.equal(await starting, false);
   assert.equal(databaseCloses, 1);
 });
+
+// Test that shutting down the backend during an active request allows the request to complete before stopping the worker and closing the database.
+test("shutdown drains an active request before stopping the worker and closing the database", async (t) => {
+  let finish!: () => void;
+  const finishRequest = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  let entered!: () => void;
+  const requestEntered = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let closed!: () => void;
+  const databaseClosed = new Promise<void>((resolve) => {
+    closed = resolve;
+  });
+  const events: string[] = [];
+  const server = createServer(async (_request, response) => {
+    entered();
+    await finishRequest;
+    assert.equal(events.includes("worker.stop"), false);
+    events.push("request.complete");
+    response.end("completed with worker available");
+  });
+  const lifecycle = createBackendLifecycle(
+    {
+      start: async () => {},
+      stop: () => {
+        events.push("worker.stop");
+      },
+    },
+    () => server.listen(0, "127.0.0.1"),
+    () => {
+      events.push("database.close");
+      closed();
+    },
+  );
+  t.after(() => {
+    finish();
+    lifecycle.stop();
+  });
+  await lifecycle.start();
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const response = fetch(`http://127.0.0.1:${address.port}/`);
+  await requestEntered;
+  lifecycle.stop();
+  lifecycle.stop();
+  assert.equal(server.listening, false);
+  assert.deepEqual(events, []);
+  finish();
+  assert.equal(
+    await (await response).text(),
+    "completed with worker available",
+  );
+  await databaseClosed;
+  assert.deepEqual(events, [
+    "request.complete",
+    "worker.stop",
+    "database.close",
+  ]);
+});
