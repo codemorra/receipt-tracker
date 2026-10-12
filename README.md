@@ -41,6 +41,26 @@ Receipts reference merchants and products, while aliases allow confirmed labels 
 
 ## Getting started
 
+The recommended way to run Receipt Tracker is with Docker.
+
+### Self-hosted Docker
+
+The Docker setup uses a Linux amd64 container with CPU OCR. It is tested on Linux and can also run through Docker Desktop on Windows and macOS, although these platforms are currently unverified.
+
+Clone the repository and start the application with Docker Compose:
+
+```bash
+git clone https://github.com/codemorra/receipt-tracker.git
+cd receipt-tracker
+docker compose up --build -d
+```
+
+Open `http://localhost:3000` and configure a provider in **Settings**. The first build takes longer because it installs Python/OCR dependencies and prepares the models. Application data and the API-key master key persist in Docker volumes.
+
+OpenAI uses normal outgoing HTTPS. For Ollama, enter a base URL reachable **from the container**; for Ollama on the host or a container with a host-published port, this can be `http://host.docker.internal:11434`. See [Docker setup](docs/docker.md) for other Ollama setups, persistence and host-directory mounts.
+
+### Local development setup
+
 Requires Node.js 24, npm and Python 3.12. The following setup assumes Linux.
 
 **1. Clone the repository and install Node.js dependencies.**
@@ -98,7 +118,7 @@ Receipt extraction is currently tuned for OpenAI `gpt-6-luna` and `qwen3.8:27b` 
 Open **Settings**, choose **Add provider**, configure and enable it, then select a default:
 
 - **OpenAI:** API key and model (`gpt-6-luna`).
-- **Ollama:** local base URL (initially `http://127.0.0.1:11434`) and model (`qwen3.8:27b`). Start Ollama and download the model with `ollama pull qwen3.8:27b` before importing.
+- **Ollama:** a base URL reachable from the backend (`http://127.0.0.1:11434` for local setup; see [Docker setup](docs/docker.md#provider-addresses) for containers) and model (`qwen3.8:27b`). Start Ollama and download the model with `ollama pull qwen3.8:27b` before importing.
 
 Providers start unconfigured. Settings saved in SQLite control provider configuration at runtime; provider environment variables are not used. A provider can also be selected per import. There is no automatic provider fallback.
 
