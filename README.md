@@ -60,9 +60,10 @@ python3.12 -m venv python_worker/.venv
 source python_worker/.venv/bin/activate
 python -m pip install -r python_worker/requirements.txt
 paddleocr install_hpi_deps cpu
+python -m python_worker.prepare_models
 ```
 
-See the [worker README](python_worker/README.md) for worker details and tests. OCR models are downloaded on first initialization.
+The prepare command downloads the required OCR and orientation models and prepares HPI artifacts before the application starts. Its first run can take several minutes; later runs reuse the local cache. See the [worker README](python_worker/README.md) for details and tests.
 
 **3. Start the backend.**
 

@@ -29,6 +29,14 @@ class PaddleOCR:
             raise ValueError("Unexpected PaddleOCR configuration")
         print("PaddleOCR initialized")
         os.write(1, b"Native OCR initialization log\n")
+        self.paddlex_pipeline = SimpleNamespace(text_rec_model=self.recognize)
+
+    def recognize(self, crops):
+        """Mock recognize method for the PaddleOCR class."""
+        if os.environ.get("OCR_TEST_FAIL_RECOGNIZE"):
+            raise RuntimeError("Recognition prediction failed")
+        print("Recognition predicted")
+        return [{"rec_text": "RECEIPT", "rec_score": 0.95} for _ in crops]
 
     def predict(self, path):
         """Mock predict method for the PaddleOCR class."""
